@@ -1,0 +1,43 @@
+/* Modern Phone Input Styling */
+.phone-input-modern .PhoneInputInput {
+  @apply rounded-xl border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 h-12 px-4 text-base transition-colors !important;
+  border: 1px solid rgb(229 231 235) !important;
+  outline: none !important;
+}
+
+.phone-input-modern .PhoneInputInput:focus {
+  border-color: rgb(59 130 246) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+.phone-input-modern .PhoneInputCountrySelect {
+  @apply rounded-l-xl border-gray-200 h-12 px-3 bg-gray-50 hover:bg-gray-100 transition-colors !important;
+  border: 1px solid rgb(229 231 235) !important;
+  border-right: none !important;
+}
+
+.phone-input-modern .PhoneInputCountryIcon {
+  @apply w-6 h-4 !important;
+}
+
+.phone-input-modern .PhoneInputCountrySelectArrow {
+  @apply text-gray-400 !important;
+}
+
+.phone-input-modern {
+  @apply flex !important;
+}
+
+.phone-input-modern .PhoneInputCountrySelect:focus {
+  border-color: rgb(59 130 246) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Remove default phone input styling conflicts */
+.phone-input-container .PhoneInput {
+  @apply w-full !important;
+}
+
+.phone-input-container .PhoneInputInput {
+  @apply w-full !important;
+}
