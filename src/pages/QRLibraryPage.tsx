@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog'
 import { 
   QrCode, 
@@ -19,8 +18,10 @@ import {
   FileImage,
   Grid3X3,
   List,
-  Plus
+  Plus,
+  Trash2
 } from 'lucide-react'
+import { supabase } from '../services/supabase'
 
 interface QRCodeItem {
   id: string
@@ -42,7 +43,6 @@ export default function QRLibraryPage() {
   const [qrCodes, setQrCodes] = useState<QRCodeItem[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCustomer, setSelectedCustomer] = useState('all')
-  const [selectedCategory, setSelectedCategory] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [loading, setLoading] = useState(true)
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
@@ -64,53 +64,48 @@ export default function QRLibraryPage() {
     loadQRCodes()
   }, [navigate])
 
-  const loadQRCodes = async () => {
-    // For now, we'll use mock data until you upload the zip files
-    const mockQRCodes: QRCodeItem[] = [
-      {
-        id: '1',
-        customer: 'Sunward Park',
-        area: 'Reception',
-        subArea: 'Main Desk',
-        floor: 'Ground Floor',
-        category: 'Office Areas',
-        qrCodeData: 'SP_RECEPTION_001',
-        createdAt: '2024-01-01'
-      },
-      {
-        id: '2',
-        customer: 'Sunward Park',
-        area: 'Toilet',
-        subArea: 'Male Toilet',
-        floor: 'Ground Floor',
-        category: 'Ablutions',
-        qrCodeData: 'SP_TOILET_M_001',
-        createdAt: '2024-01-01'
-      },
-      {
-        id: '3',
-        customer: 'Box Office',
-        area: 'Reception',
-        subArea: 'Customer Service',
-        floor: 'Ground Floor',
-        category: 'Office Areas',
-        qrCodeData: 'BO_RECEPTION_001',
-        createdAt: '2024-01-01'
-      },
-      {
-        id: '4',
-        customer: 'Box Office',
-        area: 'Kitchen',
-        subArea: 'Staff Kitchen',
-        floor: 'First Floor',
-        category: 'Kitchen Areas',
-        qrCodeData: 'BO_KITCHEN_001',
-        createdAt: '2024-01-01'
-      }
-    ]
+  const loadQRCodes = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     
-    setQrCodes(mockQRCodes)
-    setLoading(false)
+    try {
+      const { data, error } = await supabase
+        .from('building_qr_codes')
+        .select('qr_code_id, customer_name, building_area, area_description, qr_code_url, qr_code_image_path, created_at, is_active')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+      
+      if (error) {
+        console.error('Error loading QR codes:', error)
+        return
+      }
+      
+      if (data) {
+        const mapped: QRCodeItem[] = data.map((row: any) => {
+          let parsed: any
+          try { parsed = JSON.parse(row.qr_code_url) } catch { parsed = {} }
+          return {
+            id: row.qr_code_id,
+            customer: row.customer_name || parsed.customerName || '',
+            area: row.building_area || parsed.metadata?.areaName || parsed.metadata?.siteName || '',
+            subArea: row.area_description || parsed.type || '',
+            floor: parsed.metadata?.floor || '',
+            category: parsed.metadata?.category || row.category || '',
+            qrCodeData: row.qr_code_url,
+            imageUrl: row.qr_code_image_path,
+            createdAt: row.created_at
+          }
+        })
+        
+        // Hide legacy/mock rows (e.g., base64 images or placeholder data)
+        const filtered = mapped.filter(qr => typeof qr.imageUrl === 'string' && /^(https?:)?\/\//.test(qr.imageUrl || ''))
+        console.log(`Loaded ${filtered.length} QR codes`)
+        setQrCodes(filtered)
+      }
+    } catch (error) {
+      console.error('Error in loadQRCodes:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (!userType || !userId || !userName) {
@@ -121,31 +116,121 @@ export default function QRLibraryPage() {
     )
   }
 
-  const customers = [...new Set(qrCodes.map(qr => qr.customer))]
-  const categories = [...new Set(qrCodes.map(qr => qr.category))]
+  const customers = [...new Set(qrCodes.map(qr => qr.customer).filter(Boolean))]
 
   const filteredQRCodes = qrCodes.filter(qr => {
     const matchesSearch = qr.area.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          qr.subArea.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          qr.customer.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesCustomer = selectedCustomer === 'all' || qr.customer === selectedCustomer
-    const matchesCategory = selectedCategory === 'all' || qr.category === selectedCategory
     
-    return matchesSearch && matchesCustomer && matchesCategory
+    return matchesSearch && matchesCustomer
   })
 
-  const generateQRCodeImage = (data: string) => {
-    // This would typically generate a QR code image
-    // For now, we'll return a placeholder
-    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data)}`
+  const generateQRCodeImage = (data: string, fallbackUrl?: string) => {
+    try {
+      const parsed = JSON.parse(data)
+      // If we stored imageUrl separately, prefer it
+      if (fallbackUrl) return fallbackUrl
+      // Otherwise generate a QR from the encoded payload
+      return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data)}`
+    } catch {
+      return fallbackUrl || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data)}`
+    }
   }
 
-  const handleUploadComplete = (uploadedFiles: any[]) => {
-    console.log('Upload completed:', uploadedFiles)
-    // Here you would typically save the new QR codes to your database
-    // and refresh the QR codes list
-    setUploadDialogOpen(false)
-    loadQRCodes() // Refresh the list
+  const handleUploadComplete = async (uploadedFiles: any[]) => {
+    // If at least one succeeded, refresh the library and close dialog
+    const anyCompleted = uploadedFiles.some((f) => f.status === 'completed')
+    if (anyCompleted) {
+      await loadQRCodes(true)
+      setUploadDialogOpen(false)
+    }
+  }
+
+  const handleDeleteQR = async (qrId: string) => {
+    if (!confirm('Are you sure you want to delete this QR code?')) return
+    
+    // Optimistically remove from UI first
+    const originalQrCodes = [...qrCodes]
+    setQrCodes(prev => prev.filter(qr => qr.id !== qrId))
+    
+    try {
+      console.log('Deleting QR code:', qrId)
+      
+      // Perform the delete operation (mark as inactive)
+      const { data, error } = await supabase
+        .from('building_qr_codes')
+        .update({ 
+          is_active: false,
+          deactivated_at: new Date().toISOString()
+        })
+        .eq('qr_code_id', qrId)
+        .select('qr_code_id, is_active')
+      
+      if (error) {
+        console.error('Delete error:', error)
+        setQrCodes(originalQrCodes)
+        alert(`Failed to delete QR code: ${error.message}`)
+        return
+      }
+      
+      if (!data || data.length === 0) {
+        console.warn('QR code not found in database')
+        // Keep it removed from UI since it doesn't exist
+        return
+      }
+      
+      console.log('QR code successfully deleted')
+      
+    } catch (error) {
+      console.error('Delete exception:', error)
+      setQrCodes(originalQrCodes)
+      alert(`An error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  const handleDownloadQR = async (qr: QRCodeItem) => {
+    try {
+      const imageUrl = qr.imageUrl || generateQRCodeImage(qr.qrCodeData, qr.imageUrl)
+      
+      // Create a temporary link to download the image
+      const link = document.createElement('a')
+      link.href = imageUrl
+      link.download = `${qr.customer}_${qr.area}_QR.png`
+      link.target = '_blank'
+      
+      // For external URLs (like Supabase storage), we need to fetch and create blob
+      if (imageUrl.startsWith('http')) {
+        const response = await fetch(imageUrl)
+        const blob = await response.blob()
+        const blobUrl = URL.createObjectURL(blob)
+        link.href = blobUrl
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(blobUrl)
+      } else {
+        // For data URLs, direct download
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }
+    } catch (error) {
+      console.error('Error downloading QR code:', error)
+      alert('Failed to download QR code. Please try again.')
+    }
+  }
+
+  const getTypeColor = (type: string) => {
+    switch (type?.toUpperCase()) {
+      case 'CLOCK_IN': return 'bg-green-100 text-green-700'
+      case 'CLOCK_OUT': return 'bg-red-100 text-red-700'
+      case 'AREA': return 'bg-blue-100 text-blue-700'
+      case 'TASK': return 'bg-yellow-100 text-yellow-700'
+      case 'FEEDBACK': return 'bg-purple-100 text-purple-700'
+      default: return 'bg-gray-100 text-gray-700'
+    }
   }
 
   return (
@@ -162,30 +247,23 @@ export default function QRLibraryPage() {
           <div className="flex gap-3">
             <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2">
+                <Button className="gap-2 rounded-full text-white" style={{ backgroundColor: '#00339B' }}>
                   <Upload className="h-4 w-4" />
                   Upload QR Codes
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto !rounded-3xl border-0 p-6 shadow-2xl bg-white">
                 <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <Plus className="h-5 w-5" />
-                    Upload Customer QR Code Collections
-                  </DialogTitle>
+                  <DialogTitle className="sr-only">Upload QR Codes</DialogTitle>
                 </DialogHeader>
                 <QRUploadManager onUploadComplete={handleUploadComplete} />
               </DialogContent>
             </Dialog>
-            <Button variant="outline" className="gap-2">
-              <Download className="h-4 w-4" />
-              Export All
-            </Button>
           </div>
         </div>
 
         {/* Filters and Search */}
-        <Card className="card-modern border-0 shadow-xl">
+        <Card className="border-0 shadow-xl rounded-3xl">
           <CardContent className="p-6">
             <div className="flex flex-col lg:flex-row gap-4 items-end">
               <div className="flex-1">
@@ -196,7 +274,7 @@ export default function QRLibraryPage() {
                     placeholder="Search by area, customer, or location..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 rounded-full border-gray-200 focus:border-gray-300 focus:ring-gray-200/50"
                   />
                 </div>
               </div>
@@ -207,7 +285,7 @@ export default function QRLibraryPage() {
                   <select
                     value={selectedCustomer}
                     onChange={(e) => setSelectedCustomer(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00339B] bg-white"
                   >
                     <option value="all">All Customers</option>
                     {customers.map(customer => (
@@ -215,24 +293,10 @@ export default function QRLibraryPage() {
                     ))}
                   </select>
                 </div>
-                
-                <div>
-                  <label className="text-sm font-medium text-gray-600 mb-2 block">Category</label>
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="all">All Categories</option>
-                    {categories.map(category => (
-                      <option key={category} value={category}>{category}</option>
-                    ))}
-                  </select>
-                </div>
 
                 <div>
                   <label className="text-sm font-medium text-gray-600 mb-2 block">View</label>
-                  <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                  <div className="flex rounded-xl border border-gray-200 overflow-hidden bg-white">
                     <Button
                       variant={viewMode === 'grid' ? 'default' : 'ghost'}
                       size="sm"
@@ -257,49 +321,26 @@ export default function QRLibraryPage() {
         </Card>
 
         {/* Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="card-modern border-0 shadow-lg">
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-blue-600 mb-1">{qrCodes.length}</div>
-              <div className="text-sm text-gray-600">Total QR Codes</div>
-            </CardContent>
-          </Card>
-          <Card className="card-modern border-0 shadow-lg">
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-green-600 mb-1">{customers.length}</div>
-              <div className="text-sm text-gray-600">Customers</div>
-            </CardContent>
-          </Card>
-          <Card className="card-modern border-0 shadow-lg">
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-indigo-600 mb-1">{categories.length}</div>
-              <div className="text-sm text-gray-600">Categories</div>
-            </CardContent>
-          </Card>
-          <Card className="card-modern border-0 shadow-lg">
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-orange-600 mb-1">{filteredQRCodes.length}</div>
-              <div className="text-sm text-gray-600">Filtered Results</div>
-            </CardContent>
-          </Card>
+        <div className="flex justify-center gap-8 py-6">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-[#00339B] mb-1">{qrCodes.length}</div>
+            <div className="text-sm font-medium text-gray-500">Total QR Codes</div>
+          </div>
+          <div className="w-px bg-gray-200"></div>
+          <div className="text-center">
+            <div className="text-3xl font-bold text-gray-700 mb-1">{customers.length}</div>
+            <div className="text-sm font-medium text-gray-500">Customers</div>
+          </div>
+          <div className="w-px bg-gray-200"></div>
+          <div className="text-center">
+            <div className="text-3xl font-bold text-[#dc2626] mb-1">{filteredQRCodes.length}</div>
+            <div className="text-sm font-medium text-gray-500">Filtered Results</div>
+          </div>
         </div>
 
         {/* QR Codes Display */}
-        <Tabs defaultValue="library" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="library">QR Library</TabsTrigger>
-            <TabsTrigger value="categories">By Categories</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="library">
-            <Card className="card-modern border-0 shadow-xl">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3">
-                  <QrCode className="h-6 w-6 text-blue-600" />
-                  QR Code Collection
-                </CardTitle>
-              </CardHeader>
-          <CardContent>
+        <Card className="card-modern border-0 shadow-xl">
+          <CardContent className="p-6">
             {loading ? (
               <div className="flex justify-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
@@ -313,35 +354,44 @@ export default function QRLibraryPage() {
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredQRCodes.map((qr) => (
-                  <Card key={qr.id} className="card-modern border-0 shadow-lg hover:shadow-xl transition-shadow">
+                  <Card key={qr.id} className="border-0 shadow-lg hover:shadow-xl transition-shadow rounded-2xl">
                     <CardContent className="p-4">
-                      <div className="text-center space-y-3">
+                      <div className="text-center flex flex-col h-full">
                         <img
-                          src={generateQRCodeImage(qr.qrCodeData)}
+                          src={qr.imageUrl || generateQRCodeImage(qr.qrCodeData, qr.imageUrl)}
                           alt={`QR Code for ${qr.area}`}
-                          className="w-32 h-32 mx-auto border rounded-lg"
+                          className="w-32 h-32 mx-auto border border-gray-200 rounded-xl"
                         />
-                        <div>
+                        <div className="mt-3 space-y-2">
                           <h3 className="font-semibold text-gray-900">{qr.area}</h3>
-                          <p className="text-sm text-gray-600">{qr.subArea}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <Badge className="bg-blue-100 text-blue-700">{qr.customer}</Badge>
-                          <div className="text-xs text-gray-500">
-                            <div className="flex items-center gap-1 justify-center">
-                              <Building2 className="h-3 w-3" />
-                              {qr.floor}
-                            </div>
-                            <div className="flex items-center gap-1 justify-center">
-                              <MapPin className="h-3 w-3" />
-                              {qr.category}
-                            </div>
+                          <div className="flex gap-2 justify-center flex-wrap">
+                            <Badge className="bg-blue-100 text-blue-700 rounded-full px-3 py-1">{qr.customer}</Badge>
+                            <Badge className={`${getTypeColor(qr.subArea)} rounded-full px-3 py-1`}>{qr.subArea}</Badge>
                           </div>
                         </div>
-                        <Button size="sm" className="w-full gap-2">
-                          <Download className="h-3 w-3" />
-                          Download
-                        </Button>
+                        <div className="mt-auto pt-4">
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              className="flex-1 h-9 gap-2 rounded-full text-white transition-all duration-200 hover:shadow-lg hover:scale-[1.02]" 
+                              style={{ backgroundColor: '#00339B' }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1e3a8a'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#00339B'}
+                              onClick={() => handleDownloadQR(qr)}
+                            >
+                              <Download className="h-3 w-3" />
+                              Download
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="w-10 h-9 rounded-full border-red-200 text-red-600 p-0 transition-all duration-200 hover:bg-red-100 hover:border-red-400 hover:text-red-700 hover:shadow-lg hover:scale-[1.05]"
+                              onClick={() => handleDeleteQR(qr.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -350,68 +400,48 @@ export default function QRLibraryPage() {
             ) : (
               <div className="space-y-3">
                 {filteredQRCodes.map((qr) => (
-                  <div key={qr.id} className="flex items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                  <div key={qr.id} className="flex items-center gap-4 p-4 border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors">
                     <img
                       src={generateQRCodeImage(qr.qrCodeData)}
                       alt={`QR Code for ${qr.area}`}
-                      className="w-16 h-16 border rounded"
+                      className="w-16 h-16 border border-gray-200 rounded-xl"
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold text-gray-900">{qr.area}</h3>
-                        <Badge className="bg-blue-100 text-blue-700">{qr.customer}</Badge>
+                        <Badge className="bg-blue-100 text-blue-700 rounded-full px-3 py-1">{qr.customer}</Badge>
+                        <Badge className={`${getTypeColor(qr.subArea)} rounded-full px-3 py-1`}>{qr.subArea}</Badge>
                       </div>
-                      <p className="text-sm text-gray-600">{qr.subArea} • {qr.floor} • {qr.category}</p>
+                      <p className="text-sm text-gray-600">{qr.floor} • {qr.category}</p>
                       <p className="text-xs text-gray-400 font-mono">{qr.qrCodeData}</p>
                     </div>
-                    <Button size="sm" variant="outline" className="gap-2">
-                      <Download className="h-3 w-3" />
-                      Download
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        className="h-9 gap-2 rounded-full text-white transition-all duration-200 hover:shadow-lg hover:scale-[1.02]" 
+                        style={{ backgroundColor: '#00339B' }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1e3a8a'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#00339B'}
+                        onClick={() => handleDownloadQR(qr)}
+                      >
+                        <Download className="h-3 w-3" />
+                        Download
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="w-10 h-9 rounded-full border-red-200 text-red-600 p-0 transition-all duration-200 hover:bg-red-100 hover:border-red-400 hover:text-red-700 hover:shadow-lg hover:scale-[1.05]"
+                        onClick={() => handleDeleteQR(qr.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="categories">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {categories.map((category) => {
-                const categoryQRs = filteredQRCodes.filter(qr => qr.category === category)
-                const customerGroups = [...new Set(categoryQRs.map(qr => qr.customer))]
-                
-                return (
-                  <Card key={category} className="card-modern border-0 shadow-lg">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <Building2 className="h-5 w-5 text-blue-600" />
-                        {category}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div className="text-sm text-gray-600">
-                          {categoryQRs.length} QR codes across {customerGroups.length} customers
-                        </div>
-                        {customerGroups.map((customer) => {
-                          const customerQRsInCategory = categoryQRs.filter(qr => qr.customer === customer)
-                          return (
-                            <div key={customer} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                              <span className="font-medium text-gray-900">{customer}</span>
-                              <Badge variant="secondary">{customerQRsInCategory.length}</Badge>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          </TabsContent>
-        </Tabs>
+          </CardContent>
+        </Card>
       </div>
     </Sidebar07Layout>
   )

@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Camera, QrCode, AlertCircle, CheckCircle2 } from 'lucide-react'
 import QrScanner from 'qr-scanner'
 import { QRService, QRCodeData } from '../../services/qrService'
+import { ClockOutValidator } from './ClockOutValidator'
+import { TaskSelector } from './TaskSelector'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Alert, AlertDescription } from '../ui/alert'
@@ -12,13 +14,21 @@ interface QRScannerProps {
   cleanerName: string
   onScanSuccess?: (data: QRCodeData) => void
   onScanError?: (error: string) => void
+  // Restrict which QR types are valid for this scanner instance
+  allowedTypes?: QRCodeData['type'][]
+  // Show clock-out option with validator when scanning (useful on area step)
+  showClockOutOption?: boolean
+  onClockOutSuccess?: () => void
 }
 
 export const QRScanner: React.FC<QRScannerProps> = ({
   cleanerId,
   cleanerName,
   onScanSuccess,
-  onScanError
+  onScanError,
+  allowedTypes,
+  showClockOutOption,
+  onClockOutSuccess
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [qrScanner, setQrScanner] = useState<QrScanner | null>(null)
@@ -30,6 +40,11 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
+  const [showTaskSelector, setShowTaskSelector] = useState(false)
+  const [currentQRData, setCurrentQRData] = useState<QRCodeData | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [wrongType, setWrongType] = useState<QRCodeData['type'] | null>(null)
+  const [showClockOut, setShowClockOut] = useState(false)
 
   useEffect(() => {
     return () => {
@@ -64,12 +79,40 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         videoRef.current,
         async (result) => {
           try {
-            const qrData = QRService.parseQRCode(result.data)
+            let qrData = QRService.parseQRCode(result.data)
             
             if (!qrData) {
-              setError('Invalid QR code format')
+              setError('Invalid QR code format. QR code should contain "Clock In" text or be in JSON format.')
               return
             }
+
+            // Ignore scans that don't match allowed types for this step
+            if (allowedTypes && !allowedTypes.includes(qrData.type)) {
+              setWrongType(qrData.type)
+              setTimeout(() => setWrongType(null), 1200)
+              return
+            }
+
+            // Throttle processing to avoid duplicate spam
+            if (isProcessing) return
+            setIsProcessing(true)
+
+            // Resolve canonical data from database by qr_code_id if available
+            try {
+              const { data: rows } = await (await import('../../services/supabase')).supabase
+                .from('building_qr_codes')
+                .select('qr_code_url, is_active')
+                .eq('qr_code_id', qrData.id)
+                .eq('is_active', true)
+                .limit(1)
+                .maybeSingle()
+              if (rows?.qr_code_url) {
+                const resolved = QRService.parseQRCode(rows.qr_code_url)
+                if (resolved) {
+                  qrData = resolved
+                }
+              }
+            } catch {}
 
             // Get user location if available
             let location: { latitude: number; longitude: number } | undefined
@@ -91,31 +134,56 @@ export const QRScanner: React.FC<QRScannerProps> = ({
               }
             }
 
-            // Process the QR scan
-            const success = await QRService.processQRScan(qrData, cleanerId, cleanerName, location)
+            // Check if this QR code should show task selector
+            // Only AREA QR codes show tasks, CLOCK_IN just processes the clock in
+            const shouldShowTasks = qrData.type === 'AREA'
             
-            setLastScan({
-              data: qrData,
-              timestamp: new Date(),
-              success
-            })
-
-            if (success) {
-              onScanSuccess?.(qrData)
+            if (shouldShowTasks) {
+              // Stop scanning and show task selector for AREA QR codes
+              setCurrentQRData(qrData)
+              setShowTaskSelector(true)
+              stopScanning()
+              
+              setLastScan({
+                data: qrData,
+                timestamp: new Date(),
+                success: true
+              })
             } else {
-              setError('Failed to process QR code scan')
-              onScanError?.('Failed to process QR code scan')
-            }
+              // For CLOCK_IN flows, move forward immediately once recognized
+              if (qrData.type === 'CLOCK_IN' && (!allowedTypes || allowedTypes.includes('CLOCK_IN'))) {
+                onScanSuccess?.(qrData)
+              }
 
-            // Brief pause before allowing next scan
-            setTimeout(() => {
-              setError(null)
-            }, 2000)
+              // Process in the background for CLOCK_IN/CLOCK_OUT/FEEDBACK
+              const result = await QRService.processQRScan(qrData, cleanerId, cleanerName, location)
+              
+              setLastScan({
+                data: qrData,
+                timestamp: new Date(),
+                success: result.success
+              })
+
+              if (result.success) {
+                onScanSuccess?.(qrData)
+              } else {
+                const errorMessage = result.message || 'Failed to process QR code scan'
+                setError(errorMessage)
+                onScanError?.(errorMessage)
+              }
+
+              // Brief pause before allowing next scan
+              setTimeout(() => {
+                setError(null)
+              }, 2000)
+            }
 
           } catch (err) {
             console.error('Error processing QR scan:', err)
             setError('Error processing QR code')
             onScanError?.('Error processing QR code')
+          } finally {
+            setTimeout(() => setIsProcessing(false), 800)
           }
         },
         {
@@ -165,6 +233,77 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     }
   }
 
+  const handleWorkSubmitted = async () => {
+    if (!currentQRData) return
+
+    try {
+      // Process the initial QR scan with location after work is submitted
+      let location: { latitude: number; longitude: number } | undefined
+
+      if (navigator.geolocation) {
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              timeout: 5000,
+              enableHighAccuracy: true
+            })
+          })
+          location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          }
+        } catch (geoError) {
+          console.warn('Could not get location:', geoError)
+        }
+      }
+
+      const success = await QRService.processQRScan(currentQRData, cleanerId, cleanerName, location)
+      
+      if (success) {
+        setShowTaskSelector(false)
+        setCurrentQRData(null)
+        onScanSuccess?.(currentQRData)
+        
+        // Update last scan status
+        setLastScan({
+          data: currentQRData,
+          timestamp: new Date(),
+          success: true
+        })
+      } else {
+        setError('Failed to process QR code scan')
+        onScanError?.('Failed to process QR code scan')
+      }
+    } catch (err) {
+      console.error('Error processing QR scan after work submission:', err)
+      setError('Error processing QR code')
+      onScanError?.('Error processing QR code')
+    }
+  }
+
+  const handleClockOut = async () => {
+    // Clock out is handled within the TaskSelector component
+    // Reset the interface after clock out
+    setShowTaskSelector(false)
+    setCurrentQRData(null)
+    
+    // Update last scan to show clock out
+    if (currentQRData) {
+      setLastScan({
+        data: { ...currentQRData, type: 'CLOCK_OUT' },
+        timestamp: new Date(),
+        success: true
+      })
+    }
+  }
+
+  const handleTasksCancel = () => {
+    setShowTaskSelector(false)
+    setCurrentQRData(null)
+    // Allow scanning again
+    setError(null)
+  }
+
   if (hasPermission === null) {
     return (
       <Card className="w-full max-w-md mx-auto rounded-2xl border-0 shadow-sm">
@@ -209,85 +348,126 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     )
   }
 
+  // Show task selector after scanning
+  if (showTaskSelector && currentQRData) {
+    return (
+      <TaskSelector
+        qrData={currentQRData}
+        cleanerId={cleanerId}
+        cleanerName={cleanerName}
+        onWorkSubmitted={handleWorkSubmitted}
+        onClockOut={handleClockOut}
+        onCancel={handleTasksCancel}
+      />
+    )
+  }
+
+  // Show clock-out validator if requested
+  if (showClockOut && showClockOutOption) {
+    return (
+      <ClockOutValidator
+        cleanerId={cleanerId}
+        cleanerName={cleanerName}
+        onClockOutSuccess={() => {
+          setShowClockOut(false)
+          onClockOutSuccess?.()
+        }}
+        onCancel={() => setShowClockOut(false)}
+      />
+    )
+  }
+
   return (
-    <div className="w-full max-w-md mx-auto space-y-4">
-      <Card className="rounded-2xl border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <QrCode className="h-5 w-5" />
-            QR Code Scanner
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Camera View */}
-          <div className={`relative aspect-square rounded-2xl overflow-hidden border border-gray-200 shadow-sm ${isScanning ? 'bg-black' : 'bg-gray-50'}`}>
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              playsInline
-              muted
-            />
+    <div className="w-full space-y-4">
+      <div className="space-y-4">
+        {/* Camera View */}
+        <div className={`relative aspect-square rounded-3xl overflow-hidden border-2 ${isScanning ? 'border-blue-500 bg-gray-900' : 'border-gray-200 bg-gray-50'} transition-all duration-200`}>
+          <video
+            ref={videoRef}
+            className="w-full h-full object-cover"
+            playsInline
+            muted
+          />
             {isScanning && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-48 h-48 rounded-xl shadow-[0_0_0_2px_rgba(255,255,255,0.8)_inset] animate-pulse" />
+                <div className="w-56 h-56 rounded-2xl border-2 border-white/70 shadow-[0_0_0_6000px_rgba(17,24,39,0.6)_inset]" />
               </div>
             )}
-          </div>
-
-          {/* Controls */}
-          <div className="flex gap-2">
-            {!isScanning ? (
-              <Button onClick={startScanning} className="flex-1 rounded-full text-white" style={{ backgroundColor: '#00339B' }}>
-                <Camera className="h-4 w-4 mr-2" />
-                Start Scanning
-              </Button>
-            ) : (
-              <Button onClick={stopScanning} variant="destructive" className="flex-1 rounded-full">
-                Stop Scanning
-              </Button>
-            )}
-          </div>
-
-          {/* Error Display */}
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
+          {wrongType && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2">
+              <div className="px-3 py-1 rounded-full bg-yellow-100 text-yellow-900 text-xs font-medium border border-yellow-300 shadow-sm">
+                Wrong QR type • need {allowedTypes?.join(' / ')}
+              </div>
+            </div>
           )}
+          {!isScanning && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center space-y-3">
+                <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
+                  <QrCode className="w-8 h-8" style={{ color: '#00339B' }} />
+                </div>
+                <p className="text-gray-600 font-medium">Hold steady and align the QR inside the frame</p>
+              </div>
+            </div>
+          )}
+        </div>
 
-          {/* Last Scan Result */}
-          {lastScan && (
-            <Alert variant={lastScan.success ? "default" : "destructive"}>
-              <div className="flex items-center gap-2">
-                {lastScan.success ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                ) : (
-                  <AlertCircle className="h-4 w-4 text-red-600" />
-                )}
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge className={getQRTypeColor(lastScan.data.type)}>
-                      {lastScan.data.type}
-                    </Badge>
-                    <span className="text-sm font-medium">
-                      {getActionText(lastScan.data.type)}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    {lastScan.timestamp.toLocaleTimeString()}
-                  </p>
+        {/* Controls */}
+        {!isScanning ? (
+          <Button 
+            onClick={startScanning} 
+            className="w-full rounded-full py-6 text-lg font-semibold text-white shadow-lg transition-all duration-200"
+            style={{ backgroundColor: '#00339B' }}
+          >
+            <Camera className="h-5 w-5 mr-3" />
+            Start scanning
+          </Button>
+        ) : (
+          <Button 
+            onClick={stopScanning} 
+            variant="destructive" 
+            className="w-full rounded-full py-6 text-lg font-semibold"
+          >
+            Stop Scanning
+          </Button>
+        )}
+
+        {showClockOutOption && (
+          <Button
+            variant="outline"
+            onClick={() => setShowClockOut(true)}
+            className="w-full rounded-full py-5 text-red-600 border-red-200 hover:bg-red-50"
+          >
+            Clock Out
+          </Button>
+        )}
+
+        {/* Error Display removed per request */}
+
+        {/* Success Display */}
+        {lastScan && lastScan.success && (
+          <Alert className="rounded-2xl border-green-200 bg-green-50">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <AlertDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="font-medium text-green-900">
+                    {getActionText(lastScan.data.type)}
+                  </span>
                   {lastScan.data.metadata?.areaName && (
-                    <p className="text-xs text-gray-600">
+                    <p className="text-sm text-green-700 mt-1">
                       Area: {lastScan.data.metadata.areaName}
                     </p>
                   )}
                 </div>
+                <Badge className="bg-green-600 text-white">
+                  {lastScan.data.type}
+                </Badge>
               </div>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
     </div>
   )
 }

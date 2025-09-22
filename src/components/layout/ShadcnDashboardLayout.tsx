@@ -1,6 +1,6 @@
 import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Home, QrCode, FileText, Settings, LogOut, User } from 'lucide-react'
+import { Home, QrCode, FileText, Settings, LogOut, User, Clock } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -41,7 +41,7 @@ export const ShadcnDashboardLayout: React.FC<ShadcnDashboardLayoutProps> = ({
   }
 
   const cleanerMenuItems = [
-    { icon: Home, label: 'Dashboard', path: '/cleaner-dashboard' },
+    { icon: Clock, label: 'Clock In', path: '/clock-in' },
     { icon: QrCode, label: 'Scanner', path: '/scanner' },
     { icon: FileText, label: 'History', path: '/history' },
   ]

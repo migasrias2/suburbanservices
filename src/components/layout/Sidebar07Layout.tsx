@@ -1,8 +1,8 @@
 import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { 
-  Home, 
-  QrCode, 
+  Clock, 
+  MessageCircle, 
   FileText, 
   Settings, 
   LogOut, 
@@ -10,7 +10,8 @@ import {
   Building2,
   User,
   BarChart3,
-  Users
+  Users,
+  QrCode
 } from 'lucide-react'
 import {
   Sidebar,
@@ -60,8 +61,8 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
   }
 
   const cleanerMenuItems = [
-    { icon: Home, label: 'Clock In', path: '/clock-in' },
-    { icon: QrCode, label: 'Chat', path: '/chat' },
+    { icon: Clock, label: 'Clock In', path: '/clock-in' },
+    { icon: MessageCircle, label: 'Chat', path: '/chat' },
   ]
 
   const managerMenuItems = [
@@ -71,10 +72,8 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
   ]
 
   const adminMenuItems = [
-    { icon: BarChart3, label: 'Dashboard', path: '/admin-dashboard' },
     { icon: QrCode, label: 'QR Library', path: '/qr-library' },
     { icon: Users, label: 'User Management', path: '/admin-dashboard' },
-    { icon: Settings, label: 'System Settings', path: '/admin-dashboard' },
   ]
 
   const getMenuItems = () => {
@@ -94,12 +93,21 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
 
   const isActive = (path: string) => location.pathname === path
 
+  const getHeaderTitle = () => {
+    if (userType === 'admin') {
+      if (location.pathname === '/qr-library') return 'QR Library'
+      if (location.pathname === '/admin-dashboard') return 'User Management'
+      return 'Admin'
+    }
+    return userType === 'cleaner' ? 'Cleaner Dashboard' : 'Manager Dashboard'
+  }
+
   return (
     <SidebarProvider>
       <div className="min-h-screen bg-gray-50 flex w-full">
-        <Sidebar variant="sidebar" className="bg-white">
+        <Sidebar variant="sidebar" className="bg-white border-0">
           {/* Company Header */}
-          <SidebarHeader className="bg-sidebar">
+          <SidebarHeader className="bg-white border-0">
             <div className="flex items-center justify-center px-4 py-4">
               <img 
                 src="/suburban_services_logo-scaled.webp" 
@@ -113,33 +121,37 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
             {/* Navigation Menu */}
             <SidebarGroup>
               <SidebarGroupContent>
-                <SidebarMenu className="space-y-1">
-                  {menuItems.map((item) => {
+                <SidebarMenu className="space-y-3">
+                  {menuItems.map((item, index) => {
                     const Icon = item.icon
                     const active = isActive(item.path)
                     return (
-                      <SidebarMenuItem key={item.label}>
-                        <SidebarMenuButton
-                          asChild
-                          isActive={active}
-                          style={active ? { backgroundColor: '#00339B', color: '#ffffff' } : undefined}
-                          className={`
-                            rounded-xl transition-all duration-200 h-12
-                            ${active 
-                              ? 'shadow-sm' 
-                              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                            }
-                          `}
-                        >
-                          <button
-                            onClick={() => navigate(item.path)}
-                            className="flex items-center gap-3 w-full px-4 py-3"
+                      <React.Fragment key={item.label}>
+                        <SidebarMenuItem>
+                          <SidebarMenuButton
+                            asChild
+                            className={`rounded-full transition-all duration-200 h-12 ${
+                              active
+                                ? 'bg-[#00339B] text-white shadow-lg'
+                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                            }`}
                           >
-                            <Icon className="h-5 w-5" />
-                            <span className="font-medium">{item.label}</span>
-                          </button>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
+                            <button
+                              onClick={() => navigate(item.path)}
+                              className="flex items-center gap-3 w-full px-4 py-3"
+                            >
+                              <Icon className="h-5 w-5" />
+                              <span className="font-medium">{item.label}</span>
+                            </button>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        {/* Add separator between menu items except for the last one */}
+                        {index < menuItems.length - 1 && (
+                          <div className="flex justify-center py-2">
+                            <div className="w-16 h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent"></div>
+                          </div>
+                        )}
+                      </React.Fragment>
                     )
                   })}
                 </SidebarMenu>
@@ -148,14 +160,14 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
           </SidebarContent>
 
           {/* User Profile Footer */}
-          <SidebarFooter className="bg-sidebar p-2">
+          <SidebarFooter className="bg-white p-2 border-0">
             <SidebarMenu>
               <SidebarMenuItem>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <SidebarMenuButton
                       size="lg"
-                      className="rounded-xl text-gray-700 hover:bg-gray-100 data-[state=open]:bg-gray-100 h-14"
+                      className="rounded-full text-gray-700 hover:bg-gray-100 data-[state=open]:bg-gray-100 h-14"
                     >
                       <Avatar className="h-10 w-10">
                         <AvatarFallback className="bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold">
@@ -174,22 +186,22 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
                     </SidebarMenuButton>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
-                    className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-2xl border-0 shadow-xl"
+                    className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-3xl border-0 shadow-xl"
                     side="bottom"
                     align="end"
                     sideOffset={4}
                   >
                     <DropdownMenuItem
                       onClick={() => navigate('/profile')}
-                      className="gap-2 cursor-pointer rounded-lg"
+                      className="gap-2 cursor-pointer rounded-full mx-2 my-1"
                     >
                       <User className="h-4 w-4" />
                       Profile
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
+                    <DropdownMenuSeparator className="mx-4 my-2" />
                     <DropdownMenuItem
                       onClick={handleLogout}
-                      className="gap-2 cursor-pointer text-red-600 focus:text-red-600 rounded-lg"
+                      className="gap-2 cursor-pointer text-red-600 focus:text-red-600 rounded-full mx-2 my-1"
                     >
                       <LogOut className="h-4 w-4" />
                       Log out
@@ -204,17 +216,9 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
 
         <SidebarInset className="flex-1">
           {/* Top Header Bar */}
-          <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 bg-white/80 backdrop-blur-sm border-b border-gray-200">
-            <div className="flex items-center gap-2 px-4">
+          <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 bg-white">
+            <div className="flex items-center gap-3 px-4">
               <SidebarTrigger className="-ml-1 text-gray-600 hover:text-gray-900" />
-              <div className="h-4 w-px bg-gray-300" />
-              <div className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" style={{ color: '#00339B' }} />
-                <span className="font-semibold text-gray-900">
-                  {userType === 'cleaner' ? 'Cleaner Dashboard' : 
-                   userType === 'manager' ? 'Manager Dashboard' : 'Admin Dashboard'}
-                </span>
-              </div>
             </div>
           </header>
 

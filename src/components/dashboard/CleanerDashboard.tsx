@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { Clock, MapPin, CheckCircle2, AlertCircle, QrCode, BarChart3 } from 'lucide-react'
+import { Clock, MapPin, CheckCircle2, AlertCircle, QrCode, BarChart3, ClipboardCheck, ListTodo } from 'lucide-react'
 import { supabase, UKCleaner, LiveTracking } from '../../services/supabase'
+import { QRService, TaskSelection, AreaType, AREA_TASKS } from '../../services/qrService'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { Alert, AlertDescription } from '../ui/alert'
@@ -22,10 +23,13 @@ export const CleanerDashboard: React.FC<CleanerDashboardProps> = ({
     scans: 0,
     clockIns: 0,
     areas: 0,
-    duration: 0
+    duration: 0,
+    tasksSelected: 0,
+    tasksCompleted: 0
   })
   const [weeklyData, setWeeklyData] = useState<any[]>([])
   const [activityData, setActivityData] = useState<any[]>([])
+  const [taskSelections, setTaskSelections] = useState<TaskSelection[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -33,11 +37,13 @@ export const CleanerDashboard: React.FC<CleanerDashboardProps> = ({
     loadCurrentStatus()
     loadTodayStats()
     loadWeeklyData()
+    loadTodayTasks()
 
     // Set up real-time updates
     const interval = setInterval(() => {
       loadCurrentStatus()
       loadTodayStats()
+      loadTodayTasks()
     }, 30000) // Update every 30 seconds
 
     return () => clearInterval(interval)
@@ -98,10 +104,21 @@ export const CleanerDashboard: React.FC<CleanerDashboardProps> = ({
         duration = Math.round((new Date().getTime() - new Date(clockInTime).getTime()) / (1000 * 60 * 60))
       }
 
-      setTodayStats({ scans, clockIns, areas, duration })
+      // Get task stats (will be updated when loadTodayTasks is called)
+      const currentTasks = await QRService.getTaskSelections(cleanerId, today)
+      const tasksSelected = currentTasks.reduce((sum, selection) => sum + selection.selectedTasks.length, 0)
+      const tasksCompleted = currentTasks.reduce((sum, selection) => sum + (selection.completedTasks?.length || 0), 0)
+
+      setTodayStats({ scans, clockIns, areas, duration, tasksSelected, tasksCompleted })
     }
     
     setLoading(false)
+  }
+
+  const loadTodayTasks = async () => {
+    const today = new Date().toISOString().split('T')[0]
+    const selections = await QRService.getTaskSelections(cleanerId, today)
+    setTaskSelections(selections)
   }
 
   const loadWeeklyData = async () => {
@@ -216,7 +233,7 @@ export const CleanerDashboard: React.FC<CleanerDashboardProps> = ({
       </Card>
 
       {/* Today's Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 lg:gap-6">
         <Card className="card-modern border-0 shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer group">
           <CardContent className="p-4 lg:p-6 text-center">
             <div className="w-12 h-12 mx-auto mb-3 rounded-2xl flex items-center justify-center group-hover:shadow-lg transition-shadow" style={{ backgroundColor: '#00339B' }}>
@@ -242,6 +259,24 @@ export const CleanerDashboard: React.FC<CleanerDashboardProps> = ({
             </div>
             <div className="text-2xl lg:text-3xl font-bold text-indigo-600 mb-1">{todayStats.areas}</div>
             <div className="text-xs lg:text-sm text-gray-600 font-medium">Areas</div>
+          </CardContent>
+        </Card>
+        <Card className="card-modern border-0 shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer group">
+          <CardContent className="p-4 lg:p-6 text-center">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-orange-600 flex items-center justify-center group-hover:shadow-lg transition-shadow">
+              <ListTodo className="h-6 w-6 text-white" />
+            </div>
+            <div className="text-2xl lg:text-3xl font-bold text-orange-600 mb-1">{todayStats.tasksSelected}</div>
+            <div className="text-xs lg:text-sm text-gray-600 font-medium">Tasks Selected</div>
+          </CardContent>
+        </Card>
+        <Card className="card-modern border-0 shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer group">
+          <CardContent className="p-4 lg:p-6 text-center">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-emerald-600 flex items-center justify-center group-hover:shadow-lg transition-shadow">
+              <ClipboardCheck className="h-6 w-6 text-white" />
+            </div>
+            <div className="text-2xl lg:text-3xl font-bold text-emerald-600 mb-1">{todayStats.tasksCompleted}</div>
+            <div className="text-xs lg:text-sm text-gray-600 font-medium">Tasks Done</div>
           </CardContent>
         </Card>
         <Card className="card-modern border-0 shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer group">

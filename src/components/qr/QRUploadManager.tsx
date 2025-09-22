@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -12,6 +12,10 @@ import {
   AlertCircle,
   Folder
 } from 'lucide-react'
+import QrScanner from 'qr-scanner'
+import JSZip from 'jszip'
+import { supabase } from '../../services/supabase'
+import { QRService, QRCodeData } from '../../services/qrService'
 
 interface UploadedFile {
   name: string
@@ -20,6 +24,7 @@ interface UploadedFile {
   qrCount?: number
   customer?: string
   error?: string
+  file: File
 }
 
 interface QRUploadManagerProps {
@@ -30,87 +35,144 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const directoryInputRef = useRef<HTMLInputElement>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  const sanitizeSegment = (value: string | undefined) => {
+    return (value || 'unknown')
+      .toString()
+      .trim()
+      .replace(/\s+/g, '_')
+      .replace(/[^a-zA-Z0-9._-]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .toLowerCase()
+  }
 
   const handleFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files || [])
-    const zipFiles = selectedFiles.filter(file => 
-      file.name.toLowerCase().endsWith('.zip')
-    )
+    if (selectedFiles.length === 0) return
 
-    if (zipFiles.length === 0) {
-      return
-    }
-
-    const newFiles: UploadedFile[] = zipFiles.map(file => ({
+    const newFiles: UploadedFile[] = selectedFiles
+      .filter(f => /\.(png|jpe?g|webp|gif|bmp|zip)$/i.test(f.name))
+      .map(file => ({
       name: file.name,
       size: file.size,
-      status: 'pending'
+      status: 'pending',
+      file
     }))
 
     setFiles(newFiles)
+    // Auto-start processing after selection using the concrete list
+    setTimeout(() => {
+      void processSelectedFiles(newFiles)
+    }, 0)
   }
 
-  const processZipFiles = async () => {
+  const processSelectedFiles = async (selectedList: UploadedFile[]) => {
     setUploading(true)
+    setErrorMsg(null)
     setUploadProgress(0)
 
     const processedFiles: UploadedFile[] = []
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
+    for (let i = 0; i < selectedList.length; i++) {
+      const entry = selectedList[i]
+      const fileObj = entry.file
       
       // Update status to processing
       setFiles(prev => prev.map(f => 
-        f.name === file.name ? { ...f, status: 'processing' } : f
+        f.name === entry.name ? { ...f, status: 'processing' } : f
       ))
 
       try {
-        // Simulate processing time
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        
-        // Mock processing results - in reality, you'd extract and process the zip
-        const mockResults = {
-          'sunward-park-qr-codes.zip': { customer: 'Sunward Park', qrCount: 45 },
-          'box-office-qr-codes.zip': { customer: 'Box Office', qrCount: 32 },
-          'retail-center-qr-codes.zip': { customer: 'Retail Center', qrCount: 67 },
-          'corporate-office-qr-codes.zip': { customer: 'Corporate Office', qrCount: 28 },
-          'shopping-mall-qr-codes.zip': { customer: 'Shopping Mall', qrCount: 89 }
+        let qrData: QRCodeData | null = null
+
+        // If ZIP: read first image file inside and extract the QR
+        if (fileObj.name.toLowerCase().endsWith('.zip')) {
+          const zip = await JSZip.loadAsync(fileObj)
+          const firstImage = Object.values(zip.files).find(f => !f.dir && /\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name))
+          if (!firstImage) {
+            throw new Error('No images found in ZIP')
+          }
+          const imageBlob = await firstImage.async('blob')
+          const scanResult = await QrScanner.scanImage(imageBlob as Blob, { returnDetailedScanResult: true }).catch(() => null)
+          const qrText = (scanResult && (scanResult as any).data) || (scanResult as any) || null
+          if (qrText) {
+            qrData = QRService.parseQRCode(qrText as string)
+          }
+        } else {
+          // Single image file (PNG/JPG)
+          const scanResult = await QrScanner.scanImage(fileObj as unknown as Blob, { returnDetailedScanResult: true }).catch(() => null)
+          const qrText = (scanResult && (scanResult as any).data) || (scanResult as any) || null
+          if (qrText) {
+            qrData = QRService.parseQRCode(qrText as string)
+          }
         }
 
-        const fileName = file.name.toLowerCase()
-        const result = Object.entries(mockResults).find(([key]) => 
-          fileName.includes(key.split('-')[0])
-        )?.[1] || { customer: 'Unknown Customer', qrCount: Math.floor(Math.random() * 50) + 10 }
+        if (!qrData) throw new Error('No QR found in image')
+
+        // Upload image to Supabase Storage
+        const bucket = supabase.storage.from('qr-codes')
+        // If the user selected folders, try to infer folder path from file name (webkitRelativePath)
+        const rel = (fileObj as any).webkitRelativePath || ''
+        const parts = rel ? rel.split('/') : []
+        const customerFromPath = parts.length >= 3 ? parts[parts.length - 3] : undefined
+        const areaFromPath = parts.length >= 2 ? parts[parts.length - 2] : undefined
+        const safeCustomer = sanitizeSegment(customerFromPath || qrData.customerName)
+        const safeArea = sanitizeSegment(areaFromPath || (qrData.metadata?.areaName || qrData.metadata?.siteName || qrData.type))
+        const sanitizedName = sanitizeSegment(fileObj.name)
+        const path = `${safeCustomer}/${safeArea}/${qrData.id}-${sanitizedName}`
+        const { error: uploadError } = await bucket.upload(path, fileObj, { upsert: true })
+        if (uploadError) throw uploadError
+
+        const { data: publicUrlData } = bucket.getPublicUrl(path)
+        const publicUrl = publicUrlData?.publicUrl || path
+
+        // Save metadata to database
+        const { error: insertError } = await supabase
+          .from('building_qr_codes')
+          .upsert({
+            qr_code_id: qrData.id,
+            customer_name: qrData.customerName || 'Unknown',
+            building_area: (qrData.metadata?.areaName || qrData.metadata?.siteName || safeArea || 'Area'),
+            area_description: qrData.type,
+            qr_code_url: JSON.stringify(qrData),
+            qr_code_image_path: publicUrl,
+            is_active: true,
+            created_at: new Date().toISOString()
+          }, { onConflict: 'qr_code_id' })
+
+        if (insertError) {
+          throw insertError
+        }
 
         const processedFile: UploadedFile = {
-          ...file,
+          ...entry,
           status: 'completed',
-          customer: result.customer,
-          qrCount: result.qrCount
+          customer: qrData.customerName || 'Unknown',
+          qrCount: 1
         }
 
         processedFiles.push(processedFile)
 
         // Update status to completed
-        setFiles(prev => prev.map(f => 
-          f.name === file.name ? processedFile : f
-        ))
+        setFiles(prev => prev.map(f => f.name === entry.name ? processedFile : f))
 
-      } catch (error) {
+      } catch (error: any) {
+        console.error('Upload error:', error)
+        setErrorMsg(error?.message || 'Upload failed')
         const errorFile: UploadedFile = {
-          ...file,
+          ...entry,
           status: 'error',
-          error: 'Failed to process zip file'
+          error: error?.message || 'Failed to process file'
         }
 
         processedFiles.push(errorFile)
 
-        setFiles(prev => prev.map(f => 
-          f.name === file.name ? errorFile : f
-        ))
+        setFiles(prev => prev.map(f => f.name === entry.name ? errorFile : f))
       }
 
-      setUploadProgress(((i + 1) / files.length) * 100)
+      setUploadProgress(((i + 1) / selectedList.length) * 100)
     }
 
     setUploading(false)
@@ -152,38 +214,53 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
   }
 
   return (
-    <Card className="card-modern border-0 shadow-xl">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-3">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="text-center">
+        <h2 className="flex items-center justify-center gap-3 text-xl font-semibold text-gray-900 mb-2">
           <Upload className="h-6 w-6 text-blue-600" />
           Upload QR Code Collections
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
+        </h2>
+      </div>
         {/* Upload Area */}
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
-          <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
+        <div className="rounded-3xl p-8 text-center bg-gray-50 border border-gray-200">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-gray-300">
+            <Upload className="h-8 w-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-1">
             Upload Customer QR Code Collections
           </h3>
-          <p className="text-gray-600 mb-4">
-            Select ZIP files containing QR codes organized by customer areas
+          <p className="text-gray-600 mb-6">
+            Select a folder of PNG/JPG images (or ZIPs). Folder structure: Customer/Area/Images
           </p>
-          <Input
+          <input
+            ref={directoryInputRef}
             type="file"
-            accept=".zip"
+            accept=".png,.jpg,.jpeg,.webp,.gif,.bmp,.zip"
             multiple
             onChange={handleFileSelection}
             className="hidden"
             id="zip-upload"
+            // @ts-ignore – enable folder selection in supported browsers
+            webkitdirectory="true"
+            // @ts-ignore
+            directory="true"
           />
-          <Button asChild className="gap-2">
+          <Button asChild className="gap-2 rounded-full text-white px-5" style={{ backgroundColor: '#00339B' }}>
             <label htmlFor="zip-upload" className="cursor-pointer">
               <Folder className="h-4 w-4" />
-              Select ZIP Files
+              Select Folder
             </label>
           </Button>
         </div>
+
+        {/* Errors */}
+        {errorMsg && (
+          <Alert className="border-red-200 bg-red-50 rounded-2xl">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-700">{errorMsg}</AlertDescription>
+          </Alert>
+        )}
 
         {/* File List */}
         {files.length > 0 && (
@@ -191,7 +268,7 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
             <div className="flex items-center justify-between">
               <h4 className="font-medium text-gray-900">Selected Files ({files.length})</h4>
               {!uploading && files.some(f => f.status === 'pending') && (
-                <Button onClick={processZipFiles} className="gap-2">
+                <Button onClick={() => processSelectedFiles(files)} className="gap-2">
                   <Upload className="h-4 w-4" />
                   Process Files
                 </Button>
@@ -199,18 +276,18 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
             </div>
 
             {uploading && (
-              <div className="space-y-2">
+                <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Processing files...</span>
                   <span className="text-gray-600">{Math.round(uploadProgress)}%</span>
                 </div>
-                <Progress value={uploadProgress} className="h-2" />
+                <Progress value={uploadProgress} className="h-2 rounded-full" />
               </div>
             )}
 
             <div className="space-y-3">
               {files.map((file, index) => (
-                <div key={index} className="flex items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                <div key={index} className="flex items-center gap-4 p-4 border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors">
                   {getStatusIcon(file.status)}
                   
                   <div className="flex-1">
@@ -247,16 +324,13 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
         )}
 
         {/* Instructions */}
-        <Alert className="border-blue-200 bg-blue-50">
+        <Alert className="border-blue-100 bg-blue-50 rounded-2xl">
           <AlertCircle className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-blue-800">
-            <strong>Instructions:</strong> Upload ZIP files containing QR code images. 
-            Each ZIP should be organized by customer with folders for different areas 
-            (e.g., Reception, Toilets, Kitchen, etc.). The system will automatically 
-            categorize and organize the QR codes by customer and area type.
+            <strong>Instructions:</strong> Choose a folder containing QR images. Use folders to organize by
+            customer and area, for example: <em>Avtrade/Toilets/*.png</em>. ZIP files are also accepted.
           </AlertDescription>
         </Alert>
-      </CardContent>
-    </Card>
+    </div>
   )
 }

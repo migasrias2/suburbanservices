@@ -9,7 +9,8 @@ import {
   Camera,
   FileText,
   Settings,
-  X
+  X,
+  Clock
 } from 'lucide-react'
 import { Button } from '../ui/button'
 
@@ -32,7 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, userType, use
   }
 
   const cleanerMenuItems = [
-    { icon: Home, label: 'Dashboard', path: '/cleaner-dashboard' },
+    { icon: Clock, label: 'Clock In', path: '/clock-in' },
     { icon: QrCode, label: 'Scanner', path: '/scanner' },
     { icon: FileText, label: 'History', path: '/history' },
   ]

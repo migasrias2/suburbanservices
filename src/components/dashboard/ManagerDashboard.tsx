@@ -238,15 +238,17 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold">Operations Dashboard</h1>
-          <p className="text-gray-600">Welcome, {managerName}</p>
+          <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+            Operations Dashboard
+          </h1>
+          <p className="text-gray-600 text-lg">Welcome, {managerName}</p>
         </div>
         <div className="flex gap-2">
           <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-48 rounded-xl border-gray-200">
               <SelectValue placeholder="Select customer" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="rounded-xl border-0 shadow-xl">
               <SelectItem value="all">All Customers</SelectItem>
               {customers.map((customer) => (
                 <SelectItem key={customer} value={customer}>
@@ -255,7 +257,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={exportData} variant="outline">
+          <Button onClick={exportData} variant="outline" className="rounded-full">
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -264,7 +266,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="border-0 shadow-lg rounded-2xl">
           <CardContent className="p-4 text-center">
             <div className="flex items-center justify-center mb-2">
               <Users className="h-6 w-6 text-blue-600" />
@@ -273,7 +275,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             <div className="text-sm text-gray-600">Active Cleaners</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-0 shadow-lg rounded-2xl">
           <CardContent className="p-4 text-center">
             <div className="flex items-center justify-center mb-2">
               <MapPin className="h-6 w-6 text-green-600" />
@@ -282,7 +284,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             <div className="text-sm text-gray-600">Active Sites</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-0 shadow-lg rounded-2xl">
           <CardContent className="p-4 text-center">
             <div className="flex items-center justify-center mb-2">
               <Clock className="h-6 w-6 text-purple-600" />
@@ -291,7 +293,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             <div className="text-sm text-gray-600">Tasks Completed</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-0 shadow-lg rounded-2xl">
           <CardContent className="p-4 text-center">
             <div className="flex items-center justify-center mb-2">
               <QrCode className="h-6 w-6 text-orange-600" />
@@ -304,17 +306,17 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="cleaners">Cleaners</TabsTrigger>
-          <TabsTrigger value="qr-generator">QR Generator</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-full gap-1 border border-gray-200">
+          <TabsTrigger value="overview" className="rounded-full transition-colors data-[state=active]:bg-[#00339B] data-[state=active]:text-white">Overview</TabsTrigger>
+          <TabsTrigger value="cleaners" className="rounded-full transition-colors data-[state=active]:bg-[#00339B] data-[state=active]:text-white">Cleaners</TabsTrigger>
+          <TabsTrigger value="qr-generator" className="rounded-full transition-colors data-[state=active]:bg-[#00339B] data-[state=active]:text-white">QR Generator</TabsTrigger>
+          <TabsTrigger value="reports" className="rounded-full transition-colors data-[state=active]:bg-[#00339B] data-[state=active]:text-white">Reports</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
           <div className="grid md:grid-cols-2 gap-6">
             {/* Active Cleaners */}
-            <Card>
+            <Card className="border-0 shadow-xl rounded-2xl">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
@@ -324,7 +326,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               <CardContent>
                 <div className="space-y-3 max-h-64 overflow-y-auto">
                   {activeCleaners.map((cleaner) => (
-                    <div key={cleaner.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                    <div key={cleaner.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-2xl">
                       <Badge className={getStatusColor(cleaner.event_type)}>
                         {cleaner.event_type?.replace('_', ' ').toUpperCase() || 'ACTIVE'}
                       </Badge>
@@ -348,7 +350,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
             </Card>
 
             {/* Recent Activity */}
-            <Card>
+            <Card className="border-0 shadow-xl rounded-2xl">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Clock className="h-5 w-5" />
@@ -358,7 +360,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               <CardContent>
                 <div className="space-y-3 max-h-64 overflow-y-auto">
                   {recentActivity.slice(0, 10).map((activity) => (
-                    <div key={activity.id} className="flex items-center gap-3 p-2 border-l-4 border-blue-500">
+                    <div key={activity.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-2xl">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{activity.cleaner_name}</span>
@@ -380,14 +382,14 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         </TabsContent>
 
         <TabsContent value="cleaners" className="space-y-4">
-          <Card>
+          <Card className="border-0 shadow-xl rounded-2xl">
             <CardHeader>
               <CardTitle>All Active Cleaners</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {activeCleaners.map((cleaner) => (
-                  <Card key={cleaner.id}>
+                  <Card key={cleaner.id} className="border-0 shadow-lg rounded-2xl">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <Badge className={getStatusColor(cleaner.event_type)}>
@@ -421,7 +423,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-4">
-          <Card>
+          <Card className="border-0 shadow-xl rounded-2xl">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5" />
@@ -432,13 +434,13 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="font-medium">Today's Activity Log</h3>
-                  <Button onClick={exportData} variant="outline" size="sm">
+                  <Button onClick={exportData} variant="outline" size="sm" className="rounded-full">
                     <Download className="h-4 w-4 mr-2" />
                     Export CSV
                   </Button>
                 </div>
                 
-                <div className="border rounded-lg overflow-hidden">
+                <div className="border border-gray-200 rounded-2xl overflow-hidden">
                   <div className="bg-gray-50 px-4 py-2 grid grid-cols-5 gap-4 text-sm font-medium">
                     <div>Time</div>
                     <div>Cleaner</div>
@@ -448,7 +450,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({
                   </div>
                   <div className="max-h-96 overflow-y-auto">
                     {recentActivity.map((activity) => (
-                      <div key={activity.id} className="px-4 py-2 grid grid-cols-5 gap-4 text-sm border-t">
+                      <div key={activity.id} className="px-4 py-2 grid grid-cols-5 gap-4 text-sm border-t border-gray-100">
                         <div>{new Date(activity.timestamp).toLocaleTimeString()}</div>
                         <div>{activity.cleaner_name}</div>
                         <div>

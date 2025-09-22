@@ -54,7 +54,7 @@ export default function Login() {
         // Navigate based on user type
         switch (result.user.user_type) {
           case 'cleaner':
-            navigate('/cleaner-dashboard')
+            navigate('/clock-in')
             break
           case 'manager':
             navigate('/manager-dashboard')
@@ -177,6 +177,10 @@ export default function Login() {
   }
 
   const toggleMode = () => {
+    // Prevent entering register mode on Admin tab
+    if (activeTab === 'admin') {
+      return
+    }
     setIsRegisterMode(!isRegisterMode)
     resetForm()
   }
@@ -543,106 +547,21 @@ export default function Login() {
 
               <TabsContent value="admin" className="mt-0">
                 {isRegisterMode ? (
-                  <form onSubmit={handleRegister} className="space-y-5">
-                    <div className="text-center mb-6">
-                      <h3 className="text-lg font-semibold text-gray-900">Create Admin Account</h3>
-                      <p className="text-gray-500 text-sm mt-1">Fill in your details to get started</p>
+                  <div className="space-y-5 text-center">
+                    <div className="text-center mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900">Admin Registration Disabled</h3>
+                      <p className="text-gray-500 text-sm mt-1">Please contact a system administrator to create admin users.</p>
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-first-name-admin" className="text-gray-500 font-normal text-sm">First Name</Label>
-                        <Input
-                          id="reg-first-name-admin"
-                          type="text"
-                          value={regFirstName}
-                          onChange={(e) => setRegFirstName(e.target.value)}
-                          placeholder="John"
-                          className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 text-sm"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-last-name-admin" className="text-gray-500 font-normal text-sm">Last Name</Label>
-                        <Input
-                          id="reg-last-name-admin"
-                          type="text"
-                          value={regLastName}
-                          onChange={(e) => setRegLastName(e.target.value)}
-                          placeholder="Doe"
-                          className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 text-sm"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <PhoneInput
-                      id="reg-mobile-admin"
-                      label="Mobile Number"
-                      placeholder="Enter your phone number"
-                      value={regMobile}
-                      onChange={setRegMobile}
-                      required
-                    />
-
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-email-admin" className="text-gray-500 font-normal text-sm">Email</Label>
-                      <Input
-                        id="reg-email-admin"
-                        type="email"
-                        value={regEmail}
-                        onChange={(e) => setRegEmail(e.target.value)}
-                        placeholder="admin@example.com"
-                        className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 text-sm"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-password-admin" className="text-gray-500 font-normal text-sm">Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="reg-password-admin"
-                          type={showPassword ? "text" : "password"}
-                          value={regPassword}
-                          onChange={(e) => setRegPassword(e.target.value)}
-                          placeholder="Enter your password"
-                          className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 pr-12 text-sm"
-                          required
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-gray-400 hover:text-gray-600"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-confirm-password-admin" className="text-gray-500 font-normal text-sm">Confirm Password</Label>
-                      <Input
-                        id="reg-confirm-password-admin"
-                        type={showPassword ? "text" : "password"}
-                        value={regConfirmPassword}
-                        onChange={(e) => setRegConfirmPassword(e.target.value)}
-                        placeholder="Confirm your password"
-                        className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 text-sm"
-                        required
-                      />
-                    </div>
-
-                    <Button 
-                      type="submit" 
-                      className="w-full h-11 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-normal shadow-sm hover:shadow-md transition-all duration-200" 
-                      disabled={loading}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsRegisterMode(false)}
+                      className="gap-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-full px-3 py-2 mx-auto"
                     >
-                      {loading ? 'Creating Account...' : 'Create Account'}
+                      <ArrowLeft className="h-4 w-4" />
+                      Back to Sign In
                     </Button>
-                  </form>
+                  </div>
                 ) : (
                   <form onSubmit={handleLogin} className="space-y-5">
                     <div className="space-y-2">

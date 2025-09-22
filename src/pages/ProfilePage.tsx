@@ -81,7 +81,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Profile Information */}
-        <Card className="card-modern border-0 shadow-xl">
+        <Card className="card-modern border-0 shadow-xl rounded-3xl">
           <CardContent className="p-8">
             <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
               <User className="h-6 w-6 text-blue-600" />
@@ -96,7 +96,7 @@ export default function ProfilePage() {
                       <User className="h-4 w-4" />
                       First Name
                     </label>
-                    <p className="text-lg text-gray-900 bg-gray-50 p-3 rounded-xl">
+                    <p className="text-lg text-gray-900 bg-gray-50 p-3 rounded-full">
                       {cleaner.first_name || 'Not provided'}
                     </p>
                   </div>
@@ -106,7 +106,7 @@ export default function ProfilePage() {
                       <User className="h-4 w-4" />
                       Last Name
                     </label>
-                    <p className="text-lg text-gray-900 bg-gray-50 p-3 rounded-xl">
+                    <p className="text-lg text-gray-900 bg-gray-50 p-3 rounded-full">
                       {cleaner.last_name || 'Not provided'}
                     </p>
                   </div>
@@ -138,7 +138,7 @@ export default function ProfilePage() {
                       <Hash className="h-4 w-4" />
                       Employee Number
                     </label>
-                    <p className="text-lg text-gray-900 bg-gray-50 p-3 rounded-xl">
+                    <p className="text-lg text-gray-900 bg-gray-50 p-3 rounded-full">
                       {cleaner.employee_number}
                     </p>
                   </div>
@@ -150,7 +150,7 @@ export default function ProfilePage() {
                       <Building className="h-4 w-4" />
                       Assigned Customer
                     </label>
-                    <p className="text-lg text-gray-900 bg-gray-50 p-3 rounded-xl">
+                    <p className="text-lg text-gray-900 bg-gray-50 p-3 rounded-full">
                       {cleaner.customer_name}
                     </p>
                   </div>
@@ -171,10 +171,10 @@ export default function ProfilePage() {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
             <div className="space-y-3">
               <button 
-                onClick={() => navigate('/cleaner-dashboard')}
+                onClick={() => navigate('/clock-in')}
                 className="w-full text-left p-3 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors text-blue-700 font-medium"
               >
-                → Go to Dashboard
+                → Go to Clock In
               </button>
               <button 
                 onClick={() => navigate('/scanner')}

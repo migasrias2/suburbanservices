@@ -33,6 +33,14 @@ export const authService = {
   // Register new user
   async registerUser(userData: CreateUserData) {
     try {
+      // Disallow admin self-registration at the application level
+      if (userData.user_type === 'admin') {
+        return {
+          success: false,
+          error: 'Admin account creation is disabled. Please contact a system administrator.'
+        }
+      }
+
       // Hash the password
       const hashedPassword = await this.hashPassword(userData.password)
 
@@ -56,12 +64,9 @@ export const authService = {
           existingUser = existingManager
           break
         case 'admin':
-          const { data: existingAdmin } = await supabase
-            .from('admins')
-            .select('username')
-            .eq('username', userData.username || userData.mobile_number)
-            .single()
-          existingUser = existingAdmin
+          // This path should not be reached due to the early return above,
+          // but we keep it for explicitness and safety.
+          existingUser = null
           break
       }
 
@@ -104,19 +109,8 @@ export const authService = {
           break
 
         case 'admin':
-          result = await supabase
-            .from('admins')
-            .insert({
-              username: userData.username || userData.mobile_number,
-              first_name: userData.first_name,
-              last_name: userData.last_name,
-              password_hash: hashedPassword,
-              email: userData.email || '',
-              is_active: true
-            })
-            .select()
-            .single()
-          break
+          // Guardrail: should not reach here because admin registration is disabled
+          throw new Error('Admin account creation is disabled')
 
         default:
           throw new Error('Invalid user type')
@@ -144,10 +138,40 @@ export const authService = {
   // Login user
   async loginUser(loginData: LoginData) {
     try {
+      // Special-case: use server-side RPC for admin login due to RLS
+      if (loginData.user_type === 'admin') {
+        if (!loginData.username) {
+          throw new Error('Username is required')
+        }
+        const { data: rows, error } = await supabase.rpc('admin_login', {
+          p_username: loginData.username,
+          p_password: loginData.password
+        })
+
+        if (error || !rows || (Array.isArray(rows) && rows.length === 0)) {
+          throw new Error('Invalid credentials')
+        }
+
+        const adminRow = Array.isArray(rows) ? rows[0] : rows
+        const userData = {
+          id: adminRow.id,
+          name: `${adminRow.first_name} ${adminRow.last_name}`,
+          username: adminRow.username,
+          email: adminRow.email,
+          user_type: 'admin' as const
+        }
+
+        return {
+          success: true,
+          user: userData,
+          message: 'Login successful'
+        }
+      }
+
+      // Default flow for cleaner/manager using client-side verification
       let tableName
       let identifierField
 
-      // Determine table and identifier based on user type
       switch (loginData.user_type) {
         case 'cleaner':
           tableName = 'cleaners'
@@ -157,18 +181,13 @@ export const authService = {
           tableName = 'managers'
           identifierField = 'mobile_number'
           break
-        case 'admin':
-          tableName = 'admins'
-          identifierField = 'username'
-          break
         default:
           throw new Error('Invalid user type')
       }
 
-      // Get user from database
-      const identifier = loginData.mobile_number || loginData.username
+      const identifier = loginData.mobile_number
       if (!identifier) {
-        throw new Error('Mobile number or username is required')
+        throw new Error('Mobile number is required')
       }
 
       const { data, error } = await supabase
@@ -181,14 +200,11 @@ export const authService = {
         throw new Error('Invalid credentials')
       }
 
-      // Check if user is active
       if (!data.is_active) {
         throw new Error('Account is deactivated. Please contact admin.')
       }
 
-      // Verify password
       const hashedPassword = data.password_hash
-      
       if (!hashedPassword) {
         throw new Error('Account not properly configured. Please contact admin.')
       }
@@ -198,38 +214,22 @@ export const authService = {
         throw new Error('Invalid credentials')
       }
 
-      // Return user data for session storage
-      let userData
-      switch (loginData.user_type) {
-        case 'cleaner':
-          userData = {
+      const userData = loginData.user_type === 'cleaner'
+        ? {
             id: data.id,
             name: `${data.first_name} ${data.last_name}`,
             mobile_number: data.mobile_number,
             email: data.email,
-            user_type: 'cleaner'
+            user_type: 'cleaner' as const
           }
-          break
-        case 'manager':
-          userData = {
+        : {
             id: data.id,
             name: `${data.first_name} ${data.last_name}`,
             mobile_number: data.mobile_number,
             email: data.email,
             employee_id: data.employee_id,
-            user_type: 'manager'
+            user_type: 'manager' as const
           }
-          break
-        case 'admin':
-          userData = {
-            id: data.id,
-            name: `${data.first_name} ${data.last_name}`,
-            username: data.username,
-            email: data.email,
-            user_type: 'admin'
-          }
-          break
-      }
 
       return {
         success: true,
