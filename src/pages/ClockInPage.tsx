@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Sidebar07Layout } from '@/components/layout/Sidebar07Layout'
 import { QRScanner } from '@/components/qr/QRScanner'
 import { WorkflowManager } from '@/components/qr/WorkflowManager'
 import { Button } from '@/components/ui/button'
 import { Clock, QrCode } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '@/services/supabase'
 
 type Phase = 'clock_in' | 'workflow' | 'completed'
 
@@ -29,6 +30,68 @@ export default function ClockInPage() {
     const saved = localStorage.getItem('currentClockInData')
     return saved ? JSON.parse(saved) : null
   })
+
+  // Reconcile UI with server state on mount and when returning to tab
+  useEffect(() => {
+    const reconcileClockState = async () => {
+      try {
+        // Check if there is an open attendance record for this cleaner
+        const { data, error } = await supabase
+          .from('time_attendance')
+          .select('*')
+          .eq('cleaner_name', userName)
+          .is('clock_out', null)
+          .order('id', { ascending: false })
+          .limit(1)
+
+        const hasOpenClockIn = !error && data && data.length > 0
+
+        if (!hasOpenClockIn) {
+          // No active session → reset any stale local state
+          setCurrentPhase('clock_in')
+          setShowScanner(false)
+          setClockInData(null)
+          localStorage.removeItem('currentClockInData')
+          localStorage.removeItem('currentClockInPhase')
+        } else if (hasOpenClockIn && currentPhase !== 'workflow') {
+          // Ensure we're in workflow if server says clocked in
+          setCurrentPhase('workflow')
+          localStorage.setItem('currentClockInPhase', 'workflow')
+          // Hydrate display data if missing
+          if (!clockInData) {
+            const record = data[0]
+            setClockInData({
+              time: record.clock_in || new Date().toISOString(),
+              siteName: record.site_name || record.customer_name || 'Work Site'
+            })
+            localStorage.setItem('currentClockInData', JSON.stringify({
+              time: record.clock_in || new Date().toISOString(),
+              siteName: record.site_name || record.customer_name || 'Work Site'
+            }))
+          }
+        }
+      } catch (err) {
+        // Fail silently; keep local UI state
+        console.warn('Clock state reconciliation failed:', err)
+      }
+    }
+
+    // Run on mount
+    reconcileClockState()
+
+    // Re-run when window/tab gains focus or becomes visible
+    const onFocus = () => reconcileClockState()
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') reconcileClockState()
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [userName, currentPhase, clockInData])
 
   const handleClockInSuccess = (qrData: any) => {
     // Store clock-in information

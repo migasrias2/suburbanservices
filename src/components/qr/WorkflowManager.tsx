@@ -7,6 +7,8 @@ import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { QRCodeData } from '../../services/qrService'
+import { QRService } from '../../services/qrService'
+import { getDraft as getLocalDraft } from '../../lib/offlineStore'
 
 type WorkflowStep = 
   | 'welcome' 
@@ -42,6 +44,7 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
   const [currentAreaData, setCurrentAreaData] = useState<QRCodeData | null>(null)
   const [completedAreas, setCompletedAreas] = useState<CompletedArea[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [initialTaskState, setInitialTaskState] = useState<any | null>(null)
 
   // Format the current time for display
   const getCurrentTime = () => {
@@ -70,6 +73,55 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
       setCurrentStep('tasks')
     }
   }
+
+  // On mount, try to resume from remote draft (fallback to local)
+  useEffect(() => {
+    const cleanerId = localStorage.getItem('userId') || ''
+    const resume = async () => {
+      setIsLoading(true)
+      try {
+        const remote = await QRService.fetchRemoteDraft(cleanerId)
+        const local = await getLocalDraft()
+        // Prefer local draft with photos if present. Otherwise merge remote+local when same qr.
+        let chosen: any = null
+        const localHasPhotos = !!local?.state?.taskCompletions?.some((tc: any) => (tc.photos?.length || 0) > 0)
+        if (localHasPhotos) {
+          chosen = local
+        } else if (remote) {
+          // Try to merge photos from local when both refer to the same QR
+          if (local && (local.qrCodeId === remote.qr_code_id)) {
+            chosen = {
+              ...remote,
+              qrCodeId: remote.qr_code_id,
+              state: {
+                ...(remote.state || {}),
+                qrData: remote.state?.qrData || local.state?.qrData,
+                taskCompletions: local.state?.taskCompletions || [],
+                confirmedPhotos: remote.state?.confirmedPhotos || local.state?.confirmedPhotos || {}
+              },
+              currentTaskIndex: remote.current_task_index ?? local.currentTaskIndex ?? 0
+            }
+          } else {
+            chosen = { ...remote, qrCodeId: remote.qr_code_id }
+          }
+        } else if (local) {
+          chosen = local
+        }
+
+        if (chosen && chosen.step === 'tasks' && chosen.state?.qrData) {
+          setCurrentAreaData(chosen.state.qrData)
+          setCurrentStep('tasks')
+          setInitialTaskState({
+            currentTaskIndex: chosen.current_task_index ?? chosen.currentTaskIndex ?? 0,
+            taskCompletions: chosen.state.taskCompletions || [],
+            confirmedPhotos: chosen.state.confirmedPhotos || {}
+          })
+        }
+      } catch {}
+      setIsLoading(false)
+    }
+    resume()
+  }, [])
 
   const handleTasksCompleted = () => {
     if (currentAreaData) {
@@ -287,6 +339,7 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
           qrData={currentAreaData}
           cleanerId={cleanerId}
           cleanerName={cleanerName}
+          initialState={initialTaskState || undefined}
           onWorkSubmitted={handleTasksCompleted}
           onClockOut={handleClockOutStart}
           onCancel={() => setCurrentStep('area_scan')}

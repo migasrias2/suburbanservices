@@ -1,11 +1,9 @@
 import React, { useState, useRef } from 'react'
-import { CheckCircle2, Clock, MapPin, Camera, Upload, X, Image, ChevronDown, ChevronUp, ArrowLeft, ArrowRight } from 'lucide-react'
-import { QRCodeData, AreaType, TaskDefinition, QRService, TaskSelection } from '../../services/qrService'
+import { CheckCircle2, Camera, Folder, ArrowLeft, Trash2, RotateCcw, Check, X, Flag } from 'lucide-react'
+import { QRCodeData, AreaType, QRService, TaskSelection } from '../../services/qrService'
 import { Button } from '../ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
-import { Badge } from '../ui/badge'
-import { Checkbox } from '../ui/checkbox'
 import { Alert, AlertDescription } from '../ui/alert'
+import { saveDraft as saveLocalDraft } from '../../lib/offlineStore'
 
 interface TaskCompletionProps {
   qrData: QRCodeData
@@ -14,6 +12,11 @@ interface TaskCompletionProps {
   onWorkSubmitted?: () => void
   onClockOut?: () => void
   onCancel?: () => void
+  initialState?: {
+    currentTaskIndex: number
+    taskCompletions: TaskCompletion[]
+    confirmedPhotos: Record<string, boolean>
+  }
 }
 
 interface TaskPhoto {
@@ -35,16 +38,19 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
   cleanerName,
   onWorkSubmitted,
   onClockOut,
-  onCancel
+  onCancel,
+  initialState
 }) => {
   const [taskCompletions, setTaskCompletions] = useState<TaskCompletion[]>([])
-  const [openTaskIds, setOpenTaskIds] = useState<Record<string, boolean>>({})
+  const [currentIndex, setCurrentIndex] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isClockingOut, setIsClockingOut] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showPhotoCapture, setShowPhotoCapture] = useState<string | null>(null)
+  const [confirmedPhotos, setConfirmedPhotos] = useState<Record<string, boolean>>({})
+  const [isCameraOpen, setIsCameraOpen] = useState(false)
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   // Detect area type from QR data
   const areaType = QRService.detectAreaType(qrData)
@@ -60,6 +66,17 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
     setTaskCompletions(initialCompletions)
   }, [])
 
+  // Hydrate from initial draft (including photos)
+  React.useEffect(() => {
+    if (!initialState) return
+    if (tasks.length === 0) return
+    const map = new Map(initialState.taskCompletions.map(tc => [tc.taskId, tc]))
+    const merged = tasks.map(t => map.get(t.id) || { taskId: t.id, completed: false, photos: [] })
+    setTaskCompletions(merged)
+    setConfirmedPhotos(initialState.confirmedPhotos || {})
+    setCurrentIndex(Math.min(Math.max(initialState.currentTaskIndex || 0, 0), Math.max(merged.length - 1, 0)))
+  }, [initialState, tasks.length])
+
   const getAreaDisplayName = (area: AreaType): string => {
     switch (area) {
       case 'BATHROOMS_ABLUTIONS': return 'Bathrooms / Ablutions'
@@ -72,30 +89,8 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
     }
   }
 
-  const getAreaColor = (area: AreaType): string => {
-    switch (area) {
-      case 'BATHROOMS_ABLUTIONS': return 'bg-blue-500'
-      case 'ADMIN_OFFICE': return 'bg-purple-500'
-      case 'GENERAL_AREAS': return 'bg-green-500'
-      case 'WAREHOUSE_INDUSTRIAL': return 'bg-orange-500'
-      case 'KITCHEN_CANTEEN': return 'bg-red-500'
-      case 'RECEPTION_COMMON': return 'bg-indigo-500'
-      default: return 'bg-gray-500'
-    }
-  }
-
-  const toggleTaskCompletion = (taskId: string) => {
-    setTaskCompletions(prev => 
-      prev.map(completion => 
-        completion.taskId === taskId 
-          ? { ...completion, completed: !completion.completed }
-          : completion
-      )
-    )
-  }
-
-  const toggleOpen = (taskId: string) => {
-    setOpenTaskIds(prev => ({ ...prev, [taskId]: !prev[taskId] }))
+  const getDisplayArea = (): string => {
+    return qrData.metadata?.areaName || getAreaDisplayName(areaType)
   }
 
   const handlePhotoCapture = async (taskId: string, file: File) => {
@@ -109,12 +104,14 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
       }
 
       setTaskCompletions(prev =>
-        prev.map(completion =>
-          completion.taskId === taskId
-            ? { ...completion, photos: [...(completion.photos || []), photo] }
-            : completion
-        )
+        prev.map(completion => {
+          if (completion.taskId !== taskId) return completion
+          // Replace first photo (single-photo per task UX) and mark completed
+          const newPhotos = [photo]
+          return { ...completion, completed: true, photos: newPhotos }
+        })
       )
+      setConfirmedPhotos(prev => ({ ...prev, [taskId]: false }))
       setShowPhotoCapture(null)
     } catch (err) {
       console.error('Error processing photo:', err)
@@ -122,31 +119,13 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
     }
   }
 
-  const removePhoto = (taskId: string, photoId?: string, index?: number) => {
+  const clearPhoto = (taskId: string) => {
     setTaskCompletions(prev =>
-      prev.map(completion => {
-        if (completion.taskId !== taskId) return completion
-        const photos = [...(completion.photos || [])]
-        let newPhotos
-        if (photoId) newPhotos = photos.filter(p => p.id !== photoId)
-        else if (typeof index === 'number') { photos.splice(index, 1); newPhotos = photos }
-        else newPhotos = photos
-        return { ...completion, photos: newPhotos }
-      })
+      prev.map(completion => (
+        completion.taskId === taskId ? { ...completion, completed: false, photos: [] } : completion
+      ))
     )
-  }
-
-  const movePhoto = (taskId: string, fromIndex: number, toIndex: number) => {
-    setTaskCompletions(prev =>
-      prev.map(completion => {
-        if (completion.taskId !== taskId) return completion
-        const photos = [...(completion.photos || [])]
-        if (fromIndex < 0 || toIndex < 0 || fromIndex >= photos.length || toIndex >= photos.length) return completion
-        const [moved] = photos.splice(fromIndex, 1)
-        photos.splice(toIndex, 0, moved)
-        return { ...completion, photos }
-      })
-    )
+    setConfirmedPhotos(prev => ({ ...prev, [taskId]: false }))
   }
 
   const convertFileToBase64 = (file: File): Promise<string> => {
@@ -158,12 +137,64 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
     })
   }
 
-  const handleCameraCapture = (taskId: string) => {
-    setShowPhotoCapture(taskId)
-    if (cameraInputRef.current) {
-      cameraInputRef.current.click()
+  const startCamera = async (taskId: string) => {
+    try {
+      setShowPhotoCapture(taskId)
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      })
+      setCameraStream(stream)
+      setIsCameraOpen(true)
+    } catch (err) {
+      console.error('Camera start failed:', err)
+      setError('Unable to access camera. Please allow camera permission and try again.')
     }
   }
+
+  const stopCamera = () => {
+    try { cameraStream?.getTracks().forEach(t => t.stop()) } catch {}
+    setCameraStream(null)
+    setIsCameraOpen(false)
+  }
+
+  const captureFromCamera = async () => {
+    if (!videoRef.current || !showPhotoCapture) return
+    try {
+      const video = videoRef.current
+      const canvas = document.createElement('canvas')
+      const width = video.videoWidth || 1280
+      const height = video.videoHeight || 720
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('Canvas context not available')
+      ctx.drawImage(video, 0, 0, width, height)
+      const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve as BlobCallback, 'image/jpeg', 0.92))
+      if (!blob) throw new Error('Failed to capture photo')
+      const file = new File([blob], 'task-photo.jpg', { type: 'image/jpeg' })
+      await handlePhotoCapture(showPhotoCapture, file)
+    } catch (err) {
+      console.error('Capture failed:', err)
+      setError('Failed to capture photo. Please try again.')
+    } finally {
+      stopCamera()
+    }
+  }
+
+  // Attach stream to video when ready and ensure cleanup on unmount
+  React.useEffect(() => {
+    if (isCameraOpen && cameraStream && videoRef.current) {
+      const video = videoRef.current
+      video.muted = true
+      video.setAttribute('playsinline', 'true')
+      video.autoplay = true
+      try { ;(video as any).srcObject = cameraStream } catch { /* no-op */ }
+      const playVideo = async () => { try { await video.play() } catch {} }
+      if (video.readyState >= 2) playVideo()
+      else video.onloadedmetadata = () => playVideo()
+    }
+    return () => { try { cameraStream?.getTracks().forEach(t => t.stop()) } catch {} }
+  }, [isCameraOpen, cameraStream])
 
   const handleFileUpload = (taskId: string) => {
     setShowPhotoCapture(taskId)
@@ -173,17 +204,9 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
   }
 
   const handleWorkSubmission = async () => {
-    const completedTasks = taskCompletions.filter(tc => tc.completed)
-    
-    if (completedTasks.length === 0) {
-      setError('Please complete at least one task before submitting.')
-      return
-    }
-
-    // Check if all completed tasks have photos
-    const tasksWithoutPhotos = completedTasks.filter(tc => !(tc.photos && tc.photos.length > 0))
-    if (tasksWithoutPhotos.length > 0) {
-      setError('Please take photos for all completed tasks before submitting.')
+    const completedTasks = taskCompletions.filter(tc => (tc.photos?.length || 0) > 0)
+    if (completedTasks.length !== tasks.length) {
+      setError('Please add a photo for each task to finish.')
       return
     }
 
@@ -224,83 +247,66 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
     }
   }
 
-  const handleClockOut = async () => {
-    setIsClockingOut(true)
-    setError(null)
-
-    try {
-      // Process clock out QR scan
-      const clockOutData = {
-        ...qrData,
-        type: 'CLOCK_OUT' as const,
-        metadata: {
-          ...qrData.metadata,
-          action: 'clock_out',
-          timestamp: new Date().toISOString()
-        }
-      }
-
-      let location: { latitude: number; longitude: number } | undefined
-      if (navigator.geolocation) {
-        try {
-          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              timeout: 5000,
-              enableHighAccuracy: true
-            })
-          })
-          location = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          }
-        } catch (geoError) {
-          console.warn('Could not get location:', geoError)
-        }
-      }
-
-      const result = await QRService.processQRScan(clockOutData, cleanerId, cleanerName, location)
-      
-      if (result.success) {
-        onClockOut?.()
-      } else {
-        setError(result.message || 'Failed to clock out. Please try again.')
-      }
-    } catch (err) {
-      console.error('Error clocking out:', err)
-      setError('An error occurred while clocking out.')
-    } finally {
-      setIsClockingOut(false)
-    }
+  const confirmCurrentPhoto = () => {
+    if (!currentTask) return
+    // Mark current task confirmed; do NOT auto-advance
+    setConfirmedPhotos(prev => ({ ...prev, [currentTask.id]: true }))
   }
 
-  const completedTasksCount = taskCompletions.filter(tc => tc.completed).length
-  const tasksWithPhotos = taskCompletions.filter(tc => tc.completed && (tc.photos?.length || 0) > 0).length
+  const currentTask = tasks[currentIndex]
+  const currentCompletion = taskCompletions.find(tc => tc.taskId === currentTask?.id)
+  const currentHasPhoto = (currentCompletion?.photos?.length || 0) > 0
+  const completedTasksCount = taskCompletions.filter(tc => (tc.photos?.length || 0) > 0).length
+  const confirmedCount = tasks.filter(t => confirmedPhotos[t.id]).length
+  const confirmedBeforeCount = tasks
+    .slice(0, Math.max(0, currentIndex))
+    .filter(t => confirmedPhotos[t.id])
+    .length
+  const progressPercent = Math.round((confirmedBeforeCount / Math.max(tasks.length, 1)) * 100)
+
+  // Persist draft (local + remote-light) whenever key state changes
+  React.useEffect(() => {
+    const draft = {
+      cleanerId,
+      qrCodeId: qrData.id,
+      areaType,
+      step: 'tasks',
+      currentTaskIndex: currentIndex,
+      state: {
+        qrData,
+        taskCompletions,
+        confirmedPhotos
+      }
+    }
+    saveLocalDraft(draft).catch(() => {})
+    const light = {
+      ...draft,
+      state: {
+        qrData: { ...qrData, metadata: { areaName: qrData.metadata?.areaName } },
+        taskCompletions: taskCompletions.map(tc => ({ taskId: tc.taskId, completed: tc.completed })),
+        confirmedPhotos
+      }
+    }
+    QRService.saveRemoteDraft(light)
+  }, [taskCompletions, confirmedPhotos, currentIndex])
 
   if (tasks.length === 0) {
     return (
-      <Card className="w-full max-w-md mx-auto rounded-2xl border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5" />
-            Area Recognized
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-center space-y-4">
-          <Alert>
-            <AlertDescription>
-              No specific tasks defined for this area yet. Your scan has been logged successfully.
-            </AlertDescription>
-          </Alert>
-          <Button onClick={onCancel} className="w-full rounded-full text-white" style={{ backgroundColor: '#00339B' }}>
-            Continue
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="w-full max-w-md mx-auto space-y-4 text-center">
+        <Alert>
+          <AlertDescription>
+            No specific tasks defined for this area yet. Your scan has been logged successfully.
+          </AlertDescription>
+        </Alert>
+        <Button onClick={onCancel} className="w-full rounded-full text-white" style={{ backgroundColor: '#00339B' }}>
+          Continue
+        </Button>
+      </div>
     )
   }
 
   return (
-    <div className="w-full max-w-lg mx-auto space-y-4">
+    <div className="w-full max-w-lg mx-auto space-y-6">
       {/* Hidden file inputs */}
       <input
         ref={fileInputRef}
@@ -308,265 +314,178 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
         accept="image/*"
         className="hidden"
         onChange={(e) => {
-          if (e.target.files?.[0] && showPhotoCapture) {
-            handlePhotoCapture(showPhotoCapture, e.target.files[0])
+          if (e.target.files?.[0]) {
+            handlePhotoCapture(currentTask.id, e.target.files[0])
           }
         }}
       />
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => {
-          if (e.target.files?.[0] && showPhotoCapture) {
-            handlePhotoCapture(showPhotoCapture, e.target.files[0])
-          }
-        }}
-      />
+      {/* inline camera uses getUserMedia; gallery input above */}
 
-      {/* Header Card */}
-      <Card className="rounded-2xl border-0 shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-3 text-lg">
-              <div className="p-2 rounded-xl" style={{ backgroundColor: '#e6eefc' }}>
-                <CheckCircle2 className="h-5 w-5" style={{ color: '#00339B' }} />
+      {/* Top progress */}
+      <div className="space-y-3">
+        <div className="text-center text-sm text-gray-600">working on: {getDisplayArea()}</div>
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-5 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full" style={{ width: `${progressPercent}%`, backgroundColor: '#00339B', transition: 'width 400ms ease' }} />
+          </div>
+          <Flag className="w-5 h-5 text-gray-400" />
+        </div>
+      </div>
+
+      {/* Task title */}
+      <div className="text-center space-y-2">
+        <div className="text-sm text-gray-500">Task {currentIndex + 1}/{tasks.length}</div>
+        <h2 className="text-3xl font-bold text-gray-900">{currentTask.name}</h2>
+      </div>
+
+      {/* Photo frame with in-frame capture options */}
+      <div className="space-y-4">
+        <div className="relative rounded-3xl overflow-hidden border-2 border-blue-200 bg-blue-50" style={{ aspectRatio: '4 / 3' }}>
+          {currentHasPhoto && !isCameraOpen && (
+            <img src={currentCompletion?.photos?.[0]?.photo} alt="Task" className="w-full h-full object-cover" />
+          )}
+
+          {/* In-frame controls */}
+          <div className={`absolute inset-0 ${isCameraOpen ? '' : 'flex items-center'} ${isCameraOpen ? '' : (currentHasPhoto ? 'justify-end pb-4 items-end' : 'justify-center items-center')}`}>
+            {isCameraOpen ? (
+              <div className="relative w-full h-full">
+                <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay style={{ transform: 'scaleX(1) rotate(0deg)' }} />
+                {/* Capture UI: left cancel (X), centered capture button */}
+                <button
+                  aria-label="Close camera"
+                  onClick={stopCamera}
+                  className="absolute bottom-4 left-4 h-12 w-12 rounded-full bg-white/95 border border-blue-200 shadow flex items-center justify-center hover:bg-white"
+                >
+                  <X className="h-5 w-5" style={{ color: '#00339B' }} />
+                </button>
+                <button
+                  aria-label="Take photo"
+                  onClick={captureFromCamera}
+                  className="absolute bottom-4 left-1/2 -translate-x-1/2 h-14 w-14 rounded-full bg-white/95 border border-blue-200 shadow flex items-center justify-center hover:bg-white"
+                >
+                  <Camera className="h-6 w-6" style={{ color: '#00339B' }} />
+                </button>
               </div>
-              Complete Tasks
-            </CardTitle>
-            {onCancel && (
-              <Button variant="ghost" size="sm" onClick={onCancel} className="h-8 w-8 p-0 rounded-full">
-                <X className="h-4 w-4" />
-              </Button>
+            ) : (
+              <>
+                 {!currentHasPhoto ? (
+                   <div className="w-full h-full flex items-center justify-center px-8">
+                     <div className="grid w-full grid-cols-[1fr_auto_1fr] items-end gap-16">
+                       <div className="flex flex-col items-center justify-end justify-self-end">
+                         <button
+                           onClick={() => startCamera(currentTask.id)}
+                           className="h-20 w-20 rounded-full bg-white/95 border border-blue-200 shadow flex items-center justify-center hover:bg-white"
+                         >
+                           <Camera className="h-8 w-8" style={{ color: '#00339B' }} />
+                         </button>
+                         <span className="mt-3 text-[13px] text-gray-400">take photo</span>
+                       </div>
+                       <span className="self-center justify-self-center text-2xl font-medium select-none" style={{ color: '#00339B' }}>or</span>
+                       <div className="flex flex-col items-center justify-end justify-self-start">
+                         <button
+                           onClick={() => fileInputRef.current?.click()}
+                           className="h-20 w-20 rounded-full bg-white/95 border border-blue-200 shadow flex items-center justify-center hover:bg-white"
+                         >
+                           <Folder className="h-8 w-8" style={{ color: '#00339B' }} />
+                         </button>
+                         <span className="mt-3 text-[13px] text-gray-400">select from gallery</span>
+                       </div>
+                     </div>
+                   </div>
+                ) : (
+                  <div className="absolute inset-0">
+                    <div className="absolute bottom-4 left-4">
+                      <button
+                        aria-label="Delete photo"
+                        onClick={() => clearPhoto(currentTask.id)}
+                        className="h-12 w-12 rounded-full bg-white/95 border border-blue-200 shadow hover:bg-white flex items-center justify-center"
+                      >
+                        <Trash2 className="h-5 w-5" style={{ color: '#00339B' }} />
+                      </button>
+                    </div>
+                    {!confirmedPhotos[currentTask.id] && (
+                      <div className="absolute bottom-4 right-4 flex gap-3">
+                        <button
+                          aria-label="Retake photo"
+                          onClick={() => startCamera(currentTask.id)}
+                          className="h-12 w-12 rounded-full bg-white/95 border border-blue-200 shadow hover:bg-white flex items-center justify-center"
+                        >
+                          <RotateCcw className="h-5 w-5" style={{ color: '#00339B' }} />
+                        </button>
+                        <button
+                          aria-label="Confirm photo"
+                          onClick={confirmCurrentPhoto}
+                          className="h-12 w-12 rounded-full bg-white/95 border border-blue-200 shadow hover:bg-white flex items-center justify-center"
+                        >
+                          <Check className="h-5 w-5" style={{ color: '#00339B' }} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Area Info */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Badge className={`${getAreaColor(areaType)} text-white px-3 py-1 rounded-full text-sm`}>
-                {getAreaDisplayName(areaType)}
-              </Badge>
-            </div>
-            <p className="text-sm text-gray-600">
-              {qrData.metadata?.areaName || qrData.customerName || 'Check off tasks as you complete them and take photos'}
-            </p>
-          </div>
+        </div>
+      </div>
 
-          {/* Progress Summary */}
-          <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-blue-600" />
-              <span className="text-sm font-medium text-blue-900">
-                Progress: {completedTasksCount}/{tasks.length} tasks • {tasksWithPhotos}/{completedTasksCount} photos
-              </span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tasks Card */}
-      <Card className="rounded-2xl border-0 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <CheckCircle2 className="h-5 w-5 text-green-600" />
-            Task Checklist
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {tasks.map((task, idx) => {
-            const completion = taskCompletions.find(tc => tc.taskId === task.id)
-            const isCompleted = completion?.completed || false
-            const photoCount = completion?.photos?.length || 0
-            const isOpen = !!openTaskIds[task.id]
-
-            return (
-              <div
-                key={task.id}
-                className={`
-                  border rounded-2xl p-4 transition-all
-                  ${isCompleted 
-                    ? 'bg-green-50/80 border-green-200 shadow-sm' 
-                    : 'bg-white border-gray-200 hover:bg-gray-50'
-                  }
-                `}
-              >
-                <div className="flex items-start gap-3">
-                  <button
-                    aria-label={isCompleted ? 'Mark as incomplete' : 'Mark as complete'}
-                    onClick={() => toggleTaskCompletion(task.id)}
-                    className={`mt-1 h-5 w-5 rounded-full border flex items-center justify-center transition-colors
-                      ${isCompleted ? 'bg-green-600 border-green-600' : 'bg-white border-gray-300 hover:border-blue-400'}`}
-                  >
-                    {isCompleted && <span className="block h-2.5 w-2.5 rounded-full bg-white" />}
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-3">
-                      <label htmlFor={task.id} className={`text-[15px] font-medium cursor-pointer block ${isCompleted ? 'text-green-900' : 'text-gray-900'}`}>
-                        {idx + 1}. {task.name}
-                      </label>
-                      <div className="flex items-center gap-2">
-                        {isCompleted && (
-                          <span className="inline-flex items-center gap-1 text-green-700 text-xs bg-green-100 px-2 py-1 rounded-full">
-                            <CheckCircle2 className="h-3 w-3" /> Done
-                          </span>
-                        )}
-                        {isCompleted && (
-                          <button
-                            onClick={() => toggleOpen(task.id)}
-                            aria-label="Toggle photos"
-                            className={`h-8 w-8 rounded-full border flex items-center justify-center
-                              ${isOpen ? 'border-green-300 bg-green-100 text-green-800' : 'border-green-200 bg-green-50 text-green-800 hover:bg-green-100'}`}
-                          >
-                            {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    {task.description && (
-                      <p className="text-xs text-gray-500 mt-1">{task.description}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Collapsed summary when a photo exists and panel is closed */}
-                {isCompleted && !isOpen && photoCount > 0 && (
-                  <div className="mt-3 pt-3 border-t border-green-200/60">
-                    <div className="flex items-center gap-2 text-green-700">
-                      <Image className="h-4 w-4" />
-                      <span className="text-sm font-medium">Photo uploaded ✓</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Photo upload section for completed tasks */}
-                {isCompleted && isOpen && (
-                  <div className="mt-4 pt-4 border-t border-green-200/60 space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleCameraCapture(task.id)}
-                        className="flex-1 text-sm rounded-xl border-green-300 text-green-800 bg-green-50 hover:bg-green-100"
-                      >
-                        <Camera className="h-3 w-3 mr-1" />
-                        Camera
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleFileUpload(task.id)}
-                        className="flex-1 text-sm rounded-xl border-green-300 text-green-800 bg-green-50 hover:bg-green-100"
-                      >
-                        <Upload className="h-3 w-3 mr-1" />
-                        Upload
-                      </Button>
-                    </div>
-
-                    {photoCount > 0 && (
-                      <div className="grid grid-cols-3 gap-2">
-                        {completion?.photos?.map((p, photoIndex) => (
-                          <div key={p.id || photoIndex} className="relative group aspect-square">
-                            <img src={p.photo} alt="Task photo" className="w-full h-full object-cover rounded-xl" />
-                            {/* top-right circular close - positioned properly on top of image */}
-                            <button
-                              type="button"
-                              aria-label="Remove photo"
-                              onClick={() => removePhoto(task.id, p.id, photoIndex)}
-                              className="absolute top-1 right-1 h-6 w-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg hover:bg-red-600 transition-colors z-10"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                            <div className="absolute inset-0 rounded-xl flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
-                              {photoIndex > 0 && (
-                                <Button 
-                                  size="icon" 
-                                  variant="ghost" 
-                                  onClick={() => movePhoto(task.id, photoIndex, photoIndex - 1)} 
-                                  className="h-8 w-8 rounded-full bg-white/95 hover:bg-white shadow-md border border-gray-200"
-                                >
-                                  <ArrowLeft className="h-3 w-3 text-gray-700" />
-                                </Button>
-                              )}
-                              {photoIndex < photoCount - 1 && (
-                                <Button 
-                                  size="icon" 
-                                  variant="ghost" 
-                                  onClick={() => movePhoto(task.id, photoIndex, photoIndex + 1)} 
-                                  className="h-8 w-8 rounded-full bg-white/95 hover:bg-white shadow-md border border-gray-200"
-                                >
-                                  <ArrowRight className="h-3 w-3 text-gray-700" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </CardContent>
-      </Card>
-
-      {/* Error Display */}
       {error && (
         <Alert variant="destructive" className="rounded-xl">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      {/* Action Buttons */}
+      {/* Bottom navigation */}
       <div className="flex gap-3">
         <Button
-          onClick={handleWorkSubmission}
-          disabled={isSubmitting || completedTasksCount === 0 || tasksWithPhotos < completedTasksCount}
-          className="flex-1 rounded-full text-white font-medium"
-          style={{ backgroundColor: '#00339B' }}
+          variant="outline"
+          onClick={() => (currentIndex > 0 ? setCurrentIndex(currentIndex - 1) : onCancel?.())}
+          className="flex-1 rounded-full border-blue-200 text-blue-700 hover:bg-blue-50"
         >
-          {isSubmitting ? (
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Submitting...
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4" />
-              Submit Work Done ({completedTasksCount} tasks)
-            </div>
-          )}
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
         </Button>
-        
-        <Button 
-          variant="outline" 
-          onClick={handleClockOut}
-          disabled={isClockingOut}
-          className="px-6 rounded-full border-red-200 text-red-600 hover:bg-red-50"
-        >
-          {isClockingOut ? (
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
-              Clocking Out...
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Clock Out
-            </div>
-          )}
-        </Button>
+        {currentIndex < tasks.length - 1 ? (
+          <Button
+            onClick={() => {
+              // Animate bar to include this task then advance after animation
+              if (!confirmedPhotos[currentTask.id]) return
+              const animateTo = Math.round(((confirmedBeforeCount + 1) / Math.max(tasks.length, 1)) * 100)
+              const bar = document.createElement('div')
+              // No-op: width transition handled by CSS above since we derive from confirmedBeforeCount
+              // Delay page advance slightly to let animation play
+              setTimeout(() => setCurrentIndex(currentIndex + 1), 420)
+            }}
+            disabled={!confirmedPhotos[currentTask.id]}
+            className="flex-1 rounded-full text-white"
+            style={{ backgroundColor: '#00339B' }}
+          >
+            Continue
+          </Button>
+        ) : (
+          <Button
+            onClick={handleWorkSubmission}
+            disabled={!confirmedPhotos[currentTask.id] || isSubmitting || confirmedCount !== tasks.length}
+            className="flex-1 rounded-full text-white"
+            style={{ backgroundColor: '#00339B' }}
+          >
+            {isSubmitting ? (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Finishing...
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                Finish
+              </div>
+            )}
+          </Button>
+        )}
       </div>
 
-      {/* Help Text */}
       <div className="text-center">
-        <p className="text-xs text-gray-500">
-          Complete tasks and take photos before submitting your work
-        </p>
+        <p className="text-xs text-gray-500">Photos are required to continue</p>
       </div>
     </div>
   )

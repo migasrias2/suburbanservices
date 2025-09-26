@@ -87,6 +87,54 @@ export const AREA_TASKS: Record<AreaType, TaskDefinition[]> = {
 }
 
 export class QRService {
+  static async saveRemoteDraft(draft: any) {
+    try {
+      const cleanerName = localStorage.getItem('userName') || 'Unknown Cleaner'
+      await supabase
+        .from('work_drafts')
+        .upsert({
+          cleaner_id: draft.cleanerId,
+          cleaner_name: cleanerName,
+          qr_code_id: draft.qrCodeId,
+          area_type: draft.areaType,
+          step: draft.step,
+          current_task_index: draft.currentTaskIndex,
+          state: draft.state,
+          is_finalized: false
+        }, { onConflict: 'id' })
+    } catch (e) {
+      console.warn('saveRemoteDraft failed (will retry later):', e)
+    }
+  }
+
+  static async fetchRemoteDraft(cleanerId: string) {
+    try {
+      const { data } = await supabase
+        .from('work_drafts')
+        .select('*')
+        .eq('cleaner_id', cleanerId)
+        .eq('is_finalized', false)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      return data || null
+    } catch (e) {
+      console.warn('fetchRemoteDraft failed:', e)
+      return null
+    }
+  }
+
+  static async finalizeRemoteDraft(cleanerId: string) {
+    try {
+      await supabase
+        .from('work_drafts')
+        .update({ is_finalized: true })
+        .eq('cleaner_id', cleanerId)
+        .eq('is_finalized', false)
+    } catch (e) {
+      console.warn('finalizeRemoteDraft failed:', e)
+    }
+  }
   /** Build QR data from non-JSON plain text (best-effort). */
   static fromPlainText(text: string): QRCodeData {
     const raw = (text || '').trim()

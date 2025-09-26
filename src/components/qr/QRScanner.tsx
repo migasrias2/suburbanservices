@@ -3,7 +3,6 @@ import { Camera, QrCode, AlertCircle, CheckCircle2 } from 'lucide-react'
 import QrScanner from 'qr-scanner'
 import { QRService, QRCodeData } from '../../services/qrService'
 import { ClockOutValidator } from './ClockOutValidator'
-import { TaskSelector } from './TaskSelector'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Alert, AlertDescription } from '../ui/alert'
@@ -40,8 +39,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
-  const [showTaskSelector, setShowTaskSelector] = useState(false)
-  const [currentQRData, setCurrentQRData] = useState<QRCodeData | null>(null)
+  // Task selector is handled by parent workflow; do not embed here
   const [isProcessing, setIsProcessing] = useState(false)
   const [wrongType, setWrongType] = useState<QRCodeData['type'] | null>(null)
   const [showClockOut, setShowClockOut] = useState(false)
@@ -136,19 +134,12 @@ export const QRScanner: React.FC<QRScannerProps> = ({
 
             // Check if this QR code should show task selector
             // Only AREA QR codes show tasks, CLOCK_IN just processes the clock in
-            const shouldShowTasks = qrData.type === 'AREA'
-            
-            if (shouldShowTasks) {
-              // Stop scanning and show task selector for AREA QR codes
-              setCurrentQRData(qrData)
-              setShowTaskSelector(true)
+            const shouldGoToTasks = qrData.type === 'AREA'
+            if (shouldGoToTasks) {
+              // Delegate to parent to render tasks UI; avoid duplicate headers/buttons
               stopScanning()
-              
-              setLastScan({
-                data: qrData,
-                timestamp: new Date(),
-                success: true
-              })
+              onScanSuccess?.(qrData)
+              setLastScan({ data: qrData, timestamp: new Date(), success: true })
             } else {
               // For CLOCK_IN flows, move forward immediately once recognized
               if (qrData.type === 'CLOCK_IN' && (!allowedTypes || allowedTypes.includes('CLOCK_IN'))) {
@@ -348,19 +339,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     )
   }
 
-  // Show task selector after scanning
-  if (showTaskSelector && currentQRData) {
-    return (
-      <TaskSelector
-        qrData={currentQRData}
-        cleanerId={cleanerId}
-        cleanerName={cleanerName}
-        onWorkSubmitted={handleWorkSubmitted}
-        onClockOut={handleClockOut}
-        onCancel={handleTasksCancel}
-      />
-    )
-  }
+  // Task UI is handled by parent; this component just scans
 
   // Show clock-out validator if requested
   if (showClockOut && showClockOutOption) {
