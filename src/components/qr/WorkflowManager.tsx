@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Clock, QrCode, CheckCircle2, ArrowLeft, MapPin, Calendar } from 'lucide-react'
+import { Clock, QrCode, CheckCircle2, MapPin, Calendar } from 'lucide-react'
 import { QRScanner } from './QRScanner'
 import { TaskSelector, TaskSubmissionSummary } from './TaskSelector'
 import { ClockOutValidator } from './ClockOutValidator'
@@ -23,7 +23,6 @@ interface WorkflowManagerProps {
   clockInTime?: string
   siteName?: string
   onClockOut?: () => void
-  onBack?: () => void
 }
 
 interface CompletedArea {
@@ -38,8 +37,7 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
   cleanerName,
   clockInTime,
   siteName,
-  onClockOut,
-  onBack
+  onClockOut
 }) => {
   const [currentStep, setCurrentStep] = useState<WorkflowStep>('welcome')
   const [currentAreaData, setCurrentAreaData] = useState<QRCodeData | null>(null)
@@ -197,32 +195,32 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
   // Welcome Screen
   if (currentStep === 'welcome') {
     return (
-      <div className="w-full max-w-lg mx-auto space-y-6">
+      <div className="w-full max-w-lg mx-auto space-y-6 px-4 sm:px-0">
         {/* Welcome Header */}
         <div className="text-center space-y-4">
-          <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
-            <CheckCircle2 className="w-10 h-10 text-white" />
+          <div className="w-14 h-14 sm:w-20 sm:h-20 mx-auto bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
+            <CheckCircle2 className="w-7 h-7 sm:w-10 sm:h-10 text-white" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
               Welcome back, {cleanerName}!
             </h1>
-            <p className="text-gray-600">You're successfully clocked in</p>
+            <p className="text-sm sm:text-lg text-gray-600">You're successfully clocked in</p>
           </div>
         </div>
 
         {/* Clock-in Info Card */}
         <Card className="rounded-3xl border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100">
-          <CardContent className="p-6">
+          <CardContent className="p-5 sm:p-6">
             <div className="space-y-4">
               {/* Clock-in Time */}
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <Clock className="w-6 h-6" style={{ color: '#00339B' }} />
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-9 h-9 sm:w-12 sm:h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <Clock className="w-4 h-4 sm:w-6 sm:h-6" style={{ color: '#00339B' }} />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Clocked in at</p>
-                  <p className="text-xl font-bold" style={{ color: '#00339B' }}>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">Clocked in at</p>
+                  <p className="text-base sm:text-xl font-bold" style={{ color: '#00339B' }}>
                     {getClockInTime()}
                   </p>
                 </div>
@@ -230,25 +228,25 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
 
               {/* Site Info */}
               {(persistentSiteName || siteName) && (
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <MapPin className="w-6 h-6" style={{ color: '#00339B' }} />
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-9 h-9 sm:w-12 sm:h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <MapPin className="w-4 h-4 sm:w-6 sm:h-6" style={{ color: '#00339B' }} />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-500">Location</p>
-                    <p className="text-lg font-semibold" style={{ color: '#00339B' }}>{persistentSiteName || siteName}</p>
+                    <p className="text-xs sm:text-sm font-medium text-gray-500">Location</p>
+                    <p className="text-sm sm:text-lg font-semibold" style={{ color: '#00339B' }}>{persistentSiteName || siteName}</p>
                   </div>
                 </div>
               )}
 
               {/* Current Date */}
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <Calendar className="w-6 h-6" style={{ color: '#00339B' }} />
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-9 h-9 sm:w-12 sm:h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <Calendar className="w-4 h-4 sm:w-6 sm:h-6" style={{ color: '#00339B' }} />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Date</p>
-                  <p className="text-lg font-semibold" style={{ color: '#00339B' }}>
+                  <p className="text-xs sm:text-sm font-medium text-gray-500">Date</p>
+                  <p className="text-sm sm:text-lg font-semibold" style={{ color: '#00339B' }}>
                     {new Date().toLocaleDateString('en-US', { 
                       weekday: 'long',
                       month: 'long', 
@@ -263,38 +261,40 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
 
         {/* Next Step Card */}
         <Card className="rounded-3xl border-0 shadow-lg">
-          <CardContent className="p-6">
+          <CardContent className="p-5 sm:p-6">
             <div className="text-center space-y-4">
-              <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
-                <QrCode className="w-8 h-8" style={{ color: '#00339B' }} />
+              <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
+                <QrCode className="w-6 h-6 sm:w-8 sm:h-8" style={{ color: '#00339B' }} />
               </div>
               <div className="space-y-2">
-                <h3 className="text-xl font-bold text-gray-900">Ready to Start</h3>
-                <p className="text-gray-600">
+                <h3 className="text-base sm:text-xl font-bold text-gray-900">Ready to Start</h3>
+                <p className="text-sm sm:text-base text-gray-600">
                   Scan the Area QR code to begin your cleaning tasks
                 </p>
               </div>
               <Button
                 onClick={() => setCurrentStep('area_scan')}
-                className="w-full rounded-full py-4 text-lg font-semibold text-white shadow-lg transition-all duration-200"
+                className="w-full rounded-full py-3 sm:py-4 text-sm sm:text-lg font-semibold text-white shadow-lg transition-all duration-200"
                 style={{ backgroundColor: '#00339B' }}
               >
-                <QrCode className="w-5 h-5 mr-3" />
+                <QrCode className="w-5 h-5 mr-2 sm:mr-3" />
                 Scan Area QR Code
               </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Back Button */}
-        {onBack && (
-          <div className="text-center">
-            <Button variant="ghost" onClick={onBack} className="text-gray-500 rounded-full">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
-          </div>
-        )}
+        {/* Clock Out Button */}
+        <div className="text-center">
+          <Button
+            variant="outline"
+            onClick={handleClockOutStart}
+            className="rounded-full px-8 py-3 text-red-600 border-red-200 hover:bg-red-50 transition-colors duration-200"
+          >
+            <Clock className="w-4 h-4 mr-2" />
+            Clock Out
+          </Button>
+        </div>
       </div>
     )
   }
@@ -302,7 +302,7 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
   // Area QR Scan Step
   if (currentStep === 'area_scan') {
     return (
-      <div className="w-full max-w-lg mx-auto space-y-6">
+      <div className="w-full max-w-lg mx-auto space-y-6 px-4 sm:px-0">
         {/* Header */}
         <div className="text-center space-y-4">
           <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center">

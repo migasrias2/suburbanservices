@@ -28,16 +28,17 @@ import {
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
-} from "@/components/ui/sidebar"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { 
+} from '@/components/ui/sidebar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Button } from "@/components/ui/button"
+} from '@/components/ui/dropdown-menu'
+import { Button } from '@/components/ui/button'
+import { useIsMobile } from '@/hooks/use-mobile'
 
 interface Sidebar07LayoutProps {
   children: React.ReactNode
@@ -52,6 +53,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
 }) => {
   const navigate = useNavigate()
   const location = useLocation()
+  const isMobile = useIsMobile()
 
   const handleLogout = () => {
     localStorage.removeItem('userType')
@@ -100,7 +102,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
   }
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={!isMobile}>
       <div className="min-h-screen bg-gray-50 flex w-full">
         <Sidebar variant="sidebar" className="bg-white border-0">
           {/* Company Header */}
@@ -109,7 +111,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
               <img 
                 src="/suburban_services_logo-scaled.webp" 
                 alt="Suburban Services" 
-                className="h-24 w-24 object-contain"
+                className="h-16 w-16 object-contain sm:h-20 sm:w-20"
               />
             </div>
           </SidebarHeader>
@@ -127,7 +129,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
                         <SidebarMenuItem>
                           <SidebarMenuButton
                             asChild
-                            className={`rounded-full transition-all duration-200 h-12 ${
+                            className={`rounded-full transition-all duration-200 h-11 text-sm ${
                               active
                                 ? 'bg-[#00339B] text-white shadow-lg'
                                 : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -135,7 +137,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
                           >
                             <button
                               onClick={() => navigate(item.path)}
-                              className="flex items-center gap-3 w-full px-4 py-3"
+                              className="flex items-center gap-3 w-full px-4 py-2"
                             >
                               <Icon className="h-5 w-5" />
                               <span className="font-medium">{item.label}</span>
@@ -158,7 +160,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
                   <DropdownMenuTrigger asChild>
                     <SidebarMenuButton
                       size="lg"
-                      className="rounded-full text-gray-700 hover:bg-gray-100 data-[state=open]:bg-gray-100 h-14"
+                      className="rounded-full text-gray-700 hover:bg-gray-100 data-[state=open]:bg-gray-100 h-12"
                     >
                       <Avatar className="h-10 w-10">
                         <AvatarFallback className="bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold">
@@ -207,15 +209,17 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
 
         <SidebarInset className="flex-1">
           {/* Top Header Bar */}
-          <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 bg-white">
-            <div className="flex items-center gap-3 px-4">
+          <header className={`flex shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 bg-white ${
+            isMobile ? 'h-14' : 'h-16'
+          }`}>
+            <div className="flex items-center gap-3 px-3 sm:px-4">
               <SidebarTrigger className="-ml-1 text-gray-600 hover:text-gray-900" />
             </div>
           </header>
 
           {/* Main Content with subtle page fade animation */}
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <div className="w-full max-w-7xl mx-auto py-6">
+          <div className="flex flex-1 flex-col gap-4 px-4 pb-6 pt-2 sm:p-6 sm:pt-0">
+            <div className="w-full max-w-7xl mx-auto py-4 sm:py-6">
               <div className="page-fade-enter page-fade-enter-active">
                 {children}
               </div>

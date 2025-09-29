@@ -221,7 +221,6 @@ export default function ClockInPage() {
             clockInTime={clockInData.time}
             siteName={clockInData.siteName}
             onClockOut={handleClockOut}
-            onBack={handleBackToClockIn}
           />
         )}
 
