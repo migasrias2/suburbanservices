@@ -62,7 +62,6 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
 
   const cleanerMenuItems = [
     { icon: Clock, label: 'Clock In', path: '/clock-in' },
-    { icon: MessageCircle, label: 'Chat', path: '/chat' },
   ]
 
   const managerMenuItems = [
