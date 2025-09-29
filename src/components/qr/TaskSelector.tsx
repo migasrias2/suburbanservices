@@ -3,13 +3,18 @@ import { CheckCircle2, Camera, Folder, ArrowLeft, Trash2, RotateCcw, Check, X, F
 import { QRCodeData, AreaType, QRService, TaskSelection } from '../../services/qrService'
 import { Button } from '../ui/button'
 import { Alert, AlertDescription } from '../ui/alert'
-import { saveDraft as saveLocalDraft } from '../../lib/offlineStore'
+import { saveDraft as saveLocalDraft, clearDraft } from '../../lib/offlineStore'
+
+export interface TaskSubmissionSummary {
+  taskCount?: number
+  areaName?: string
+}
 
 interface TaskCompletionProps {
   qrData: QRCodeData
   cleanerId: string
   cleanerName: string
-  onWorkSubmitted?: () => void
+  onWorkSubmitted?: (summary?: TaskSubmissionSummary) => void
   onClockOut?: () => void
   onCancel?: () => void
   initialState?: {
@@ -235,7 +240,13 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
       const success = await QRService.saveTaskSelection(taskSelection, photos)
 
       if (success) {
-        onWorkSubmitted?.()
+        // Finalize and clear any persisted drafts because the area is done
+        try { await QRService.finalizeRemoteDraft(cleanerId) } catch {}
+        try { await clearDraft() } catch {}
+        onWorkSubmitted?.({
+          taskCount: tasks.length,
+          areaName: getDisplayArea()
+        })
       } else {
         setError('Failed to submit work. Please try again.')
       }
@@ -388,7 +399,8 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
                          >
                            <Folder className="h-8 w-8" style={{ color: '#00339B' }} />
                          </button>
-                         <span className="mt-3 text-[13px] text-gray-400">select from gallery</span>
+                        <span className="mt-3 text-[13px] text-gray-400 hidden sm:block">select from gallery</span>
+                        <span className="mt-3 text-[13px] text-gray-400 sm:hidden">from gallery</span>
                        </div>
                      </div>
                    </div>
@@ -439,7 +451,10 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
       <div className="flex gap-3">
         <Button
           variant="outline"
-          onClick={() => (currentIndex > 0 ? setCurrentIndex(currentIndex - 1) : onCancel?.())}
+          onClick={() => {
+            if (currentIndex > 0) setCurrentIndex(currentIndex - 1)
+            else onCancel?.()
+          }}
           className="flex-1 rounded-full border-blue-200 text-blue-700 hover:bg-blue-50"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -449,14 +464,14 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
           <Button
             onClick={() => {
               // Animate bar to include this task then advance after animation
-              if (!confirmedPhotos[currentTask.id]) return
+              if (!currentHasPhoto) return
               const animateTo = Math.round(((confirmedBeforeCount + 1) / Math.max(tasks.length, 1)) * 100)
               const bar = document.createElement('div')
               // No-op: width transition handled by CSS above since we derive from confirmedBeforeCount
               // Delay page advance slightly to let animation play
               setTimeout(() => setCurrentIndex(currentIndex + 1), 420)
             }}
-            disabled={!confirmedPhotos[currentTask.id]}
+            disabled={!currentHasPhoto}
             className="flex-1 rounded-full text-white"
             style={{ backgroundColor: '#00339B' }}
           >
@@ -465,7 +480,7 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
         ) : (
           <Button
             onClick={handleWorkSubmission}
-            disabled={!confirmedPhotos[currentTask.id] || isSubmitting || confirmedCount !== tasks.length}
+            disabled={isSubmitting || completedTasksCount !== tasks.length || !currentHasPhoto}
             className="flex-1 rounded-full text-white"
             style={{ backgroundColor: '#00339B' }}
           >

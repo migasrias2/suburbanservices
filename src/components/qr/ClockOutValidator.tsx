@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react'
 import { AlertCircle, CheckCircle2, Clock, QrCode, Camera, X } from 'lucide-react'
 import QrScanner from 'qr-scanner'
 import { QRService, QRCodeData } from '../../services/qrService'
+import { clearDraft } from '../../lib/offlineStore'
+import { supabase } from '../../services/supabase'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Alert, AlertDescription } from '../ui/alert'
@@ -166,6 +168,25 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
       )
 
       if (result.success) {
+        // Finalize and clear any persisted drafts so we don't auto-resume tasks
+        try { await QRService.finalizeRemoteDraft(cleanerId) } catch {}
+        try { await clearDraft() } catch {}
+        // Mark recent clock out to avoid immediate server reconciliation flipping us back
+        try { localStorage.setItem('recentClockOutAt', String(Date.now())) } catch {}
+        // Force-close any lingering open attendance records and deactivate live tracking
+        try {
+          const nowIso = new Date().toISOString()
+          await supabase
+            .from('time_attendance')
+            .update({ clock_out: nowIso })
+            .eq('cleaner_name', cleanerName)
+            .is('clock_out', null)
+          await supabase
+            .from('live_tracking')
+            .update({ is_active: false, event_type: 'clock_out' })
+            .eq('cleaner_id', cleanerId)
+            .eq('is_active', true)
+        } catch {}
         onClockOutSuccess?.()
       } else {
         setError(result.message || 'Failed to process clock out. Please try again.')

@@ -67,8 +67,6 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
 
   const managerMenuItems = [
     { icon: BarChart3, label: 'Dashboard', path: '/manager-dashboard' },
-    { icon: Users, label: 'Live Tracking', path: '/manager-dashboard' },
-    { icon: QrCode, label: 'QR Generator', path: '/manager-dashboard' },
   ]
 
   const adminMenuItems = [
@@ -122,7 +120,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
             <SidebarGroup>
               <SidebarGroupContent>
                 <SidebarMenu className="space-y-3">
-                  {menuItems.map((item, index) => {
+                  {menuItems.map((item) => {
                     const Icon = item.icon
                     const active = isActive(item.path)
                     return (
@@ -145,12 +143,6 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
                             </button>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
-                        {/* Add separator between menu items except for the last one */}
-                        {index < menuItems.length - 1 && (
-                          <div className="flex justify-center py-2">
-                            <div className="w-16 h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent"></div>
-                          </div>
-                        )}
                       </React.Fragment>
                     )
                   })}

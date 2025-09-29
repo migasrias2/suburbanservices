@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react'
-import { Clock, QrCode, CheckCircle2, ArrowLeft, MapPin, Camera, User, Calendar } from 'lucide-react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { Clock, QrCode, CheckCircle2, ArrowLeft, MapPin, Calendar } from 'lucide-react'
 import { QRScanner } from './QRScanner'
-import { TaskSelector } from './TaskSelector'
+import { TaskSelector, TaskSubmissionSummary } from './TaskSelector'
 import { ClockOutValidator } from './ClockOutValidator'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
@@ -30,6 +30,7 @@ interface CompletedArea {
   qrData: QRCodeData
   completedAt: string
   tasksCount: number
+  areaName?: string
 }
 
 export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
@@ -45,6 +46,31 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
   const [completedAreas, setCompletedAreas] = useState<CompletedArea[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [initialTaskState, setInitialTaskState] = useState<any | null>(null)
+  const getStoredSiteName = useCallback(() => {
+    if (typeof window === 'undefined') return undefined
+    return localStorage.getItem('currentSiteName') || undefined
+  }, [])
+  const [persistentSiteName, setPersistentSiteName] = useState<string | undefined>(() => siteName || (typeof window !== 'undefined' ? localStorage.getItem('currentSiteName') || undefined : undefined))
+  const [lastCompletedAreaName, setLastCompletedAreaName] = useState<string | undefined>(undefined)
+  const [lastCompletedTaskCount, setLastCompletedTaskCount] = useState<number>(0)
+
+  const persistSiteName = useCallback((name: string) => {
+    setPersistentSiteName(name)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('currentSiteName', name)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (siteName && siteName !== persistentSiteName) {
+      persistSiteName(siteName)
+    } else if (!persistentSiteName) {
+      const stored = getStoredSiteName()
+      if (stored) {
+        setPersistentSiteName(stored)
+      }
+    }
+  }, [siteName, persistentSiteName, persistSiteName, getStoredSiteName])
 
   // Format the current time for display
   const getCurrentTime = () => {
@@ -70,6 +96,12 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
   const handleAreaScan = (qrData: QRCodeData) => {
     if (qrData.type === 'AREA') {
       setCurrentAreaData(qrData)
+      if (qrData.customerName) {
+        persistSiteName(qrData.customerName)
+      }
+      if (qrData.metadata?.siteName) {
+        persistSiteName(qrData.metadata.siteName)
+      }
       setCurrentStep('tasks')
     }
   }
@@ -123,17 +155,19 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
     resume()
   }, [])
 
-  const handleTasksCompleted = () => {
+  const handleTasksCompleted = (summary?: TaskSubmissionSummary) => {
     if (currentAreaData) {
       const newCompletedArea: CompletedArea = {
         qrData: currentAreaData,
         completedAt: new Date().toISOString(),
-        tasksCount: 0 // This would be updated with actual task count
+        tasksCount: summary?.taskCount ?? 0,
+        areaName: summary?.areaName || currentAreaData.metadata?.areaName
       }
       setCompletedAreas(prev => [...prev, newCompletedArea])
       setCurrentAreaData(null)
-      // Go back to welcome page after task completion
-      setCurrentStep('welcome')
+      setLastCompletedAreaName(summary?.areaName || currentAreaData.metadata?.areaName)
+      setLastCompletedTaskCount(summary?.taskCount ?? 0)
+      setCurrentStep('next_action')
     }
   }
 
@@ -146,12 +180,17 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
   }
 
   const handleScanAnotherArea = () => {
+    setCurrentAreaData(null)
+    setLastCompletedAreaName(undefined)
+    setLastCompletedTaskCount(0)
     setCurrentStep('area_scan')
   }
 
   const handleBackToTasks = () => {
     if (currentAreaData) {
       setCurrentStep('tasks')
+    } else {
+      setCurrentStep('area_scan')
     }
   }
 
@@ -190,14 +229,14 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
               </div>
 
               {/* Site Info */}
-              {siteName && (
+              {(persistentSiteName || siteName) && (
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
                     <MapPin className="w-6 h-6" style={{ color: '#00339B' }} />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-500">Location</p>
-                    <p className="text-lg font-semibold" style={{ color: '#00339B' }}>{siteName}</p>
+                    <p className="text-lg font-semibold" style={{ color: '#00339B' }}>{persistentSiteName || siteName}</p>
                   </div>
                 </div>
               )}
@@ -376,10 +415,22 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
               </div>
               
               <div className="space-y-3">
+                {lastCompletedAreaName && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Last area:</span>
+                    <span className="font-semibold" style={{ color: '#00339B' }}>{lastCompletedAreaName}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Areas completed:</span>
                   <span className="font-semibold" style={{ color: '#00339B' }}>{completedAreas.length}</span>
                 </div>
+                {lastCompletedTaskCount > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Tasks submitted:</span>
+                    <span className="font-semibold" style={{ color: '#00339B' }}>{lastCompletedTaskCount}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Time:</span>
                   <span className="font-semibold" style={{ color: '#00339B' }}>{getCurrentTime()}</span>

@@ -9,6 +9,15 @@
     /* Brand primary: #00339B (H 220 S 100% L 30%) */
     --primary: 220 100% 30%;
     --primary-foreground: 0 0% 100%;
+    /* Sidebar palette tuned for light theme */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 220 100% 35%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 100% 97%;
+    --sidebar-accent-foreground: 223 42% 27%;
+    --sidebar-border: 220 28% 88%;
+    --sidebar-ring: 220 90% 56%;
   }
   * {
     @apply border-border;
@@ -18,6 +27,17 @@
     @apply bg-background text-foreground;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
+}
+
+.dark {
+  --sidebar-background: 222 47% 10%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-primary: 220 100% 70%;
+  --sidebar-primary-foreground: 222 47% 10%;
+  --sidebar-accent: 220 42% 20%;
+  --sidebar-accent-foreground: 220 100% 97%;
+  --sidebar-border: 220 40% 26%;
+  --sidebar-ring: 220 90% 70%;
 }
 
 @layer components {

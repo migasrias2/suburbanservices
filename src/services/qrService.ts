@@ -355,13 +355,17 @@ export class QRService {
           .from('cleaner_logs')
           .insert({
             cleaner_id: cleanerId,
+            cleaner_name: localStorage.getItem('userName') || 'Unknown Cleaner',
             action: action,
             site_id: qrData.siteId,
             area_id: qrData.areaId,
             latitude: location?.latitude,
             longitude: location?.longitude,
+            customer_name: qrData.customerName || null,
+            site_area: siteArea,
             comments: `${siteArea} - ${qrData.customerName || ''}`,
-            device_info: { qr_code_scanned: qrData, device_ip: await this.getDeviceIP() }
+            device_info: { qr_code_scanned: qrData, device_ip: await this.getDeviceIP() },
+            timestamp: new Date().toISOString()
           })
 
         if (error) {
@@ -553,11 +557,14 @@ export class QRService {
       .from('live_tracking')
       .upsert({
         cleaner_id: cleanerId,
+        cleaner_name: localStorage.getItem('userName') || 'Unknown Cleaner',
         site_id: qrData.siteId,
         area_id: qrData.areaId,
         event_type: action.toLowerCase().replace(' ', '_'),
         latitude: location?.latitude,
         longitude: location?.longitude,
+        customer_name: qrData.customerName || null,
+        site_area: qrData.metadata?.areaName || null,
         // Active while working; becomes inactive when clocked out
         is_active: action.toLowerCase() !== 'clock out'
       })

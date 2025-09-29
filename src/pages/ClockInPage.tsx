@@ -17,8 +17,11 @@ export default function ClockInPage() {
 
   // Initialize state from localStorage to persist across refreshes
   const [currentPhase, setCurrentPhase] = useState<Phase>(() => {
-    const savedPhase = localStorage.getItem('currentClockInPhase')
-    return (savedPhase as Phase) || 'clock_in'
+    const savedPhase = localStorage.getItem('currentClockInPhase') as Phase | null
+    const hasSavedData = !!localStorage.getItem('currentClockInData')
+    // Guard: if phase says workflow but there is no saved data, fall back to clock_in
+    if (savedPhase === 'workflow' && !hasSavedData) return 'clock_in'
+    return savedPhase || 'clock_in'
   })
   
   const [showScanner, setShowScanner] = useState(false)
@@ -31,10 +34,22 @@ export default function ClockInPage() {
     return saved ? JSON.parse(saved) : null
   })
 
+  // Guard against blank page: if phase is workflow but there is no data, reset to clock_in
+  useEffect(() => {
+    if (currentPhase === 'workflow' && !clockInData) {
+      setCurrentPhase('clock_in')
+      localStorage.setItem('currentClockInPhase', 'clock_in')
+    }
+  }, [currentPhase, clockInData])
+
   // Reconcile UI with server state on mount and when returning to tab
   useEffect(() => {
     const reconcileClockState = async () => {
       try {
+        const recentClockOutAt = parseInt(localStorage.getItem('recentClockOutAt') || '0', 10)
+        const now = Date.now()
+        const withinCooldown = recentClockOutAt && (now - recentClockOutAt < 60000) // 60s cooldown
+
         // Check if there is an open attendance record for this cleaner
         const { data, error } = await supabase
           .from('time_attendance')
@@ -53,7 +68,8 @@ export default function ClockInPage() {
           setClockInData(null)
           localStorage.removeItem('currentClockInData')
           localStorage.removeItem('currentClockInPhase')
-        } else if (hasOpenClockIn && currentPhase !== 'workflow') {
+          localStorage.removeItem('recentClockOutAt')
+        } else if (hasOpenClockIn && currentPhase !== 'workflow' && !withinCooldown) {
           // Ensure we're in workflow if server says clocked in
           setCurrentPhase('workflow')
           localStorage.setItem('currentClockInPhase', 'workflow')
@@ -104,20 +120,25 @@ export default function ClockInPage() {
     
     // Persist to localStorage
     localStorage.setItem('currentClockInData', JSON.stringify(clockInInfo))
+    if (clockInInfo.siteName) {
+      localStorage.setItem('currentSiteName', clockInInfo.siteName)
+    }
     localStorage.setItem('currentClockInPhase', 'workflow')
   }
 
   const handleClockOut = () => {
-    // Handle successful clock out
-    setCurrentPhase('completed')
-    
-    // Clear persisted clock-in state
+    // On successful clock out, reset to clock-in view without logging the user out
     localStorage.removeItem('currentClockInData')
+    localStorage.removeItem('currentSiteName')
     localStorage.removeItem('currentClockInPhase')
-    
-    setTimeout(() => {
-      navigate('/login')
-    }, 2000)
+    localStorage.setItem('recentClockOutAt', String(Date.now()))
+    // Explicitly reset local UI
+    setClockInData(null)
+    setShowScanner(false)
+    setCurrentPhase('clock_in')
+    localStorage.setItem('currentClockInPhase', 'clock_in')
+    // Ensure route is at /clock-in (noop if already there)
+    try { navigate('/clock-in', { replace: true }) } catch {}
   }
 
   const handleBackToClockIn = () => {
@@ -127,6 +148,7 @@ export default function ClockInPage() {
     
     // Clear persisted state when going back to clock-in
     localStorage.removeItem('currentClockInData')
+    localStorage.removeItem('currentSiteName')
     localStorage.removeItem('currentClockInPhase')
   }
 
