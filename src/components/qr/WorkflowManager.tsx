@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Clock, QrCode, CheckCircle2, MapPin, Calendar } from 'lucide-react'
+import { Clock, QrCode, CheckCircle2, MapPin, Calendar, ArrowLeft } from 'lucide-react'
 import { QRScanner } from './QRScanner'
 import { TaskSelector, TaskSubmissionSummary } from './TaskSelector'
 import { ClockOutValidator } from './ClockOutValidator'

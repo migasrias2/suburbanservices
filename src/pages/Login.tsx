@@ -186,8 +186,22 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 flex items-center justify-center p-6">
-      <div className="w-full max-w-sm space-y-8">
+    <div
+      className="relative min-h-screen flex items-center justify-center p-6"
+      style={{
+        backgroundImage: 'url("/cropped-view-of-african-american-cleaner-moving-vacuum-cleaner-in-office%20(1).jpg")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      }}
+    >
+      <div
+        className="absolute inset-0"
+        aria-hidden="true"
+        style={{
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(0,27,68,0.7) 100%)'
+        }}
+      />
+      <div className="relative z-10 w-full max-w-sm space-y-8">
         {/* Header */}
         <div className="text-center">
           <img 
