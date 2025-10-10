@@ -138,10 +138,11 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
           chosen = local
         }
 
-        if (chosen && chosen.step === 'tasks' && chosen.state?.qrData) {
+      if (chosen && chosen.step === 'tasks' && chosen.state?.qrData) {
           setCurrentAreaData(chosen.state.qrData)
           setCurrentStep('tasks')
           setInitialTaskState({
+          qrCodeId: chosen.state.qrData?.id || chosen.qrCodeId || chosen.qr_code_id,
             currentTaskIndex: chosen.current_task_index ?? chosen.currentTaskIndex ?? 0,
             taskCompletions: chosen.state.taskCompletions || [],
             confirmedPhotos: chosen.state.confirmedPhotos || {}
@@ -163,6 +164,7 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
       }
       setCompletedAreas(prev => [...prev, newCompletedArea])
       setCurrentAreaData(null)
+      setInitialTaskState(null)
       setLastCompletedAreaName(summary?.areaName || currentAreaData.metadata?.areaName)
       setLastCompletedTaskCount(summary?.taskCount ?? 0)
       setCurrentStep('next_action')
@@ -179,6 +181,7 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
 
   const handleScanAnotherArea = () => {
     setCurrentAreaData(null)
+    setInitialTaskState(null)
     setLastCompletedAreaName(undefined)
     setLastCompletedTaskCount(0)
     setCurrentStep('area_scan')

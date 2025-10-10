@@ -38,7 +38,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     success: boolean
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null)
+  const [permissionState, setPermissionState] = useState<'unknown' | 'granted' | 'denied' | 'prompt'>('unknown')
+  const [isCheckingPermission, setIsCheckingPermission] = useState(false)
   // Task selector is handled by parent workflow; do not embed here
   const [isProcessing, setIsProcessing] = useState(false)
   const [wrongType, setWrongType] = useState<QRCodeData['type'] | null>(null)
@@ -53,25 +54,57 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     }
   }, [qrScanner])
 
+  useEffect(() => {
+    const checkPermission = async () => {
+      if (!navigator.permissions?.query) {
+        setPermissionState('prompt')
+        return
+      }
+      try {
+        setIsCheckingPermission(true)
+        const result = await navigator.permissions.query({ name: 'camera' as PermissionName })
+        setPermissionState(result.state === 'prompt' ? 'prompt' : (result.state as 'granted' | 'denied'))
+        result.onchange = () => {
+          setPermissionState(result.state === 'prompt' ? 'prompt' : (result.state as 'granted' | 'denied'))
+        }
+      } catch (err) {
+        console.error('Permission api error:', err)
+      } finally {
+        setIsCheckingPermission(false)
+      }
+    }
+    checkPermission()
+  }, [])
+
   const requestCameraPermission = async () => {
     try {
+      setIsCheckingPermission(true)
       const stream = await navigator.mediaDevices.getUserMedia({ video: true })
       stream.getTracks().forEach(track => track.stop()) // Stop the test stream
-      setHasPermission(true)
+      setPermissionState('granted')
       setError(null)
     } catch (err) {
       console.error('Camera permission denied:', err)
-      setHasPermission(false)
+      setPermissionState('denied')
       setError('Camera access is required to scan QR codes. Please allow camera permission.')
+    } finally {
+      setIsCheckingPermission(false)
     }
   }
 
   const startScanning = async () => {
+    if (isScanning) return
     if (!videoRef.current) return
 
     try {
       setError(null)
       setIsScanning(true)
+
+      if (qrScanner) {
+        qrScanner.stop()
+        qrScanner.destroy()
+        setQrScanner(null)
+      }
 
       const scanner = new QrScanner(
         videoRef.current,
@@ -224,78 +257,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     }
   }
 
-  const handleWorkSubmitted = async () => {
-    if (!currentQRData) return
-
-    try {
-      // Process the initial QR scan with location after work is submitted
-      let location: { latitude: number; longitude: number } | undefined
-
-      if (navigator.geolocation) {
-        try {
-          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              timeout: 5000,
-              enableHighAccuracy: true
-            })
-          })
-          location = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          }
-        } catch (geoError) {
-          console.warn('Could not get location:', geoError)
-        }
-      }
-
-      const success = await QRService.processQRScan(currentQRData, cleanerId, cleanerName, location)
-      
-      if (success) {
-        setShowTaskSelector(false)
-        setCurrentQRData(null)
-        onScanSuccess?.(currentQRData)
-        
-        // Update last scan status
-        setLastScan({
-          data: currentQRData,
-          timestamp: new Date(),
-          success: true
-        })
-      } else {
-        setError('Failed to process QR code scan')
-        onScanError?.('Failed to process QR code scan')
-      }
-    } catch (err) {
-      console.error('Error processing QR scan after work submission:', err)
-      setError('Error processing QR code')
-      onScanError?.('Error processing QR code')
-    }
-  }
-
-  const handleClockOut = async () => {
-    // Clock out is handled within the TaskSelector component
-    // Reset the interface after clock out
-    setShowTaskSelector(false)
-    setCurrentQRData(null)
-    
-    // Update last scan to show clock out
-    if (currentQRData) {
-      setLastScan({
-        data: { ...currentQRData, type: 'CLOCK_OUT' },
-        timestamp: new Date(),
-        success: true
-      })
-    }
-  }
-
-  const handleTasksCancel = () => {
-    setShowTaskSelector(false)
-    setCurrentQRData(null)
-    // Allow scanning again
-    setError(null)
-  }
-
-  if (hasPermission === null) {
+  if (permissionState === 'unknown' || permissionState === 'prompt') {
     return (
       <Card className="w-full max-w-md mx-auto rounded-2xl border-0 shadow-sm">
         <CardHeader>
@@ -315,7 +277,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     )
   }
 
-  if (hasPermission === false) {
+  if (permissionState === 'denied') {
     return (
       <Card className="w-full max-w-md mx-auto rounded-2xl border-0 shadow-sm">
         <CardHeader>

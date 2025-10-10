@@ -297,7 +297,7 @@ export class QRService {
             }
           }
           
-          const clockInResult = await this.logClockEvent(cleanerId, qrData.siteId!, 'clock_in', qrData.id)
+          const clockInResult = await this.logClockEvent(cleanerId, qrData.siteId!, 'clock_in', qrData.id, qrData)
           if (!clockInResult.success) {
             return { success: false, message: clockInResult.message }
           }
@@ -321,7 +321,7 @@ export class QRService {
             }
           }
           
-          const clockOutResult = await this.logClockEvent(cleanerId, qrData.siteId!, 'clock_out', qrData.id)
+          const clockOutResult = await this.logClockEvent(cleanerId, qrData.siteId!, 'clock_out', qrData.id, qrData)
           if (!clockOutResult.success) {
             return { success: false, message: clockOutResult.message }
           }
@@ -393,7 +393,8 @@ export class QRService {
     cleanerId: string, 
     siteId: string, 
     eventType: 'clock_in' | 'clock_out',
-    qrCodeId: string
+    qrCodeId: string,
+    qrData: QRCodeData
   ): Promise<{success: boolean, message?: string}> {
     try {
       const cleanerName = localStorage.getItem('userName') || 'Unknown Cleaner'
@@ -406,8 +407,8 @@ export class QRService {
           .insert({
             cleaner_id: cleanerId.includes('-') ? null : parseInt(cleanerId), // Handle UUID vs integer
             cleaner_name: cleanerName,
-            customer_name: siteId || 'Unknown Site',
-            site_name: siteId || 'Unknown Site',
+            customer_name: qrData.customerName || siteId || 'Unknown Site',
+            site_name: qrData.metadata?.siteName || qrData.metadata?.areaName || siteId || 'Unknown Site',
             clock_in: currentTime,
             clock_in_qr: qrCodeId,
             cleaner_mobile: localStorage.getItem('userMobile') || '',
@@ -438,7 +439,9 @@ export class QRService {
           .from('time_attendance')
           .update({
             clock_out: currentTime,
-            notes: openRecord.notes ? `${openRecord.notes} | Clock-out via QR` : 'Clock-out via QR'
+            notes: openRecord.notes ? `${openRecord.notes} | Clock-out via QR` : 'Clock-out via QR',
+            customer_name: qrData.customerName || openRecord.customer_name,
+            site_name: qrData.metadata?.siteName || openRecord.site_name
           })
           .eq('id', openRecord.id)
 

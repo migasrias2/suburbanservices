@@ -1,0 +1,238 @@
+import { useMemo } from 'react'
+import { ChevronDown, ChevronRight, MoreVertical, Plus, Trash2, Pencil } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { cn } from '@/lib/utils'
+import type { AreaTask } from '@/services/supabase'
+
+export type TreeAreaGroup = {
+  customer: string
+  areas: TreeArea[]
+}
+
+export type TreeArea = {
+  name: string
+  tasks: AreaTask[]
+}
+
+export interface AreaTasksTreeProps {
+  tasks: AreaTask[]
+  expandedNodes: Record<string, boolean>
+  onToggleNode: (nodeId: string) => void
+  onEditTask: (task: AreaTask) => void
+  onDeleteTask: (task: AreaTask) => void
+  onCreateTask: (payload: { customer: string; area: string }) => void
+}
+
+const buildTree = (tasks: AreaTask[]): TreeAreaGroup[] => {
+  const map = new Map<string, Map<string, AreaTask[]>>()
+
+  tasks.forEach((task) => {
+    const customer = task.customer_name?.trim() || task.customer_name || 'Unassigned Customer'
+    const area = task.area?.trim() || 'Unassigned Area'
+    if (!map.has(customer)) {
+      map.set(customer, new Map())
+    }
+    const areaMap = map.get(customer)!
+    if (!areaMap.has(area)) {
+      areaMap.set(area, [])
+    }
+    areaMap.get(area)!.push(task)
+  })
+
+  return Array.from(map.entries())
+    .sort(([customerA], [customerB]) => customerA.localeCompare(customerB))
+    .map(([customer, areaMap]) => ({
+      customer,
+      areas: Array.from(areaMap.entries())
+        .sort(([areaA], [areaB]) => areaA.localeCompare(areaB))
+        .map(([name, areaTasks]) => ({
+          name,
+          tasks: [...areaTasks].sort((a, b) => {
+            const posA = a.position ?? Number.MAX_SAFE_INTEGER
+            const posB = b.position ?? Number.MAX_SAFE_INTEGER
+            if (posA !== posB) return posA - posB
+            return a.task_description.localeCompare(b.task_description)
+          })
+        }))
+    }))
+}
+
+export const AreaTasksTree = ({
+  tasks,
+  expandedNodes,
+  onToggleNode,
+  onEditTask,
+  onDeleteTask,
+  onCreateTask,
+}: AreaTasksTreeProps) => {
+  const tree = useMemo(() => buildTree(tasks), [tasks])
+
+  if (!tree.length) {
+    return (
+      <Card className="rounded-3xl border border-dashed border-[#00339B]/20 bg-white shadow-none">
+        <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+          <div className="h-16 w-16 rounded-full bg-[#00339B]/10 flex items-center justify-center">
+            <Plus className="h-6 w-6 text-[#00339B]" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-[#00339B]">No tasks found</h3>
+            <p className="text-sm text-gray-500">Start by adding a task to an area.</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const renderCustomerRow = (group: TreeAreaGroup) => {
+    const nodeId = `customer:${group.customer}`
+    const isExpanded = expandedNodes[nodeId] ?? true
+    return (
+      <div
+        key={group.customer}
+        className={cn(
+          'rounded-3xl border bg-white shadow-sm transition-colors',
+          isExpanded ? 'border-[#00339B]/20 bg-[#f6f8ff]' : 'border-gray-100'
+        )}
+      >
+        <button
+          onClick={() => onToggleNode(nodeId)}
+            className="flex w-full items-center justify-between rounded-3xl px-6 py-5 text-left transition"
+        >
+          <div className="flex items-center gap-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#00339B]/10">
+              {isExpanded ? (
+                <ChevronDown className="h-5 w-5 text-[#00339B]" />
+              ) : (
+                <ChevronRight className="h-5 w-5 text-[#00339B]" />
+              )}
+            </div>
+            <div>
+              <p className="text-base font-semibold text-gray-900">{group.customer}</p>
+              <p className="text-xs text-gray-500">{group.areas.length} area{group.areas.length === 1 ? '' : 's'}</p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            className="rounded-full bg-[#00339B] px-4 py-1 text-xs font-semibold hover:bg-[#00297a]"
+            onClick={(event) => {
+              event.stopPropagation()
+              onCreateTask({ customer: group.customer, area: '' })
+            }}
+          >
+            New Task
+          </Button>
+        </button>
+        {isExpanded && (
+          <div className="space-y-4 border-t border-gray-100 px-6 py-5">
+            {group.areas.map((area) => renderAreaRow(group.customer, area))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const renderAreaRow = (customer: string, area: TreeArea) => {
+    const nodeId = `area:${customer}:${area.name}`
+    const isExpanded = expandedNodes[nodeId] ?? true
+    return (
+      <div
+        key={area.name}
+        className={cn(
+          'rounded-2xl border transition-colors',
+          isExpanded ? 'border-[#00339B]/20 bg-[#eef2ff]' : 'border-gray-100 bg-white/70'
+        )}
+      >
+        <button
+          onClick={() => onToggleNode(nodeId)}
+            className="flex w-full items-center justify-between rounded-2xl px-5 py-4 text-left transition"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#00339B]/10">
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4 text-[#00339B]" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-[#00339B]" />
+              )}
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-sm font-semibold text-gray-900">{area.name}</p>
+              <p className="text-xs text-gray-500">{area.tasks.length} task{area.tasks.length === 1 ? '' : 's'}</p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-full border-[#00339B]/30 bg-white text-xs font-semibold text-[#00339B] hover:bg-[#00339B]/10"
+            onClick={(event) => {
+              event.stopPropagation()
+              onCreateTask({ customer, area: area.name })
+            }}
+          >
+            Add Task
+          </Button>
+        </button>
+        {isExpanded && (
+          <div className="space-y-3 border-t border-gray-100 bg-white px-5 py-4">
+            {area.tasks.map((task) => renderTaskRow(task))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const renderTaskRow = (task: AreaTask) => {
+    const nodeId = `task:${task.id}`
+    const isActive = task.active
+    return (
+      <div
+        key={task.id}
+        className={cn(
+          'flex items-start justify-between rounded-2xl border px-4 py-3 shadow-sm transition',
+          isActive ? 'border-emerald-100 bg-emerald-50/60' : 'border-gray-100 bg-gray-50'
+        )}
+      >
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-gray-900">{task.task_description}</p>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+            {task.task_type && <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] uppercase tracking-wide text-[#00339B]">{task.task_type}</span>}
+            {task.qr_code && <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] text-gray-600">QR: {task.qr_code}</span>}
+            <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', isActive ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-200 text-gray-600')}>
+              {isActive ? 'Active' : 'Inactive'}
+            </span>
+          </div>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="rounded-full hover:bg-gray-100">
+              <MoreVertical className="h-4 w-4 text-gray-500" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-40 rounded-2xl border-0 shadow-lg">
+            <DropdownMenuItem className="gap-2" onClick={() => onEditTask(task)}>
+              <Pencil className="h-4 w-4" />
+              Edit Task
+            </DropdownMenuItem>
+            <DropdownMenuItem className="gap-2 text-rose-600 focus:text-rose-600" onClick={() => onDeleteTask(task)}>
+              <Trash2 className="h-4 w-4" />
+              Delete Task
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5 pb-6 pt-3">
+      {tree.map((group) => renderCustomerRow(group))}
+    </div>
+  )
+}
+

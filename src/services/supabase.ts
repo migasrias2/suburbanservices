@@ -77,6 +77,19 @@ export type Area = {
   updated_at: string;
 }
 
+export type AreaTask = {
+  id: string;
+  customer_name: string;
+  area: string | null;
+  qr_code: string | null;
+  task_type: string | null;
+  task_description: string;
+  position: number | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export type QRCode = {
   id: string;
   code: string;
@@ -115,6 +128,12 @@ export type CleanerLog = {
   device_info?: any;
   comments?: string;
   timestamp: string;
+}
+
+export type ManagerCleaner = {
+  manager_id: string
+  cleaner_id: string
+  created_at: string
 }
 
 // Legacy type aliases for backward compatibility

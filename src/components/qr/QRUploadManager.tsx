@@ -68,6 +68,76 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
     }, 0)
   }
 
+  const ensureAreaTask = async (
+    qrData: QRCodeData,
+    customerName: string,
+    areaName: string
+  ) => {
+    const normalizedCustomer = customerName.trim() || 'Unassigned Customer'
+    const normalizedArea = areaName.trim() || 'Unassigned Area'
+    const normalizedType = qrData.type?.trim().toUpperCase() || 'AREA'
+
+    const describeTask = () => {
+      if (normalizedType === 'CLOCK_IN') {
+        return `Clock in checkpoint – ${normalizedArea}`
+      }
+      if (normalizedType === 'CLOCK_OUT') {
+        return `Clock out checkpoint – ${normalizedArea}`
+      }
+      if (normalizedType === 'TASK') {
+        return `Task QR – ${normalizedArea}`
+      }
+      return `Service checklist – ${normalizedArea}`
+    }
+
+    try {
+      const { data: existing, error: fetchError } = await supabase
+        .from('area_tasks')
+        .select('id')
+        .eq('qr_code', qrData.id)
+        .maybeSingle()
+
+      if (fetchError) {
+        console.error('Failed to read existing area task', fetchError)
+        return
+      }
+
+      if (existing?.id) {
+        const { error: updateError } = await supabase
+          .from('area_tasks')
+          .update({
+            customer_name: normalizedCustomer,
+            area: normalizedArea,
+            task_description: describeTask(),
+            task_type: normalizedType,
+            active: true,
+          })
+          .eq('id', existing.id)
+
+        if (updateError) {
+          console.error('Failed to update area task', updateError)
+        }
+      } else {
+        const { error: insertError } = await supabase
+          .from('area_tasks')
+          .insert({
+            customer_name: normalizedCustomer,
+            area: normalizedArea,
+            task_description: describeTask(),
+            task_type: normalizedType,
+            qr_code: qrData.id,
+            active: true,
+          })
+
+        if (insertError) {
+          console.error('Failed to insert area task', insertError)
+        }
+      }
+    } catch (areaTaskError) {
+      console.error('Error ensuring area task record', areaTaskError)
+    }
+  }
+
   const processSelectedFiles = async (selectedList: UploadedFile[]) => {
     setUploading(true)
     setErrorMsg(null)
@@ -128,13 +198,16 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
         const { data: publicUrlData } = bucket.getPublicUrl(path)
         const publicUrl = publicUrlData?.publicUrl || path
 
+        const areaName = qrData.metadata?.areaName || qrData.metadata?.siteName || safeArea || 'Area'
+        const customerName = qrData.customerName || customerFromPath || 'Unknown'
+
         // Save metadata to database
         const { error: insertError } = await supabase
           .from('building_qr_codes')
           .upsert({
             qr_code_id: qrData.id,
-            customer_name: qrData.customerName || 'Unknown',
-            building_area: (qrData.metadata?.areaName || qrData.metadata?.siteName || safeArea || 'Area'),
+            customer_name: customerName,
+            building_area: areaName,
             area_description: qrData.type,
             qr_code_url: JSON.stringify(qrData),
             qr_code_image_path: publicUrl,
@@ -145,6 +218,8 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
         if (insertError) {
           throw insertError
         }
+
+        await ensureAreaTask(qrData, customerName, areaName)
 
         const processedFile: UploadedFile = {
           ...entry,

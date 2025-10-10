@@ -12,7 +12,9 @@ import ScannerPage from "./pages/ScannerPage";
 import HistoryPage from "./pages/HistoryPage";
 import ProfilePage from "./pages/ProfilePage";
 import QRLibraryPage from "./pages/QRLibraryPage";
+import AreaTasksPage from "./pages/AreaTasksPage";
 import NotFound from "./pages/NotFound";
+import ManagerActivityPage from "./pages/ManagerActivityPage";
 import { Navigate } from "react-router-dom";
 
 const queryClient = new QueryClient();
@@ -33,7 +35,9 @@ const App = () => (
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/qr-library" element={<QRLibraryPage />} />
+          <Route path="/area-tasks" element={<AreaTasksPage />} />
           <Route path="/manager-dashboard" element={<ManagerDashboardPage />} />
+          <Route path="/manager-activity" element={<ManagerActivityPage />} />
           <Route path="/admin-dashboard" element={<ManagerDashboardPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

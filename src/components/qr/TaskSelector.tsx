@@ -18,6 +18,7 @@ interface TaskCompletionProps {
   onClockOut?: () => void
   onCancel?: () => void
   initialState?: {
+    qrCodeId?: string
     currentTaskIndex: number
     taskCompletions: TaskCompletion[]
     confirmedPhotos: Record<string, boolean>
@@ -69,11 +70,14 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
       photos: []
     }))
     setTaskCompletions(initialCompletions)
-  }, [])
+    setConfirmedPhotos({})
+    setCurrentIndex(0)
+  }, [qrData.id, areaType, tasks])
 
   // Hydrate from initial draft (including photos)
   React.useEffect(() => {
     if (!initialState) return
+    if (initialState.qrCodeId && initialState.qrCodeId !== qrData.id) return
     if (tasks.length === 0) return
     const map = new Map(initialState.taskCompletions.map(tc => [tc.taskId, tc]))
     const merged = tasks.map(t => map.get(t.id) || { taskId: t.id, completed: false, photos: [] })
