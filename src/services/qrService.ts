@@ -1,6 +1,7 @@
 import QRCode from 'qrcode'
 import { supabase } from './supabase'
 import { v4 as uuidv4 } from 'uuid'
+import { getStoredCleanerName, normalizeCleanerNumericId } from '../lib/identity'
 
 export type AreaType = 
   | 'BATHROOMS_ABLUTIONS'
@@ -89,7 +90,7 @@ export const AREA_TASKS: Record<AreaType, TaskDefinition[]> = {
 export class QRService {
   static async saveRemoteDraft(draft: any) {
     try {
-      const cleanerName = localStorage.getItem('userName') || 'Unknown Cleaner'
+      const cleanerName = getStoredCleanerName()
       await supabase
         .from('work_drafts')
         .upsert({
@@ -310,7 +311,7 @@ export class QRService {
           siteArea = qrData.metadata?.areaName || 'Site Exit'
           
           // Check if already clocked out
-          const cleanerName = localStorage.getItem('userName') || 'Unknown Cleaner'
+          const cleanerName = getStoredCleanerName()
           console.log('Clock-out validation for:', cleanerName)
           
           const alreadyClockedOut = await this.isAlreadyClockedOut(cleanerId)
@@ -357,7 +358,7 @@ export class QRService {
           .from('cleaner_logs')
           .insert({
             cleaner_id: cleanerId,
-            cleaner_name: localStorage.getItem('userName') || 'Unknown Cleaner',
+            cleaner_name: getStoredCleanerName(),
             action: action,
             site_id: qrData.siteId,
             area_id: qrData.areaId,
@@ -399,15 +400,15 @@ export class QRService {
     qrData: QRCodeData
   ): Promise<{success: boolean, message?: string}> {
     try {
-      const cleanerName = localStorage.getItem('userName') || 'Unknown Cleaner'
+      const cleanerName = getStoredCleanerName()
       const currentTime = new Date().toISOString()
 
       if (eventType === 'clock_in') {
         // For clock-in, create a new time_attendance record
-        const { error: attendanceError } = await supabase
+          const { error: attendanceError } = await supabase
           .from('time_attendance')
           .insert({
-            cleaner_id: cleanerId.includes('-') ? null : parseInt(cleanerId), // Handle UUID vs integer
+            cleaner_id: normalizeCleanerNumericId(cleanerId),
             cleaner_name: cleanerName,
             customer_name: qrData.customerName || siteId || 'Unknown Site',
             site_name: qrData.metadata?.siteName || qrData.metadata?.areaName || siteId || 'Unknown Site',
@@ -486,7 +487,7 @@ export class QRService {
         return false
       }
 
-      const cleanerName = localStorage.getItem('userName') || 'Unknown Cleaner'
+      const cleanerName = getStoredCleanerName()
       console.log('Checking if clocked in for:', cleanerName)
 
       // Check by cleaner_name instead of cleaner_id to handle UUID vs integer mismatch
@@ -531,7 +532,7 @@ export class QRService {
         return false
       }
 
-      const cleanerName = localStorage.getItem('userName') || 'Unknown Cleaner'
+      const cleanerName = getStoredCleanerName()
       console.log('Checking clock-out status for:', cleanerName)
 
       // If there's no active clock-in, consider them clocked out
@@ -562,7 +563,7 @@ export class QRService {
       .from('live_tracking')
       .upsert({
         cleaner_id: cleanerId,
-        cleaner_name: localStorage.getItem('userName') || 'Unknown Cleaner',
+        cleaner_name: getStoredCleanerName(),
         site_id: qrData.siteId,
         area_id: qrData.areaId,
         event_type: action.toLowerCase().replace(' ', '_'),
@@ -646,7 +647,7 @@ export class QRService {
         .from('uk_cleaner_task_selections')
         .insert({
           cleaner_id: taskSelection.cleanerId,
-          cleaner_name: localStorage.getItem('userName') || 'Unknown Cleaner',
+          cleaner_name: getStoredCleanerName(),
           qr_code_id: taskSelection.qrCodeId,
           area_type: taskSelection.areaType,
           selected_tasks: JSON.stringify(taskSelection.selectedTasks),
@@ -663,7 +664,7 @@ export class QRService {
       if (photos && photos.length > 0) {
         const photoInserts = photos.map(photo => ({
           cleaner_id: taskSelection.cleanerId,
-          cleaner_name: localStorage.getItem('userName') || 'Unknown Cleaner',
+          cleaner_name: getStoredCleanerName(),
           qr_code_id: taskSelection.qrCodeId,
           task_id: photo.taskId,
           area_type: taskSelection.areaType,

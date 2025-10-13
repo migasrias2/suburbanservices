@@ -22,6 +22,7 @@ import {
   Trash2
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
+import { getStoredCleanerName } from '../lib/identity'
 
 interface QRCodeItem {
   id: string
@@ -51,7 +52,7 @@ export default function QRLibraryPage() {
     // Get user info from localStorage
     const type = localStorage.getItem('userType')
     const id = localStorage.getItem('userId')
-    const name = localStorage.getItem('userName')
+    const name = getStoredCleanerName()
 
     if (!type || !id || !name || type !== 'admin') {
       navigate('/login')

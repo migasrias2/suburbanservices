@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Clock, QrCode } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/services/supabase'
+import { getStoredCleanerName } from '@/lib/identity'
 
 type Phase = 'clock_in' | 'workflow' | 'completed'
 
 export default function ClockInPage() {
-  const userName = localStorage.getItem('userName') || 'Cleaner'
+  const userName = getStoredCleanerName() || 'Cleaner'
   const userType = (localStorage.getItem('userType') as 'cleaner' | 'manager' | 'admin') || 'cleaner'
   const cleanerId = localStorage.getItem('userId') || ''
   const navigate = useNavigate()

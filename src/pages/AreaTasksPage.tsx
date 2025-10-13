@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sidebar07Layout } from '@/components/layout/Sidebar07Layout'
 import { AreaTasksPage as AreaTasksContent } from '@/components/areas/AreaTasksPage'
+import { getStoredCleanerName } from '@/lib/identity'
 
 export default function AreaTasksPage() {
   const navigate = useNavigate()
@@ -10,7 +11,7 @@ export default function AreaTasksPage() {
 
   useEffect(() => {
     const type = localStorage.getItem('userType') as 'manager' | 'admin' | 'cleaner' | null
-    const name = localStorage.getItem('userName')
+    const name = getStoredCleanerName()
     const id = localStorage.getItem('userId')
 
     if (!type || type !== 'admin' || !name || !id) {

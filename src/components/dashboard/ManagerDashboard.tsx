@@ -6,8 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { fetchCleanersByIds, fetchManagerCleanerIds } from '../../services/managerService'
-import { Badge } from '../ui/badge'
 import { AREA_TASKS } from '../../services/qrService'
+import { normalizeCleanerName } from '../../lib/identity'
 
 interface ManagerDashboardProps {
   managerId: string
@@ -18,6 +18,7 @@ interface CleanerListItem {
   id: string
   cleaner_id: string
   cleaner_name: string
+  cleaner_name_normalized: string
   customer_name: string | null
   site_area: string | null
   site_id: string | null
@@ -143,6 +144,22 @@ const parseTimestamp = (value?: string | null) => {
   return Number.isNaN(time) ? null : time
 }
 
+const buildDateKey = (value?: string | null) => {
+  const timestamp = parseTimestamp(value)
+  if (timestamp === null) return 'unknown-date'
+  const date = new Date(timestamp)
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const buildSessionAnchor = (value?: string | null) => {
+  const timestamp = parseTimestamp(value)
+  if (timestamp === null) return null
+  return new Date(timestamp).toISOString()
+}
+
 const deriveAreaIdentity = (photo: TaskPhotoRow) => {
   const rawLabel = photo.area_name?.trim() || photo.area_type?.trim() || 'Unassigned Area'
   const areaLabel = formatCategoryLabel(rawLabel)
@@ -170,6 +187,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null)
   const [photoList, setPhotoList] = useState<TaskPhotoRow[]>([])
   const [photoTaskName, setPhotoTaskName] = useState<string>('')
+  const [photoTaskDate, setPhotoTaskDate] = useState<string>('')
   const [photoFeedbackMap, setPhotoFeedbackMap] = useState<Record<number, 'up' | 'down' | null>>({})
   const [isSavingFeedback, setIsSavingFeedback] = useState(false)
   const [expandedAttendanceId, setExpandedAttendanceId] = useState<number | null>(null)
@@ -217,11 +235,13 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
         ;(trackingRows ?? []).forEach((row) => {
           const key = row.cleaner_id || row.id
-          const cleanerName = row.cleaner_name ?? (() => {
+          const cleanerNameRaw = row.cleaner_name ?? (() => {
             const rosterMatch = cleanerRoster.find((cleaner) => cleaner.id === row.cleaner_id)
             if (!rosterMatch) return ''
             return `${rosterMatch.first_name ?? ''} ${rosterMatch.last_name ?? ''}`.trim()
           })()
+
+          const cleanerName = normalizeCleanerName(cleanerNameRaw)
 
           if (!key || !cleanerName) return
 
@@ -232,6 +252,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
               id: row.id || key,
               cleaner_id: row.cleaner_id || key,
               cleaner_name: cleanerName,
+              cleaner_name_normalized: cleanerName,
               customer_name: row.customer_name || null,
               site_area: row.site_area || null,
               site_id: row.site_id || null,
@@ -249,6 +270,8 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
               existing.site_id = row.site_id || existing.site_id
               existing.event_type = row.event_type || existing.event_type
               existing.is_active = row.is_active ?? existing.is_active
+              existing.cleaner_name = cleanerName
+              existing.cleaner_name_normalized = cleanerName
             }
             cleanerMap.set(key, existing)
           }
@@ -256,11 +279,13 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
         cleanerRoster.forEach((row) => {
           const name = `${row.first_name ?? ''} ${row.last_name ?? ''}`.trim() || 'Cleaner'
+          const normalizedName = normalizeCleanerName(name)
           if (!cleanerMap.has(row.id)) {
             cleanerMap.set(row.id, {
               id: row.id,
               cleaner_id: row.id,
-              cleaner_name: name,
+              cleaner_name: normalizedName,
+              cleaner_name_normalized: normalizedName,
               customer_name: null,
               site_area: null,
               site_id: null,
@@ -300,26 +325,40 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     const loadDetail = async () => {
       setIsDetailLoading(true)
       setExpandedAttendanceId(null)
-      const cleanerName = selectedCleaner.cleaner_name
+      const cleanerName = normalizeCleanerName(selectedCleaner.cleaner_name)
+      const nameTokens = Array.from(new Set(cleanerName.split(' ').filter(Boolean)))
+      const shouldRunFuzzyAttendance = nameTokens.length > 1
+      const cleanerId = selectedCleaner.cleaner_id
       const targetManagerId = 'df0bf2e7-1a07-4876-949c-6cfe8fe0fac6'
       const isAvtradeManager = managerId === targetManagerId
       const matchesAvtrade = (value: string | null | undefined) =>
         value ? value.toLowerCase().includes('avtrade') : false
 
-      const attendanceQuery = supabase
+      const attendanceExactQuery = supabase
         .from('time_attendance')
         .select('*')
         .eq('cleaner_name', cleanerName)
         .order('clock_in', { ascending: false })
         .limit(60)
+
+      const attendanceFuzzyQuery = shouldRunFuzzyAttendance
+        ? supabase
+            .from('time_attendance')
+            .select('*')
+            .ilike('cleaner_name', `%${nameTokens.join('%')}%`)
+            .order('clock_in', { ascending: false })
+            .limit(60)
+        : null
+
       if (isAvtradeManager) {
-        attendanceQuery.or('customer_name.ilike.%avtrade%,site_name.ilike.%avtrade%')
+        attendanceExactQuery.or('customer_name.ilike.%avtrade%,site_name.ilike.%avtrade%')
+        attendanceFuzzyQuery?.or('customer_name.ilike.%avtrade%,site_name.ilike.%avtrade%')
       }
 
       const logsQuery = supabase
         .from('uk_cleaner_logs')
         .select('*')
-        .eq('cleaner_name', cleanerName)
+        .or(`cleaner_id.eq.${cleanerId},cleaner_name.eq.${cleanerName}`)
         .order('timestamp', { ascending: false })
         .limit(120)
       if (isAvtradeManager) {
@@ -329,7 +368,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
       const tasksQuery = supabase
         .from('uk_cleaner_task_selections')
         .select('*')
-        .eq('cleaner_name', cleanerName)
+        .or(`cleaner_id.eq.${cleanerId},cleaner_name.eq.${cleanerName}`)
         .order('timestamp', { ascending: false })
         .limit(80)
 
@@ -346,19 +385,48 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         photosQuery.or('area_type.ilike.%avtrade%,qr_code_id.ilike.%avtrade%')
       }
 
-      const [attendanceRes, logsRes, tasksRes, photosRes] = await Promise.all([
-        attendanceQuery,
-        logsQuery,
-        tasksQuery,
-        photosQuery
-      ])
+      const [logsPromise, tasksPromise, photosPromise] = [logsQuery, tasksQuery, photosQuery]
 
-      if (attendanceRes?.error) console.warn('Attendance load failed', attendanceRes.error)
+      const attendanceExactRes = await attendanceExactQuery
+      if (attendanceExactRes?.error) {
+        console.warn('Attendance load failed', attendanceExactRes.error)
+      }
+
+      const shouldRunFuzzyQuery = shouldRunFuzzyAttendance && !(attendanceExactRes?.data?.length)
+      const attendanceFuzzyRes = shouldRunFuzzyQuery && attendanceFuzzyQuery ? await attendanceFuzzyQuery : null
+      if (attendanceFuzzyRes?.error) {
+        console.warn('Attendance fuzzy load failed', attendanceFuzzyRes.error)
+      }
+
+      const [logsRes, tasksRes, photosRes] = await Promise.all([logsPromise, tasksPromise, photosPromise])
+
       if (logsRes?.error) console.warn('Logs load failed', logsRes.error)
       if (tasksRes?.error) console.warn('Tasks load failed', tasksRes.error)
       if (photosRes?.error) console.warn('Photos load failed', photosRes.error)
 
-      setAttendance(attendanceRes?.data ?? [])
+      const attendanceByKey = new Map<string, AttendanceRow>()
+      const combineRows = (rows?: AttendanceRow[] | null) => {
+        if (!rows) return
+        rows.forEach((row) => {
+          const normalizedRowName = normalizeCleanerName(row.cleaner_name)
+          const clockInKey = row.clock_in ? Math.floor(new Date(row.clock_in).getTime() / 1000) : null
+          const clockOutKey = row.clock_out ? Math.floor(new Date(row.clock_out).getTime() / 1000) : null
+          const siteKey = (row.site_name || row.customer_name || '').trim().toLowerCase()
+          const comboKey = [clockInKey ?? 'null', clockOutKey ?? 'null', siteKey].join('::')
+          const existing = attendanceByKey.get(comboKey)
+          const shouldReplace = !existing || (row.id ?? 0) > (existing.id ?? 0)
+          if (shouldReplace) {
+            attendanceByKey.set(comboKey, { ...row, cleaner_name: normalizedRowName })
+          }
+        })
+      }
+
+      combineRows(attendanceExactRes?.data ?? [])
+      if (attendanceFuzzyRes?.data) {
+        combineRows(attendanceFuzzyRes.data)
+      }
+
+      setAttendance(Array.from(attendanceByKey.values()))
       setLogs(logsRes?.data ?? [])
       setTasks(tasksRes?.data ?? [])
       const photoRows = photosRes?.data ?? []
@@ -547,24 +615,33 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   ), [todaysTasks])
 
   const taskPhotoGroups = useMemo(() => {
-  if (!photos.length) return []
+    if (!photos.length) return []
 
     const groups = new Map<string, TaskPhotoGroup>()
 
     photos.forEach((photo) => {
-      const taskKey = photo.task_id || photo.qr_code_id || `unknown-${photo.id}`
       const { key: computedAreaKey, label: areaLabel, customer: areaCustomer } = deriveAreaIdentity(photo)
-      if (!groups.has(taskKey)) {
-        const areaTasks = photo.area_type ? AREA_TASKS[photo.area_type as keyof typeof AREA_TASKS] ?? [] : []
-        const matchedTask = areaTasks.find((task) => task.id === photo.task_id)
-        const taskName = matchedTask?.name || 'Task'
+      const areaTypeTasks = photo.area_type ? AREA_TASKS[photo.area_type as keyof typeof AREA_TASKS] ?? [] : []
+      const matchedTask = areaTypeTasks.find((task) => task.id === photo.task_id)
+      const taskName = matchedTask?.name || 'Task'
+      const category = photo.area_type || matchedTask?.category || null
+
+      const dateKey = buildDateKey(photo.photo_timestamp || photo.started_at)
+      const areaSessionAnchor = buildSessionAnchor(photo.started_at) || dateKey
+      const taskIdentifier = [photo.qr_code_id, photo.task_id, dateKey, areaSessionAnchor, computedAreaKey]
+        .filter(Boolean)
+        .join('::')
+      const fallbackTaskKey = `fallback-${photo.area_type || 'area'}-${photo.task_id || 'task'}-${photo.id}`
+      const groupKey = taskIdentifier || fallbackTaskKey
+
+      if (!groups.has(groupKey)) {
         const startedAt = photo.started_at || photo.photo_timestamp || null
         const latestAt = photo.photo_timestamp || photo.started_at || null
-        groups.set(taskKey, {
-          key: taskKey,
+        groups.set(groupKey, {
+          key: groupKey,
           taskId: photo.task_id ?? null,
           taskName,
-          category: photo.area_type || matchedTask?.category || null,
+          category,
           startedAt,
           startedTimestamp: toTimestamp(startedAt),
           latestAt,
@@ -576,15 +653,28 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         })
       }
 
-      const group = groups.get(taskKey)
+      const group = groups.get(groupKey)
       if (!group) return
-      if (!group.areaKey) {
+
+      group.photos.push(photo)
+
+      if (!group.area && areaLabel) {
+        group.area = areaLabel
+      }
+      if (!group.customer && areaCustomer) {
+        group.customer = areaCustomer
+      }
+      if (!group.category && category) {
+        group.category = category
+      }
+      if (!group.areaKey && computedAreaKey) {
         group.areaKey = computedAreaKey
       }
-      group.photos.push(photo)
+
       const candidateStart = photo.started_at || photo.photo_timestamp || null
       const candidateTimestamp = toTimestamp(candidateStart)
       const candidateLatest = parseTimestamp(photo.photo_timestamp || photo.started_at || null)
+
       if (candidateTimestamp < group.startedTimestamp) {
         group.startedAt = candidateStart
         group.startedTimestamp = candidateTimestamp
@@ -592,12 +682,6 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
       if (candidateLatest !== null && candidateLatest > group.latestTimestamp) {
         group.latestAt = photo.photo_timestamp || photo.started_at || null
         group.latestTimestamp = candidateLatest
-      }
-      if (!group.area) {
-        group.area = areaLabel
-      }
-      if (!group.customer) {
-        group.customer = areaCustomer
       }
     })
 
@@ -610,6 +694,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           if (!samplePhoto) return 'unassigned-area'
           return deriveAreaIdentity(samplePhoto).key
         })()
+
         return {
           ...group,
           startedAt: normalizedStart,
@@ -629,15 +714,16 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     const areas = new Map<string, AreaPhotoGroup>()
 
     taskPhotoGroups.forEach((task) => {
-      const areaKey = task.areaKey
-      const areaKeyBase = task.area || 'Unassigned Area'
+      const areaKey = task.areaKey || 'unassigned-area'
+      const areaName = task.area || 'Unassigned Area'
       const areaCustomer = task.customer
       const areaCategory = task.category
+
       if (!areas.has(areaKey)) {
         areas.set(areaKey, {
           key: areaKey,
           areaKey,
-          area: areaKeyBase,
+          area: areaName,
           category: areaCategory,
           customer: areaCustomer,
           startedTimestamp: task.startedTimestamp,
@@ -646,18 +732,23 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           tasks: [],
         })
       }
+
       const areaGroup = areas.get(areaKey)
       if (!areaGroup) return
+
       if (!areaGroup.category && areaCategory) {
         areaGroup.category = areaCategory
       }
       if (!areaGroup.customer && areaCustomer) {
         areaGroup.customer = areaCustomer
       }
+
       areaGroup.tasks.push(task)
+
       if (task.startedTimestamp < areaGroup.startedTimestamp) {
         areaGroup.startedTimestamp = task.startedTimestamp
       }
+
       const currentLatestTimestamp = areaGroup.latestTimestamp ?? Number.NEGATIVE_INFINITY
       if (task.latestTimestamp > currentLatestTimestamp) {
         areaGroup.latestTimestamp = task.latestTimestamp
@@ -668,11 +759,11 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     return Array.from(areas.values())
       .map((area) => ({
         ...area,
-      tasks: area.tasks
-        .filter((task) => task.areaKey === area.areaKey)
-        .sort((a, b) => b.latestTimestamp - a.latestTimestamp),
+        tasks: area.tasks
+          .filter((task) => task.areaKey === area.areaKey)
+          .sort((a, b) => b.latestTimestamp - a.latestTimestamp),
       }))
-    .sort((a, b) => (b.latestTimestamp ?? Number.NEGATIVE_INFINITY) - (a.latestTimestamp ?? Number.NEGATIVE_INFINITY))
+      .sort((a, b) => (b.latestTimestamp ?? Number.NEGATIVE_INFINITY) - (a.latestTimestamp ?? Number.NEGATIVE_INFINITY))
   }, [taskPhotoGroups])
 
   const areasToday = taskSummaries.length
@@ -683,16 +774,18 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
-  const openPhotoModal = (groupPhotos: TaskPhotoRow[], index: number, taskName?: string) => {
+  const openPhotoModal = (groupPhotos: TaskPhotoRow[], index: number, taskName?: string, taskDate?: string | null) => {
     setPhotoList(groupPhotos)
     setActivePhotoIndex(index)
     setPhotoTaskName(taskName ?? '')
+    setPhotoTaskDate(taskDate ?? '')
   }
 
   const closePhotoModal = () => {
     setActivePhotoIndex(null)
     setPhotoList([])
     setPhotoTaskName('')
+    setPhotoTaskDate('')
   }
 
   const goToPhoto = (direction: 1 | -1) => {
@@ -890,11 +983,6 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                                 {areaGroup.tasks.reduce((sum, task) => sum + task.photos.length, 0)} photos
                               </span>
                             </div>
-                            {areaGroup.category && (
-                              <Badge className="rounded-full bg-[#FFE27A] text-[#1F2937] px-3 py-1 text-[11px] font-semibold">
-                                {formatCategoryLabel(areaGroup.category)}
-                              </Badge>
-                            )}
                           </div>
                           <Button
                             variant="ghost"
@@ -907,101 +995,40 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                           </Button>
                         </div>
 
-                        <div className={`mt-5 space-y-5 overflow-hidden transition-all duration-300 ${isAreaExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                          {areaGroup.tasks.map((taskGroup) => {
-                            const previewPhotos = taskGroup.photos.slice(0, 4)
-                            const remainingPhotos = taskGroup.photos.slice(4)
-                            const taskKey = `${areaGroup.key}::${taskGroup.key}`
-                            const isTaskExpanded = expandedGroups[taskKey] ?? false
-                            return (
-                              <div key={taskKey} className="rounded-[28px] border border-white/70 bg-white/70 p-5 shadow-[0_16px_34px_rgba(15,35,95,0.06)]">
-                                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                  <div className="space-y-2">
-                                    <div className="flex items-center gap-2 text-xs font-medium text-gray-500">
-                                      <Clock className="h-3 w-3 text-[#00339B]" />
-                                      <span>{taskGroup.startedAt ? formatDateTime(taskGroup.startedAt) : 'Time not recorded'}</span>
+                        <div className={`mt-5 overflow-hidden transition-all duration-300 ${isAreaExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                            {areaGroup.tasks.map((taskGroup) => {
+                              const taskKey = `${areaGroup.key}::${taskGroup.key}`
+                              const thumbnail = taskGroup.photos[0]
+                              if (!thumbnail) return null
+
+                              return (
+                                <button
+                                  key={taskKey}
+                                  onClick={() => openPhotoModal(taskGroup.photos, 0, taskGroup.taskName, taskGroup.startedAt)}
+                                  className="group relative aspect-square w-full overflow-hidden rounded-[28px] border border-white/70 bg-white/60 shadow-[0_16px_34px_rgba(15,35,95,0.06)] transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_50px_rgba(15,35,95,0.12)]"
+                                  aria-label={`View photo for ${taskGroup.taskName}`}
+                                >
+                                  <img
+                                    src={thumbnail.photo_data}
+                                    alt={taskGroup.taskName}
+                                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                                  />
+
+                                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0f235f]/90 via-[#0f235f]/40 to-transparent p-4 text-white">
+                                    <h4 className="text-sm font-semibold leading-tight line-clamp-2">{taskGroup.taskName}</h4>
+                                    <div className="mt-2 flex items-center justify-between text-[11px] text-white/80">
+                                      <span className="flex items-center gap-1">
+                                        <Clock className="h-3 w-3" />
+                                        {thumbnail.photo_timestamp ? formatDateTime(thumbnail.photo_timestamp) : 'Time not recorded'}
+                                      </span>
+                                      <span className="rounded-full border border-white/30 px-2 py-0.5">View</span>
                                     </div>
-                                    <h4 className="text-base font-semibold text-gray-900">{taskGroup.taskName}</h4>
-                                    <span className="text-[11px] text-gray-500 font-medium">{taskGroup.photos.length} photo{taskGroup.photos.length === 1 ? '' : 's'}</span>
                                   </div>
-                                  {remainingPhotos.length > 0 && (
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => toggleGroup(taskKey)}
-                                      className="rounded-full border border-gray-200 text-gray-600 hover:bg-white"
-                                      aria-label={isTaskExpanded ? 'Collapse task photos' : 'Expand task photos'}
-                                    >
-                                      <ChevronDown className={`h-4 w-4 transition-transform ${isTaskExpanded ? 'rotate-180' : ''}`} />
-                                    </Button>
-                                  )}
-                                </div>
-
-                                <div className="mt-4 grid gap-4 md:grid-cols-4">
-                                  {previewPhotos.map((photo, index) => {
-                                    const feedback = photoFeedbackMap[photo.id]
-                                    return (
-                                      <button
-                                        key={photo.id}
-                                        onClick={() => openPhotoModal(taskGroup.photos, index, taskGroup.taskName)}
-                                        className="group overflow-hidden rounded-3xl border border-[#e5e7ff] bg-white shadow-[0_16px_30px_rgba(15,35,95,0.08)] transition-all hover:-translate-y-1 hover:shadow-[0_24px_50px_rgba(15,35,95,0.12)]"
-                                      >
-                                        <div className="relative">
-                                          <img src={photo.photo_data} alt="task" className="h-40 w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
-                                          <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-[11px] font-medium text-gray-600">
-                                            <ImageIcon className="h-3 w-3" />
-                                            <span>{index + 1}/{taskGroup.photos.length}</span>
-                                          </div>
-                                          {feedback && (
-                                            <div className={`absolute right-3 bottom-3 rounded-full px-2.5 py-1 text-[10px] font-semibold text-white ${feedback === 'up' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
-                                              {feedback === 'up' ? 'Liked' : 'Flagged'}
-                                            </div>
-                                          )}
-                                        </div>
-                                        <div className="flex items-center gap-2 px-3 py-2 text-[11px] text-gray-500">
-                                          <Clock className="h-3 w-3" />
-                                          <span>{formatDateTime(photo.photo_timestamp)}</span>
-                                        </div>
-                                      </button>
-                                    )
-                                  })}
-                                </div>
-
-                                {remainingPhotos.length > 0 && (
-                                  <div className="mt-4 grid gap-4 md:grid-cols-4">
-                                    {remainingPhotos.map((photo, extraIndex) => {
-                                      const listIndex = extraIndex + previewPhotos.length
-                                      const feedback = photoFeedbackMap[photo.id]
-                                      return (
-                                        <button
-                                          key={photo.id}
-                                          onClick={() => openPhotoModal(taskGroup.photos, listIndex, taskGroup.taskName)}
-                                          className="group overflow-hidden rounded-3xl border border-[#e5e7ff] bg-white shadow-[0_16px_30px_rgba(15,35,95,0.08)] transition-all hover:-translate-y-1 hover:shadow-[0_24px_50px_rgba(15,35,95,0.12)]"
-                                        >
-                                          <div className="relative">
-                                            <img src={photo.photo_data} alt="task" className="h-40 w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
-                                            <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-[11px] font-medium text-gray-600">
-                                              <ImageIcon className="h-3 w-3" />
-                                              <span>{listIndex + 1}/{taskGroup.photos.length}</span>
-                                            </div>
-                                            {feedback && (
-                                              <div className={`absolute right-3 bottom-3 rounded-full px-2.5 py-1 text-[10px] font-semibold text-white ${feedback === 'up' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
-                                                {feedback === 'up' ? 'Liked' : 'Flagged'}
-                                              </div>
-                                            )}
-                                          </div>
-                                          <div className="flex items-center gap-2 px-3 py-2 text-[11px] text-gray-500">
-                                            <Clock className="h-3 w-3" />
-                                            <span>{formatDateTime(photo.photo_timestamp)}</span>
-                                          </div>
-                                        </button>
-                                      )
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            )
-                          })}
+                                </button>
+                              )
+                            })}
+                          </div>
                         </div>
                       </div>
                     )
@@ -1082,8 +1109,8 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                     )}
                     <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
                       <Clock className="h-4 w-4 text-[#00339B]" />
-                      {formatTimeOnly(currentPhoto.photo_timestamp)}
-                  </div>
+                      {formatDateTime(photoTaskDate || currentPhoto.photo_timestamp)}
+                    </div>
                     <div className="flex items-center gap-2">
                       <Button
                         size="sm"

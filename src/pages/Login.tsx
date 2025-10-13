@@ -8,6 +8,7 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { useToast } from '../hooks/use-toast'
+import { setStoredCleanerName } from '../lib/identity'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 
 export default function Login() {
@@ -46,10 +47,12 @@ export default function Login() {
       const result = await authService.loginUser(loginData)
 
       if (result.success && result.user) {
+        const normalizedName = setStoredCleanerName(result.user.name)
+
         // Store user session
         localStorage.setItem('userType', result.user.user_type)
         localStorage.setItem('userId', result.user.id)
-        localStorage.setItem('userName', result.user.name)
+        setStoredCleanerName(normalizedName)
 
         // Navigate based on user type
         switch (result.user.user_type) {

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sidebar07Layout } from '../components/layout/Sidebar07Layout'
 import { ManagerDashboard } from '../components/dashboard/ManagerDashboard'
+import { getStoredCleanerName } from '../lib/identity'
 
 export default function ManagerDashboardPage() {
   const navigate = useNavigate()
@@ -13,7 +14,7 @@ export default function ManagerDashboardPage() {
     // Check if user is logged in as manager or admin
     const storedUserType = localStorage.getItem('userType')
     const userId = localStorage.getItem('userId')
-    const userName = localStorage.getItem('userName')
+    const userName = getStoredCleanerName()
 
     if ((storedUserType !== 'manager' && storedUserType !== 'admin') || !userId || !userName) {
       navigate('/login')

@@ -4,6 +4,7 @@ import { Sidebar07Layout } from '../components/layout/Sidebar07Layout'
 import { supabase, UKCleaner } from '../services/supabase'
 import { Card, CardContent } from '../components/ui/card'
 import { User, Phone, Mail, Building, Hash, Users } from 'lucide-react'
+import { getStoredCleanerName } from '../lib/identity'
 
 export default function ProfilePage() {
   const navigate = useNavigate()
@@ -17,7 +18,7 @@ export default function ProfilePage() {
     // Get user info from localStorage
     const type = localStorage.getItem('userType')
     const id = localStorage.getItem('userId')
-    const name = localStorage.getItem('userName')
+    const name = getStoredCleanerName()
 
     if (!type || !id || !name) {
       navigate('/login')

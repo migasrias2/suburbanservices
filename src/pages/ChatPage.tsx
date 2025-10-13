@@ -4,9 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Send } from 'lucide-react'
+import { getStoredCleanerName } from '@/lib/identity'
 
 export default function ChatPage() {
-  const userName = localStorage.getItem('userName') || 'Cleaner'
+  const userName = getStoredCleanerName() || 'Cleaner'
   const userType = (localStorage.getItem('userType') as 'cleaner' | 'manager' | 'admin') || 'cleaner'
   const [messages, setMessages] = useState<{ me: boolean; text: string }[]>([
     { me: false, text: 'Hi, please clock in at Bex-Sunward Park.' },

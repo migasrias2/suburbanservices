@@ -5,6 +5,7 @@ import { QRScanner } from '../components/qr/QRScanner'
 import { QRService, QRCodeData } from '../services/qrService'
 import { Card, CardContent } from '../components/ui/card'
 import { Camera } from 'lucide-react'
+import { getStoredCleanerName } from '../lib/identity'
 
 export default function ScannerPage() {
   const navigate = useNavigate()
@@ -16,7 +17,7 @@ export default function ScannerPage() {
     // Get user info from localStorage
     const type = localStorage.getItem('userType')
     const id = localStorage.getItem('userId')
-    const name = localStorage.getItem('userName')
+    const name = getStoredCleanerName()
 
     if (!type || !id || !name) {
       navigate('/login')

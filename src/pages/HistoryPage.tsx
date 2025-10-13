@@ -5,6 +5,7 @@ import { supabase } from '../services/supabase'
 import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { FileText, QrCode, MapPin, Clock } from 'lucide-react'
+import { getStoredCleanerName } from '../lib/identity'
 
 export default function HistoryPage() {
   const navigate = useNavigate()
@@ -18,7 +19,7 @@ export default function HistoryPage() {
     // Get user info from localStorage
     const type = localStorage.getItem('userType')
     const id = localStorage.getItem('userId')
-    const name = localStorage.getItem('userName')
+    const name = getStoredCleanerName()
 
     if (!type || !id || !name) {
       navigate('/login')

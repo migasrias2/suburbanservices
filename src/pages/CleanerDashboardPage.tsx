@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sidebar07Layout } from '../components/layout/Sidebar07Layout'
 import { CleanerDashboard } from '../components/dashboard/CleanerDashboard'
+import { getStoredCleanerName } from '../lib/identity'
 
 export default function CleanerDashboardPage() {
   const navigate = useNavigate()
@@ -12,7 +13,7 @@ export default function CleanerDashboardPage() {
     // Check if user is logged in as cleaner
     const userType = localStorage.getItem('userType')
     const userId = localStorage.getItem('userId')
-    const userName = localStorage.getItem('userName')
+    const userName = getStoredCleanerName()
 
     if (userType !== 'cleaner' || !userId || !userName) {
       navigate('/login')
