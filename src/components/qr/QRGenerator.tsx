@@ -77,7 +77,8 @@ export const QRGenerator: React.FC<QRGeneratorProps> = ({ onQRGenerated }) => {
         case 'CLOCK_IN':
           qrImage = await QRService.generateClockInQR(
             selectedSite,
-            selectedSiteData?.customer_name || 'Unknown Customer'
+            selectedSiteData?.customer_name || 'Unknown Customer',
+            selectedSiteData?.name
           )
           qrData = {
             id: crypto.randomUUID(),
@@ -94,7 +95,8 @@ export const QRGenerator: React.FC<QRGeneratorProps> = ({ onQRGenerated }) => {
         case 'CLOCK_OUT':
           qrImage = await QRService.generateClockOutQR(
             selectedSite,
-            selectedSiteData?.customer_name || 'Unknown Customer'
+            selectedSiteData?.customer_name || 'Unknown Customer',
+            selectedSiteData?.name
           )
           qrData = {
             id: crypto.randomUUID(),

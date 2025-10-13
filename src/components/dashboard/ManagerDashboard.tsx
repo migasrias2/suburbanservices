@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Users, Image as ImageIcon, ArrowLeft, Clock, MapPin, Search, ChevronDown, ChevronLeft, ChevronRight, ThumbsUp, ThumbsDown, X } from 'lucide-react'
+import { Users, Image as ImageIcon, ArrowLeft, ArrowRight, Clock, MapPin, Search, ChevronDown, ChevronLeft, ChevronRight, ThumbsUp, ThumbsDown, X } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -112,8 +112,12 @@ const statusColors: Record<string, string> = {
 const normalizeStatus = (status: string | null) => (status ? status.toLowerCase().replace(/\s+/g, '_') : '')
 const getStatusColor = (status: string | null) => statusColors[normalizeStatus(status)] || 'bg-gray-400'
 
-const formatTime = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—')
-const formatDateTime = (iso: string | null) => (iso ? new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—')
+const formatTime = (iso: string | null, options?: Intl.DateTimeFormatOptions) =>
+  iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', ...(options ?? {}) }) : '—'
+const formatDateTime = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+const formatDate = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '—'
 const formatTimeOnly = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—')
 const formatCategoryLabel = (category?: string | null) => {
   if (!category) return 'General'
@@ -168,6 +172,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const [photoTaskName, setPhotoTaskName] = useState<string>('')
   const [photoFeedbackMap, setPhotoFeedbackMap] = useState<Record<number, 'up' | 'down' | null>>({})
   const [isSavingFeedback, setIsSavingFeedback] = useState(false)
+  const [expandedAttendanceId, setExpandedAttendanceId] = useState<number | null>(null)
 
   useEffect(() => {
     if (activePhotoIndex !== null) {
@@ -294,6 +299,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
     const loadDetail = async () => {
       setIsDetailLoading(true)
+      setExpandedAttendanceId(null)
       const cleanerName = selectedCleaner.cleaner_name
       const targetManagerId = 'df0bf2e7-1a07-4876-949c-6cfe8fe0fac6'
       const isAvtradeManager = managerId === targetManagerId
@@ -390,7 +396,21 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     return cleaners.filter((cleaner) => cleaner.cleaner_name.toLowerCase().includes(query))
   }, [cleaners, search])
 
-  const selectedAttendancePreview = useMemo(() => attendance.slice(0, 8), [attendance])
+  const attendanceDisplayRows = useMemo(() => {
+    const sorted = [...attendance].sort((a, b) => {
+      const aTime = a.clock_in ? new Date(a.clock_in).getTime() : Number.NEGATIVE_INFINITY
+      const bTime = b.clock_in ? new Date(b.clock_in).getTime() : Number.NEGATIVE_INFINITY
+      return bTime - aTime
+    })
+
+    const activeEntries = sorted.filter((row) => row.clock_in && !row.clock_out)
+    const completedEntries = sorted.filter((row) => row.clock_in && row.clock_out)
+    const otherEntries = sorted.filter((row) => !row.clock_in && row.clock_out)
+
+    return [...activeEntries, ...completedEntries, ...otherEntries]
+  }, [attendance])
+
+  const selectedAttendancePreview = useMemo(() => attendanceDisplayRows.slice(0, 8), [attendanceDisplayRows])
   const selectedLogsPreview = useMemo(() => logs.slice(0, 15), [logs])
 
   const todayKey = useMemo(() => new Date().toDateString(), [])
@@ -401,6 +421,116 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     () => attendance.filter((row) => (row.clock_in && new Date(row.clock_in).toDateString() === todayKey) || (row.clock_out && new Date(row.clock_out).toDateString() === todayKey)),
     [attendance, todayKey]
   )
+
+  const isPlaceholderLabel = (value?: string | null) => {
+    if (!value) return false
+    const normalized = value.trim().toLowerCase()
+    return normalized === 'unknown site' || normalized === 'site'
+  }
+
+  const getAttendanceSiteLabel = (row: AttendanceRow) => {
+    if (row.site_name && !isPlaceholderLabel(row.site_name)) {
+      return row.site_name
+    }
+    if (row.customer_name && !isPlaceholderLabel(row.customer_name)) {
+      return row.customer_name
+    }
+    return row.site_name || row.customer_name || 'Site'
+  }
+
+  const renderAttendanceCard = (row: AttendanceRow) => {
+    const siteLabel = getAttendanceSiteLabel(row)
+    const isCompleted = Boolean(row.clock_out)
+    const isExpanded = expandedAttendanceId === row.id
+    const clockInLabel = row.clock_in ? formatTime(row.clock_in) : '—'
+    const clockOutLabel = row.clock_out ? formatTime(row.clock_out) : '—'
+    const dateLabel = formatDate(row.clock_out ?? row.clock_in)
+
+    const toggleExpanded = () => {
+      if (!isCompleted) return
+      setExpandedAttendanceId(isExpanded ? null : row.id)
+    }
+
+    return (
+      <div key={row.id} className="space-y-2">
+        <div
+          className={`rounded-[32px] border border-gray-200 bg-gray-100 px-6 py-5 transition ${
+            isCompleted ? 'cursor-pointer hover:border-gray-300 hover:bg-gray-100/90' : ''
+          }`}
+          onClick={toggleExpanded}
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">{siteLabel}</p>
+              <div className="flex items-center gap-6 text-sm text-gray-900">
+                <div className="text-left">
+                  <p className="font-semibold leading-tight">Clocked in</p>
+                  <p className="text-gray-600 leading-tight">{clockInLabel}</p>
+                </div>
+                <ArrowRight className="h-4 w-4 text-gray-500" />
+                <div className="text-left">
+                  <p className="font-semibold leading-tight">{isCompleted ? 'Clocked out' : 'On site'}</p>
+                  <p className="text-gray-600 leading-tight">{isCompleted ? clockOutLabel : '—'}</p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500">{dateLabel}</p>
+            </div>
+            {isCompleted ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  toggleExpanded()
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-600 transition hover:bg-gray-50"
+                aria-expanded={isExpanded}
+                aria-label="Toggle attendance details"
+              >
+                <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+              </button>
+            ) : (
+              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400">
+                <ArrowRight className="h-4 w-4" />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {isCompleted && isExpanded && (
+          <div className="space-y-2 pl-4 sm:pl-8">
+            <div className="flex items-center justify-between gap-4 rounded-[28px] border border-gray-200 bg-gray-100 px-5 py-4">
+              <div className="flex items-center gap-4 text-sm text-gray-900">
+                <div className="text-left">
+                  <p className="font-semibold leading-tight">Clocked in</p>
+                  <p className="text-gray-600 leading-tight">{clockInLabel}</p>
+                </div>
+                <ArrowRight className="h-4 w-4 text-gray-500" />
+                <div className="text-left">
+                  <p className="font-semibold leading-tight">On site</p>
+                  <p className="text-gray-600 leading-tight">—</p>
+                </div>
+              </div>
+              <span className="text-xs text-gray-500">{dateLabel}</span>
+            </div>
+            <div className="flex items-center justify-between gap-4 rounded-[28px] border border-gray-200 bg-gray-100 px-5 py-4">
+              <div className="flex items-center gap-4 text-sm text-gray-900">
+                <div className="text-left">
+                  <p className="font-semibold leading-tight">On site</p>
+                  <p className="text-gray-600 leading-tight">—</p>
+                </div>
+                <ArrowRight className="h-4 w-4 text-gray-500" />
+                <div className="text-left">
+                  <p className="font-semibold leading-tight">Clocked out</p>
+                  <p className="text-gray-600 leading-tight">{clockOutLabel}</p>
+                </div>
+              </div>
+              <span className="text-xs text-gray-500">{dateLabel}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   const taskSummaries = useMemo(() => (
     todaysTasks.map((row) => {
@@ -704,22 +834,18 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           <CardContent className="space-y-6">
           <div className="grid md:grid-cols-2 gap-6">
               <Card className="rounded-2xl border border-gray-100 shadow-sm">
-              <CardHeader>
+                <CardHeader>
                   <CardTitle className="text-sm font-semibold">Time & Attendance</CardTitle>
-              </CardHeader>
-              <CardContent>
+                </CardHeader>
+                <CardContent>
                   <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
-                    {selectedAttendancePreview.map((row) => (
-                      <div key={row.id} className="p-3 rounded-xl bg-blue-50/80">
-                        <p className="text-sm font-semibold text-[#00339B]">Clock in • {row.site_name || row.customer_name || 'Site'}</p>
-                        <p className="text-xs text-gray-600">{formatDateTime(row.clock_in)}</p>
-                        <p className="text-xs text-gray-500 mt-1">Clock out: {formatDateTime(row.clock_out)}</p>
-                    </div>
-                  ))}
-                    {selectedAttendancePreview.length === 0 && <div className="text-xs text-gray-500">No attendance entries recorded.</div>}
-                </div>
-              </CardContent>
-            </Card>
+                    {selectedAttendancePreview.map(renderAttendanceCard)}
+                    {selectedAttendancePreview.length === 0 && (
+                      <div className="text-xs text-gray-500">No attendance entries recorded.</div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
 
               <Card className="rounded-2xl border border-gray-100 shadow-sm">
                 <CardHeader>

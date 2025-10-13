@@ -27,10 +27,14 @@ const formatDateTime = (iso?: string | null) =>
       })
     : "—"
 
+const INITIAL_STATE = {
+  managerId: "",
+  managerName: "",
+}
+
 export default function ManagerActivityPage() {
   const navigate = useNavigate()
-  const [managerId, setManagerId] = useState<string>("")
-  const [managerName, setManagerName] = useState<string>("")
+  const [{ managerId, managerName }, setIdentity] = useState(INITIAL_STATE)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [activity, setActivity] = useState<ActivityRow[]>([])
@@ -46,14 +50,11 @@ export default function ManagerActivityPage() {
       return
     }
 
-    setManagerId(storedManagerId)
-    setManagerName(storedManagerName)
+    setIdentity({ managerId: storedManagerId, managerName: storedManagerName })
   }, [navigate])
 
   useEffect(() => {
-    if (!managerId) {
-      return
-    }
+    if (!managerId) return
 
     const loadActivity = async () => {
       setIsLoading(true)

@@ -183,7 +183,7 @@ export class QRService {
   /**
    * Generate Clock-In QR Code for a site
    */
-  static async generateClockInQR(siteId: string, customerName: string): Promise<string> {
+  static async generateClockInQR(siteId: string, customerName: string, siteName?: string): Promise<string> {
     const qrData: QRCodeData = {
       id: uuidv4(),
       type: 'CLOCK_IN',
@@ -191,7 +191,8 @@ export class QRService {
       customerName,
       metadata: {
         action: 'clock_in',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        siteName: siteName || undefined
       }
     }
     return this.generateQRCode(qrData)
@@ -200,7 +201,7 @@ export class QRService {
   /**
    * Generate Clock-Out QR Code for a site
    */
-  static async generateClockOutQR(siteId: string, customerName: string): Promise<string> {
+  static async generateClockOutQR(siteId: string, customerName: string, siteName?: string): Promise<string> {
     const qrData: QRCodeData = {
       id: uuidv4(),
       type: 'CLOCK_OUT',
@@ -208,7 +209,8 @@ export class QRService {
       customerName,
       metadata: {
         action: 'clock_out',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        siteName: siteName || undefined
       }
     }
     return this.generateQRCode(qrData)

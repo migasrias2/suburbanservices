@@ -68,6 +68,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
 
   const managerMenuItems = [
     { icon: BarChart3, label: 'Dashboard', path: '/manager-dashboard' },
+    { icon: Clock, label: 'Recent Activity', path: '/manager-activity' },
   ]
 
   const adminMenuItems = [
