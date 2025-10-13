@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sidebar07Layout } from '../components/layout/Sidebar07Layout'
 import { QRUploadManager } from '../components/qr/QRUploadManager'
@@ -7,6 +7,7 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog'
+import { Checkbox } from '../components/ui/checkbox'
 import { 
   QrCode, 
   Search, 
@@ -19,14 +20,18 @@ import {
   Grid3X3,
   List,
   Plus,
-  Trash2
+  Trash2,
+  CheckSquare,
+  XCircle
 } from 'lucide-react'
 import { supabase } from '../services/supabase'
 import { getStoredCleanerName } from '../lib/identity'
+import JSZip from 'jszip'
 
 interface QRCodeItem {
   id: string
   customer: string
+  customerKey: string
   area: string
   subArea: string
   floor: string
@@ -47,6 +52,9 @@ export default function QRLibraryPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [loading, setLoading] = useState(true)
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
+  const [isSelecting, setIsSelecting] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [downloadingSelected, setDownloadingSelected] = useState(false)
 
   useEffect(() => {
     // Get user info from localStorage
@@ -64,6 +72,15 @@ export default function QRLibraryPage() {
     setUserName(name)
     loadQRCodes()
   }, [navigate])
+
+  const normalizeCustomerName = (input?: string) => {
+    const trimmed = (input || '').trim()
+    if (!trimmed) {
+      return { key: 'unknown', display: 'Unknown' }
+    }
+    const lower = trimmed.toLowerCase()
+    return { key: lower, display: lower === 'psm' ? 'psm' : trimmed }
+  }
 
   const loadQRCodes = async (showLoading = true) => {
     if (showLoading) setLoading(true)
@@ -84,9 +101,12 @@ export default function QRLibraryPage() {
         const mapped: QRCodeItem[] = data.map((row: any) => {
           let parsed: any
           try { parsed = JSON.parse(row.qr_code_url) } catch { parsed = {} }
+          const rawCustomer = row.customer_name || parsed.customerName || ''
+          const { key: customerKey, display: customerDisplay } = normalizeCustomerName(rawCustomer)
           return {
             id: row.qr_code_id,
-            customer: row.customer_name || parsed.customerName || '',
+            customer: customerDisplay,
+            customerKey,
             area: row.building_area || parsed.metadata?.areaName || parsed.metadata?.siteName || '',
             subArea: row.area_description || parsed.type || '',
             floor: parsed.metadata?.floor || '',
@@ -109,6 +129,25 @@ export default function QRLibraryPage() {
     }
   }
 
+  const customerOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    qrCodes.forEach((qr) => {
+      if (!map.has(qr.customerKey)) {
+        map.set(qr.customerKey, qr.customer)
+      }
+    })
+    return Array.from(map.entries()).map(([key, label]) => ({ key, label }))
+  }, [qrCodes])
+
+  const filteredQRCodes = qrCodes.filter(qr => {
+    const matchesSearch = qr.area.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         qr.subArea.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         qr.customer.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesCustomer = selectedCustomer === 'all' || qr.customerKey === selectedCustomer
+    
+    return matchesSearch && matchesCustomer
+  })
+
   if (!userType || !userId || !userName) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -117,16 +156,39 @@ export default function QRLibraryPage() {
     )
   }
 
-  const customers = [...new Set(qrCodes.map(qr => qr.customer).filter(Boolean))]
+  const toggleSelecting = () => {
+    setIsSelecting((prev) => !prev)
+    setSelectedIds([])
+  }
 
-  const filteredQRCodes = qrCodes.filter(qr => {
-    const matchesSearch = qr.area.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         qr.subArea.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         qr.customer.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCustomer = selectedCustomer === 'all' || qr.customer === selectedCustomer
-    
-    return matchesSearch && matchesCustomer
-  })
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredQRCodes.length) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(filteredQRCodes.map((qr) => qr.id))
+    }
+  }
+
+  const handleToggleSelection = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    )
+  }
+
+  const handleSelectableClick = (event: React.MouseEvent, id: string) => {
+    if (!isSelecting) return
+    const target = event.target as HTMLElement
+    if (target.closest('button') || target.closest('a')) return
+    handleToggleSelection(id)
+  }
+
+  const handleSelectableKeyDown = (event: React.KeyboardEvent, id: string) => {
+    if (!isSelecting) return
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault()
+      handleToggleSelection(id)
+    }
+  }
 
   const generateQRCodeImage = (data: string, fallbackUrl?: string) => {
     try {
@@ -223,6 +285,56 @@ export default function QRLibraryPage() {
     }
   }
 
+  const handleDownloadSelected = async () => {
+    if (selectedIds.length === 0 || downloadingSelected) return
+
+    try {
+      setDownloadingSelected(true)
+      const selectedQRCodes = filteredQRCodes.filter((qr) => selectedIds.includes(qr.id))
+
+      if (selectedQRCodes.length === 0) {
+        alert('No QR codes selected in the current filters.')
+        return
+      }
+
+      const zip = new JSZip()
+
+      await Promise.all(
+        selectedQRCodes.map(async (qr) => {
+          const imageUrl = qr.imageUrl || generateQRCodeImage(qr.qrCodeData, qr.imageUrl)
+          const response = await fetch(imageUrl)
+          if (!response.ok) {
+            throw new Error(`Failed to fetch ${qr.area} QR code`)
+          }
+          const blob = await response.blob()
+          const arrayBuffer = await blob.arrayBuffer()
+          const sanitizedCustomer = qr.customer.replace(/[^a-zA-Z0-9._-]+/g, '_') || 'customer'
+          const sanitizedArea = qr.area.replace(/[^a-zA-Z0-9._-]+/g, '_') || 'area'
+          const fileName = `${sanitizedCustomer}_${sanitizedArea}.png`.toLowerCase()
+          zip.file(fileName, arrayBuffer)
+        })
+      )
+
+      const content = await zip.generateAsync({ type: 'blob' })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(content)
+      link.download = `qr-codes-${new Date().toISOString()}.zip`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(link.href)
+
+      // Reset selection after download
+      setSelectedIds([])
+      setIsSelecting(false)
+    } catch (error) {
+      console.error('Bulk download failed:', error)
+      alert('Failed to download selected QR codes. Please try again.')
+    } finally {
+      setDownloadingSelected(false)
+    }
+  }
+
   const getTypeColor = (type: string) => {
     switch (type?.toUpperCase()) {
       case 'CLOCK_IN': return 'bg-green-100 text-green-700'
@@ -238,15 +350,60 @@ export default function QRLibraryPage() {
     <Sidebar07Layout userType={userType as 'cleaner' | 'manager' | 'admin'} userName={userName}>
       <div className="space-y-8 max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
               QR Code Library
             </h1>
             <p className="text-gray-600 text-lg">Manage and organize all customer area QR codes</p>
           </div>
-          <div className="flex gap-3">
-            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+          <div className="flex gap-3 items-center">
+            {isSelecting && filteredQRCodes.length > 0 && (
+              <>
+                <Button
+                  variant="outline"
+                  className="rounded-full border-gray-200 text-gray-700 gap-2"
+                  onClick={toggleSelectAll}
+                >
+                  <CheckSquare className="h-4 w-4" />
+                  {selectedIds.length === filteredQRCodes.length ? 'Unselect All' : 'Select All'}
+                </Button>
+                <Button
+                  disabled={selectedIds.length === 0 || downloadingSelected}
+                  className="gap-2 rounded-full text-white px-6"
+                  style={{ backgroundColor: '#00339B' }}
+                  onClick={handleDownloadSelected}
+                >
+                  <Download className="h-4 w-4" />
+                  {downloadingSelected ? 'Preparing...' : 'Download Selected'}
+                </Button>
+              </>
+            )}
+            <Button
+              variant={isSelecting ? 'secondary' : 'outline'}
+              className={`rounded-full gap-2 ${isSelecting ? 'text-white' : 'text-gray-700'}`}
+              style={isSelecting ? { backgroundColor: '#00339B' } : undefined}
+              onClick={toggleSelecting}
+            >
+              {isSelecting ? (
+                <>
+                  <XCircle className="h-4 w-4" />
+                  Cancel Selection
+                </>
+              ) : (
+                <>
+                  <CheckSquare className="h-4 w-4" />
+                  Select QR Codes
+                </>
+              )}
+            </Button>
+            <Dialog open={uploadDialogOpen} onOpenChange={(open) => {
+              setUploadDialogOpen(open)
+              if (open) {
+                setIsSelecting(false)
+                setSelectedIds([])
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button className="gap-2 rounded-full text-white" style={{ backgroundColor: '#00339B' }}>
                   <Upload className="h-4 w-4" />
@@ -289,8 +446,8 @@ export default function QRLibraryPage() {
                     className="px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00339B] bg-white"
                   >
                     <option value="all">All Customers</option>
-                    {customers.map(customer => (
-                      <option key={customer} value={customer}>{customer}</option>
+                    {customerOptions.map(option => (
+                      <option key={option.key} value={option.key}>{option.label}</option>
                     ))}
                   </select>
                 </div>
@@ -329,7 +486,7 @@ export default function QRLibraryPage() {
           </div>
           <div className="w-px bg-gray-200"></div>
           <div className="text-center">
-            <div className="text-3xl font-bold text-gray-700 mb-1">{customers.length}</div>
+            <div className="text-3xl font-bold text-gray-700 mb-1">{customerOptions.length}</div>
             <div className="text-sm font-medium text-gray-500">Customers</div>
           </div>
           <div className="w-px bg-gray-200"></div>
@@ -355,16 +512,42 @@ export default function QRLibraryPage() {
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredQRCodes.map((qr) => (
-                  <Card key={qr.id} className="border-0 shadow-lg hover:shadow-xl transition-shadow rounded-2xl">
+                  <Card
+                    key={qr.id}
+                    className={`border-0 shadow-lg hover:shadow-xl transition-shadow rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#00339B] ${
+                      isSelecting && selectedIds.includes(qr.id) ? 'ring-2 ring-[#00339B]/60' : ''
+                    }`}
+                    tabIndex={isSelecting ? 0 : -1}
+                    onClick={(event) => handleSelectableClick(event, qr.id)}
+                    onKeyDown={(event) => handleSelectableKeyDown(event, qr.id)}
+                    role={isSelecting ? 'button' : undefined}
+                    aria-pressed={isSelecting ? selectedIds.includes(qr.id) : undefined}
+                  >
                     <CardContent className="p-4">
                       <div className="text-center flex flex-col h-full">
-                        <img
-                          src={qr.imageUrl || generateQRCodeImage(qr.qrCodeData, qr.imageUrl)}
-                          alt={`QR Code for ${qr.area}`}
-                          className="w-32 h-32 mx-auto border border-gray-200 rounded-xl"
-                        />
+                        <div className="relative">
+                          {isSelecting && (
+                            <div className="absolute left-1 top-1">
+                              <Checkbox
+                                checked={selectedIds.includes(qr.id)}
+                                onCheckedChange={() => handleToggleSelection(qr.id)}
+                                className="h-6 w-6 rounded-lg border-2 border-white shadow"
+                              />
+                            </div>
+                          )}
+                          <img
+                            src={qr.imageUrl || generateQRCodeImage(qr.qrCodeData, qr.imageUrl)}
+                            alt={`QR Code for ${qr.area}`}
+                            className={`w-32 h-32 mx-auto border border-gray-200 rounded-xl transition-transform ${
+                              isSelecting && selectedIds.includes(qr.id) ? 'scale-[0.97]' : ''
+                            }`}
+                          />
+                        </div>
                         <div className="mt-3 space-y-2">
-                          <h3 className="font-semibold text-gray-900">{qr.area}</h3>
+                          <div className="space-y-1">
+                            <h3 className="font-semibold text-gray-900">{qr.area}</h3>
+                            <p className="text-sm text-gray-500">{qr.customer}</p>
+                          </div>
                           <div className="flex gap-2 justify-center flex-wrap">
                             <Badge className="bg-blue-100 text-blue-700 rounded-full px-3 py-1">{qr.customer}</Badge>
                             <Badge className={`${getTypeColor(qr.subArea)} rounded-full px-3 py-1`}>{qr.subArea}</Badge>
@@ -401,12 +584,35 @@ export default function QRLibraryPage() {
             ) : (
               <div className="space-y-3">
                 {filteredQRCodes.map((qr) => (
-                  <div key={qr.id} className="flex items-center gap-4 p-4 border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors">
-                    <img
-                      src={generateQRCodeImage(qr.qrCodeData)}
-                      alt={`QR Code for ${qr.area}`}
-                      className="w-16 h-16 border border-gray-200 rounded-xl"
-                    />
+                  <div
+                    key={qr.id}
+                    className={`flex items-center gap-4 p-4 border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#00339B] ${
+                      isSelecting && selectedIds.includes(qr.id) ? 'ring-2 ring-[#00339B]/60' : ''
+                    }`}
+                    tabIndex={isSelecting ? 0 : -1}
+                    onClick={(event) => handleSelectableClick(event, qr.id)}
+                    onKeyDown={(event) => handleSelectableKeyDown(event, qr.id)}
+                    role={isSelecting ? 'button' : undefined}
+                    aria-pressed={isSelecting ? selectedIds.includes(qr.id) : undefined}
+                  >
+                    <div className="relative">
+                      {isSelecting && (
+                        <div className="absolute left-1 top-1">
+                          <Checkbox
+                            checked={selectedIds.includes(qr.id)}
+                            onCheckedChange={() => handleToggleSelection(qr.id)}
+                            className="h-5 w-5 rounded-lg border-2 border-white shadow"
+                          />
+                        </div>
+                      )}
+                      <img
+                        src={qr.imageUrl || generateQRCodeImage(qr.qrCodeData, qr.imageUrl)}
+                        alt={`QR Code for ${qr.area}`}
+                        className={`w-16 h-16 border border-gray-200 rounded-xl transition-transform ${
+                          isSelecting && selectedIds.includes(qr.id) ? 'scale-[0.96]' : ''
+                        }`}
+                      />
+                    </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold text-gray-900">{qr.area}</h3>
