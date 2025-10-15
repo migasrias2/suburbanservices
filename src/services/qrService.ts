@@ -110,6 +110,31 @@ export const AREA_TASKS: Record<AreaType, TaskDefinition[]> = {
 }
 
 export class QRService {
+  private static normalizeLabel(value?: string | null) {
+    if (!value) return ''
+    const trimmed = value.toString().trim()
+    if (!trimmed || /unknown site/i.test(trimmed)) return ''
+    return trimmed
+  }
+
+  private static deriveSiteLabel(qrData: QRCodeData, siteId?: string) {
+    const metadataSite = this.normalizeLabel(qrData.metadata?.siteName ?? qrData.metadata?.areaName)
+    if (metadataSite) return metadataSite
+
+    const customerName = this.normalizeLabel(qrData.customerName)
+    if (customerName) return customerName
+
+    const fallback = this.normalizeLabel(siteId)
+    if (fallback) return fallback
+
+    return 'Site'
+  }
+
+  private static deriveCustomerLabel(qrData: QRCodeData, siteLabel: string) {
+    const customerName = this.normalizeLabel(qrData.customerName)
+    return customerName || siteLabel
+  }
+
   static async saveRemoteDraft(draft: any) {
     try {
       const cleanerName = getStoredCleanerName()
@@ -167,6 +192,26 @@ export class QRService {
       .replace(/[^a-zA-Z0-9._-]+/g, '_')
       .replace(/^_+|_+$/g, '')
       .toLowerCase() || 'unknown'
+  }
+
+  private static prettifySiteLabel(value?: string | null) {
+    if (!value) return ''
+    const trimmed = value.toString().trim()
+    if (!trimmed || /unknown site/i.test(trimmed)) return ''
+
+    const normalized = trimmed
+      .replace(/[_-]+/g, ' ')
+      .replace(/\b(clock[-\s]?in|clock[-\s]?out|check[-\s]?in|check[-\s]?out|qr|site)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    if (!normalized) return ''
+
+    return normalized
+      .split(' ')
+      .filter(Boolean)
+      .map((part) => (part.length <= 3 ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()))
+      .join(' ')
   }
 
   private static describeAreaTask(type: QRCodeData['type'], areaName: string) {
@@ -488,12 +533,14 @@ export class QRService {
     try {
       let action = ''
       let siteArea = ''
+      const siteLabelRaw = this.deriveSiteLabel(qrData, qrData.siteId)
+      const siteLabel = this.prettifySiteLabel(siteLabelRaw) || siteLabelRaw || 'Site'
       // Database should be configured now
 
       switch (qrData.type) {
         case 'CLOCK_IN':
           action = 'Clock In'
-          siteArea = qrData.metadata?.areaName || 'Site Entrance'
+          siteArea = this.prettifySiteLabel(qrData.metadata?.areaName) || siteLabel
           
           // Check if already clocked in
           const alreadyClockedIn = await this.isAlreadyClockedIn(cleanerId)
@@ -512,7 +559,7 @@ export class QRService {
           
         case 'CLOCK_OUT':
           action = 'Clock Out'
-          siteArea = qrData.metadata?.areaName || 'Site Exit'
+          siteArea = this.prettifySiteLabel(qrData.metadata?.areaName) || siteLabel
           
           // Check if already clocked out
           const cleanerName = getStoredCleanerName()
@@ -536,7 +583,7 @@ export class QRService {
           
         case 'AREA':
           action = 'Area Scan'
-          siteArea = qrData.metadata?.areaName || 'Unknown Area'
+          siteArea = this.prettifySiteLabel(qrData.metadata?.areaName) || siteLabel
           
           // Check if clocked in before allowing area scan
           const isClockedIn = await this.isAlreadyClockedIn(cleanerId)
@@ -550,7 +597,7 @@ export class QRService {
           
         case 'TASK':
           action = 'Task Started'
-          siteArea = qrData.metadata?.areaName || 'Task Area'
+          siteArea = this.prettifySiteLabel(qrData.metadata?.areaName) || siteLabel
           break
         default:
           action = 'QR Scan'
@@ -558,6 +605,7 @@ export class QRService {
 
       // Log to database
       try {
+        const customerLabel = this.deriveCustomerLabel(qrData, siteLabel)
         const { error } = await supabase
           .from('cleaner_logs')
           .insert({
@@ -568,9 +616,9 @@ export class QRService {
             area_id: qrData.areaId,
             latitude: location?.latitude,
             longitude: location?.longitude,
-            customer_name: qrData.customerName || null,
+            customer_name: customerLabel,
             site_area: siteArea,
-            comments: `${siteArea} - ${qrData.customerName || ''}`,
+            comments: `${siteArea} - ${customerLabel}`.trim(),
             device_info: { qr_code_scanned: qrData, device_ip: await this.getDeviceIP() },
             timestamp: new Date().toISOString()
           })
@@ -606,6 +654,9 @@ export class QRService {
     try {
       const cleanerName = getStoredCleanerName()
       const currentTime = new Date().toISOString()
+      const siteLabelRaw = this.deriveSiteLabel(qrData, siteId)
+      const siteLabel = this.prettifySiteLabel(siteLabelRaw) || siteLabelRaw || 'Site'
+      const customerLabel = this.deriveCustomerLabel(qrData, siteLabel)
 
       if (eventType === 'clock_in') {
         // For clock-in, create a new time_attendance record
@@ -614,8 +665,8 @@ export class QRService {
           .insert({
             cleaner_id: normalizeCleanerNumericId(cleanerId),
             cleaner_name: cleanerName,
-            customer_name: qrData.customerName || siteId || 'Unknown Site',
-            site_name: qrData.metadata?.siteName || qrData.metadata?.areaName || siteId || 'Unknown Site',
+            customer_name: customerLabel,
+            site_name: siteLabel,
             clock_in: currentTime,
             clock_in_qr: qrCodeId,
             cleaner_mobile: localStorage.getItem('userMobile') || '',
@@ -647,8 +698,8 @@ export class QRService {
           .update({
             clock_out: currentTime,
             notes: openRecord.notes ? `${openRecord.notes} | Clock-out via QR` : 'Clock-out via QR',
-            customer_name: qrData.customerName || openRecord.customer_name,
-            site_name: qrData.metadata?.siteName || openRecord.site_name
+            customer_name: customerLabel || openRecord.customer_name,
+            site_name: siteLabel || openRecord.site_name
           })
           .eq('id', openRecord.id)
 
@@ -763,6 +814,10 @@ export class QRService {
     action: string,
     location?: { latitude: number; longitude: number }
   ) {
+    const siteLabelRaw = this.deriveSiteLabel(qrData, qrData.siteId)
+    const siteLabel = this.prettifySiteLabel(siteLabelRaw) || siteLabelRaw || 'Site'
+    const customerLabel = this.deriveCustomerLabel(qrData, siteLabel)
+    const areaLabel = this.prettifySiteLabel(qrData.metadata?.areaName) || siteLabel
     const { error } = await supabase
       .from('live_tracking')
       .upsert({
@@ -773,8 +828,8 @@ export class QRService {
         event_type: action.toLowerCase().replace(' ', '_'),
         latitude: location?.latitude,
         longitude: location?.longitude,
-        customer_name: qrData.customerName || null,
-        site_area: qrData.metadata?.areaName || null,
+        customer_name: customerLabel,
+        site_area: areaLabel,
         // Active while working; becomes inactive when clocked out
         is_active: action.toLowerCase() !== 'clock out'
       })
