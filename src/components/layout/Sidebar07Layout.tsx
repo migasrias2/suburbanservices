@@ -73,6 +73,8 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
 
   const adminMenuItems = [
     { icon: QrCode, label: 'QR Library', path: '/qr-library' },
+    { icon: QrCode, label: 'QR Generator', path: '/qr-generator' },
+    { icon: Building2, label: 'Areas & Tasks', path: '/area-tasks' },
     { icon: Users, label: 'User Management', path: '/admin-dashboard' },
   ]
 
@@ -96,6 +98,8 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
   const getHeaderTitle = () => {
     if (userType === 'admin') {
       if (location.pathname === '/qr-library') return 'QR Library'
+      if (location.pathname === '/qr-generator') return 'QR Generator'
+      if (location.pathname === '/area-tasks') return 'Areas & Tasks'
       if (location.pathname === '/admin-dashboard') return 'User Management'
       return 'Admin'
     }

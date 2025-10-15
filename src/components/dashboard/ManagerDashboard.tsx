@@ -5,7 +5,7 @@ import { supabase } from '../../services/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
-import { fetchCleanersByIds, fetchManagerCleanerIds } from '../../services/managerService'
+import { fetchAllCleaners, fetchCleanersByIds, fetchManagerCleanerIds } from '../../services/managerService'
 import { AREA_TASKS } from '../../services/qrService'
 import { normalizeCleanerName } from '../../lib/identity'
 
@@ -211,21 +211,31 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
       try {
         const cleanerIds = await fetchManagerCleanerIds(managerId)
+        const cleanerRoster = cleanerIds.length
+          ? await fetchCleanersByIds(cleanerIds)
+          : await fetchAllCleaners()
 
-        if (!cleanerIds.length) {
-          setCleaners([])
-          setSelectedCleaner(null)
-          setIsListLoading(false)
-          return
+        let trackingRows: any[] | null = []
+        let trackingError: any = null
+
+        if (cleanerIds.length) {
+          const trackingResponse = await supabase
+            .from('live_tracking')
+            .select('id, cleaner_id, cleaner_name, site_area, site_id, customer_name, event_type, timestamp, updated_at, created_at, is_active')
+            .in('cleaner_id', cleanerIds)
+            .order('timestamp', { ascending: false })
+
+          trackingRows = trackingResponse.data
+          trackingError = trackingResponse.error
+        } else {
+          const trackingResponse = await supabase
+            .from('live_tracking')
+            .select('id, cleaner_id, cleaner_name, site_area, site_id, customer_name, event_type, timestamp, updated_at, created_at, is_active')
+            .order('timestamp', { ascending: false })
+
+          trackingRows = trackingResponse.data
+          trackingError = trackingResponse.error
         }
-
-        const cleanerRoster = await fetchCleanersByIds(cleanerIds)
-
-        const { data: trackingRows, error: trackingError } = await supabase
-          .from('live_tracking')
-          .select('id, cleaner_id, cleaner_name, site_area, site_id, customer_name, event_type, timestamp, updated_at, created_at, is_active')
-          .in('cleaner_id', cleanerIds)
-          .order('timestamp', { ascending: false })
 
         if (trackingError) {
           console.warn('Failed to load live_tracking data', trackingError)

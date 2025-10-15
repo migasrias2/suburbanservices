@@ -18,6 +18,8 @@ interface QRScannerProps {
   // Show clock-out option with validator when scanning (useful on area step)
   showClockOutOption?: boolean
   onClockOutSuccess?: () => void
+  // When true, bypass logging and return the raw QR payload for admin testing
+  previewMode?: boolean
 }
 
 export const QRScanner: React.FC<QRScannerProps> = ({
@@ -27,7 +29,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   onScanError,
   allowedTypes,
   showClockOutOption,
-  onClockOutSuccess
+  onClockOutSuccess,
+  previewMode = false
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [qrScanner, setQrScanner] = useState<QrScanner | null>(null)
@@ -168,38 +171,44 @@ export const QRScanner: React.FC<QRScannerProps> = ({
             // Check if this QR code should show task selector
             // Only AREA QR codes show tasks, CLOCK_IN just processes the clock in
             const shouldGoToTasks = qrData.type === 'AREA'
-            if (shouldGoToTasks) {
+            if (shouldGoToTasks && !previewMode) {
               // Delegate to parent to render tasks UI; avoid duplicate headers/buttons
               stopScanning()
               onScanSuccess?.(qrData)
               setLastScan({ data: qrData, timestamp: new Date(), success: true })
             } else {
-              // For CLOCK_IN flows, move forward immediately once recognized
-              if (qrData.type === 'CLOCK_IN' && (!allowedTypes || allowedTypes.includes('CLOCK_IN'))) {
-                onScanSuccess?.(qrData)
-              }
-
-              // Process in the background for CLOCK_IN/CLOCK_OUT/FEEDBACK
-              const result = await QRService.processQRScan(qrData, cleanerId, cleanerName, location)
-              
-              setLastScan({
-                data: qrData,
-                timestamp: new Date(),
-                success: result.success
-              })
-
-              if (result.success) {
+              if (previewMode) {
+                stopScanning()
+                setLastScan({ data: qrData, timestamp: new Date(), success: true })
                 onScanSuccess?.(qrData)
               } else {
-                const errorMessage = result.message || 'Failed to process QR code scan'
-                setError(errorMessage)
-                onScanError?.(errorMessage)
-              }
+                // For CLOCK_IN flows, move forward immediately once recognized
+                if (qrData.type === 'CLOCK_IN' && (!allowedTypes || allowedTypes.includes('CLOCK_IN'))) {
+                  onScanSuccess?.(qrData)
+                }
 
-              // Brief pause before allowing next scan
-              setTimeout(() => {
-                setError(null)
-              }, 2000)
+                // Process in the background for CLOCK_IN/CLOCK_OUT/FEEDBACK
+                const result = await QRService.processQRScan(qrData, cleanerId, cleanerName, location)
+                
+                setLastScan({
+                  data: qrData,
+                  timestamp: new Date(),
+                  success: result.success
+                })
+
+                if (result.success) {
+                  onScanSuccess?.(qrData)
+                } else {
+                  const errorMessage = result.message || 'Failed to process QR code scan'
+                  setError(errorMessage)
+                  onScanError?.(errorMessage)
+                }
+
+                // Brief pause before allowing next scan
+                setTimeout(() => {
+                  setError(null)
+                }, 2000)
+              }
             }
 
           } catch (err) {

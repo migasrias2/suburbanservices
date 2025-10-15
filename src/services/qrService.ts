@@ -39,6 +39,28 @@ export interface TaskSelection {
   completedTasks?: string[]
 }
 
+export interface ManualQRCodePayload {
+  type: QRCodeData['type']
+  customerName: string
+  siteName?: string
+  siteId?: string
+  areaName?: string
+  areaId?: string
+  description?: string
+  floor?: string
+  category?: string
+  label?: string
+  notes?: string
+  metadata?: Record<string, any>
+}
+
+export interface ManualQRCodeResult {
+  qrData: QRCodeData
+  dataUrl: string
+  storageUrl: string
+  storagePath: string
+}
+
 export const AREA_TASKS: Record<AreaType, TaskDefinition[]> = {
   BATHROOMS_ABLUTIONS: [
     { id: 'bath_clean_toilets', name: 'Clean toilets', category: 'BATHROOMS_ABLUTIONS' },
@@ -134,6 +156,188 @@ export class QRService {
         .eq('is_finalized', false)
     } catch (e) {
       console.warn('finalizeRemoteDraft failed:', e)
+    }
+  }
+
+  static sanitizeSegment(value?: string | null) {
+    return (value ?? 'unknown')
+      .toString()
+      .trim()
+      .replace(/\s+/g, '_')
+      .replace(/[^a-zA-Z0-9._-]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .toLowerCase() || 'unknown'
+  }
+
+  private static describeAreaTask(type: QRCodeData['type'], areaName: string) {
+    switch (type) {
+      case 'CLOCK_IN':
+        return `Clock in checkpoint – ${areaName}`
+      case 'CLOCK_OUT':
+        return `Clock out checkpoint – ${areaName}`
+      case 'TASK':
+        return `Task QR – ${areaName}`
+      case 'FEEDBACK':
+        return `Feedback QR – ${areaName}`
+      default:
+        return `Service checklist – ${areaName}`
+    }
+  }
+
+  static async ensureAreaTaskRecord(
+    qrData: QRCodeData,
+    customerName?: string,
+    areaName?: string,
+    description?: string
+  ) {
+    try {
+      const normalizedCustomer = (customerName || 'Unassigned Customer').trim() || 'Unassigned Customer'
+      const normalizedArea = (areaName || 'Unassigned Area').trim() || 'Unassigned Area'
+      const normalizedType = qrData.type?.trim().toUpperCase() || 'AREA'
+      const taskDescription = description?.trim() || this.describeAreaTask(qrData.type, normalizedArea)
+
+      const { data: existing, error: fetchError } = await supabase
+        .from('area_tasks')
+        .select('id')
+        .eq('qr_code', qrData.id)
+        .maybeSingle()
+
+      if (fetchError) {
+        console.error('Failed to read existing area task', fetchError)
+        return
+      }
+
+      if (existing?.id) {
+        const { error: updateError } = await supabase
+          .from('area_tasks')
+          .update({
+            customer_name: normalizedCustomer,
+            area: normalizedArea,
+            task_description: taskDescription,
+            task_type: normalizedType,
+            active: true,
+          })
+          .eq('id', existing.id)
+
+        if (updateError) {
+          console.error('Failed to update area task', updateError)
+        }
+      } else {
+        const { error: insertError } = await supabase
+          .from('area_tasks')
+          .insert({
+            customer_name: normalizedCustomer,
+            area: normalizedArea,
+            task_description: taskDescription,
+            task_type: normalizedType,
+            qr_code: qrData.id,
+            active: true,
+          })
+
+        if (insertError) {
+          console.error('Failed to insert area task', insertError)
+        }
+      }
+    } catch (areaTaskError) {
+      console.error('Error ensuring area task record', areaTaskError)
+    }
+  }
+
+  private static defaultAreaDescription(type: QRCodeData['type']) {
+    switch (type) {
+      case 'CLOCK_IN':
+        return 'Clock In QR Code'
+      case 'CLOCK_OUT':
+        return 'Clock Out QR Code'
+      case 'TASK':
+        return 'Task QR Code'
+      case 'FEEDBACK':
+        return 'Feedback QR Code'
+      default:
+        return 'Area QR Code'
+    }
+  }
+
+  static async createManualQRCode(payload: ManualQRCodePayload): Promise<ManualQRCodeResult> {
+    const trimmedCustomer = payload.customerName?.trim()
+
+    if (!trimmedCustomer) {
+      throw new Error('Customer name is required')
+    }
+
+    const now = new Date().toISOString()
+    const metadata = {
+      ...payload.metadata,
+      siteName: payload.siteName?.trim() || undefined,
+      areaName: payload.areaName?.trim() || undefined,
+      floor: payload.floor?.trim() || undefined,
+      category: payload.category?.trim() || undefined,
+      label: payload.label?.trim() || undefined,
+      notes: payload.notes?.trim() || undefined,
+      generatedAt: now,
+    }
+
+    const qrData: QRCodeData = {
+      id: uuidv4(),
+      type: payload.type,
+      siteId: payload.siteId?.trim() || undefined,
+      areaId: payload.areaId?.trim() || undefined,
+      taskId: payload.type === 'TASK' ? payload.metadata?.taskId || uuidv4() : undefined,
+      customerName: trimmedCustomer,
+      metadata,
+    }
+
+    const dataUrl = await this.generateQRCode(qrData)
+
+    try {
+      const bucket = supabase.storage.from('qr-codes')
+      const sanitizedCustomer = this.sanitizeSegment(trimmedCustomer)
+      const areaSegment = this.sanitizeSegment(metadata.areaName || metadata.siteName || payload.type)
+      const storagePath = `manual/${sanitizedCustomer}/${areaSegment}/${qrData.id}.png`
+
+      const response = await fetch(dataUrl)
+      const blob = await response.blob()
+
+      const { error: uploadError } = await bucket.upload(storagePath, blob, {
+        upsert: true,
+        contentType: 'image/png',
+      })
+
+      if (uploadError) {
+        throw uploadError
+      }
+
+      const { data: publicUrlData } = bucket.getPublicUrl(storagePath)
+      const storageUrl = publicUrlData?.publicUrl || storagePath
+
+      const { error: insertError } = await supabase
+        .from('building_qr_codes')
+        .upsert({
+          qr_code_id: qrData.id,
+          customer_name: trimmedCustomer,
+          building_area: metadata.areaName || metadata.siteName || payload.type,
+          area_description: payload.description?.trim() || this.defaultAreaDescription(payload.type),
+          qr_code_url: JSON.stringify(qrData),
+          qr_code_image_path: storageUrl,
+          is_active: true,
+          created_at: now,
+        }, { onConflict: 'qr_code_id' })
+
+      if (insertError) {
+        throw insertError
+      }
+
+      await this.ensureAreaTaskRecord(qrData, trimmedCustomer, metadata.areaName || metadata.siteName || payload.type, payload.description)
+
+      return {
+        qrData,
+        dataUrl,
+        storageUrl,
+        storagePath,
+      }
+    } catch (error) {
+      console.error('Failed to create manual QR code:', error)
+      throw new Error(error instanceof Error ? error.message : 'Failed to create manual QR code')
     }
   }
   /** Build QR data from non-JSON plain text (best-effort). */

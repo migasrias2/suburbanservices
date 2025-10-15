@@ -12,6 +12,7 @@ import ScannerPage from "./pages/ScannerPage";
 import HistoryPage from "./pages/HistoryPage";
 import ProfilePage from "./pages/ProfilePage";
 import QRLibraryPage from "./pages/QRLibraryPage";
+import QRGeneratorPage from "./pages/QRGeneratorPage";
 import AreaTasksPage from "./pages/AreaTasksPage";
 import NotFound from "./pages/NotFound";
 import ManagerActivityPage from "./pages/ManagerActivityPage";
@@ -35,6 +36,7 @@ const App = () => (
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/qr-library" element={<QRLibraryPage />} />
+          <Route path="/qr-generator" element={<QRGeneratorPage />} />
           <Route path="/area-tasks" element={<AreaTasksPage />} />
           <Route path="/manager-dashboard" element={<ManagerDashboardPage />} />
           <Route path="/manager-activity" element={<ManagerActivityPage />} />

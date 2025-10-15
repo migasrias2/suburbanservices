@@ -38,6 +38,20 @@ export async function fetchCleanersByIds(cleanerIds: string[]): Promise<Cleaner[
   return data ?? []
 }
 
+export async function fetchAllCleaners(): Promise<Cleaner[]> {
+  const { data, error } = await supabase
+    .from('cleaners')
+    .select('id, first_name, last_name, created_at, email, mobile_number, is_active')
+    .order('first_name', { ascending: true })
+
+  if (error) {
+    console.error('Failed to fetch all cleaners', error)
+    throw error
+  }
+
+  return data ?? []
+}
+
 export type ManagerActivityRow = {
   id: string
   cleaner_id: string | null
