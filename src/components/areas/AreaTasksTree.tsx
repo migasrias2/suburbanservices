@@ -5,6 +5,7 @@ import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } 
 import { CSS } from '@dnd-kit/utilities'
 import { ChevronDown, ChevronRight, MoreVertical, Plus, Trash2, Pencil, GripVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Swipeable } from '@/components/ui/swipeable'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   DropdownMenu,
@@ -33,6 +34,10 @@ export interface AreaTasksTreeProps {
   onDeleteTask: (task: AreaTask) => void
   onCreateTask: (payload: { customer: string; area: string }) => void
   onReorderTasks: (payload: { customer: string; area: string; tasks: AreaTask[] }) => void
+  extraCustomers?: string[]
+  onAddCustomer?: () => void
+  onAddArea?: (payload: { customer: string }) => void
+  extraAreasByCustomer?: Record<string, string[]>
 }
 
 const buildTree = (tasks: AreaTask[]): TreeAreaGroup[] => {
@@ -144,8 +149,33 @@ export const AreaTasksTree = ({
   onDeleteTask,
   onCreateTask,
   onReorderTasks,
+  extraCustomers,
+  onAddCustomer,
+  onAddArea,
+  extraAreasByCustomer,
 }: AreaTasksTreeProps) => {
   const tree = useMemo(() => buildTree(tasks), [tasks])
+  const extendedTree = useMemo(() => {
+    const present = new Set<string>(tree.map((g) => g.customer))
+    const extras = (extraCustomers ?? [])
+      .filter((name) => name && !present.has(name))
+      .map((name) => ({ customer: name, areas: [] as TreeArea[] }))
+    return [...tree, ...extras].sort((a, b) => a.customer.localeCompare(b.customer))
+  }, [tree, extraCustomers])
+  const extendedWithAreas = useMemo(() => {
+    if (!extraAreasByCustomer) return extendedTree
+    return extendedTree.map((group) => {
+      const existing = new Set(group.areas.map((a) => a.name))
+      const extraNames = extraAreasByCustomer[group.customer] ?? []
+      const extraAreas = extraNames
+        .filter((n) => n && !existing.has(n))
+        .map((name) => ({ name, tasks: [] as AreaTask[] }))
+      return {
+        ...group,
+        areas: [...group.areas, ...extraAreas].sort((a, b) => a.name.localeCompare(b.name)),
+      }
+    })
+  }, [extendedTree, extraAreasByCustomer])
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   if (!tree.length) {
@@ -166,10 +196,11 @@ export const AreaTasksTree = ({
 
   const renderCustomerRow = (group: TreeAreaGroup) => {
     const nodeId = `customer:${group.customer}`
-    const isExpanded = expandedNodes[nodeId] ?? true
-    return (
+    const provided = expandedNodes[nodeId]
+    const defaultExpanded = group.areas.some((a) => a.tasks.length > 0)
+    const isExpanded = typeof provided === 'boolean' ? provided : defaultExpanded
+    const content = (
       <div
-        key={group.customer}
         className={cn(
           'rounded-3xl border bg-white shadow-sm transition-colors',
           isExpanded ? 'border-[#00339B]/20 bg-[#f6f8ff]' : 'border-gray-100'
@@ -200,29 +231,57 @@ export const AreaTasksTree = ({
               <p className="text-xs text-gray-500">{group.areas.length} area{group.areas.length === 1 ? '' : 's'}</p>
             </div>
           </div>
-          <Button
-            size="sm"
-            className="rounded-full bg-[#00339B] px-4 py-1 text-xs font-semibold hover:bg-[#00297a]"
-            onClick={(event) => {
-              event.stopPropagation()
-              onCreateTask({ customer: group.customer, area: '' })
-            }}
-          >
-            New Task
-          </Button>
+          {/* Removed pill New Task button as requested */}
         </div>
         {isExpanded && (
           <div className="space-y-4 border-t border-gray-100 px-6 py-5">
-            {group.areas.map((area) => renderAreaRow(group.customer, area))}
+            {group.areas.length === 0 && onAddArea ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onAddArea({ customer: group.customer })
+                }}
+                className="w-full rounded-2xl border-2 border-dotted border-gray-300 bg-white/80 px-5 py-6 text-sm font-semibold text-[#00339B] transition hover:border-[#00339B]/60 hover:bg-[#f0f4ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00339B]/40"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Create area
+                </span>
+              </button>
+            ) : (
+              group.areas.map((area) => renderAreaRow(group.customer, area))
+            )}
           </div>
         )}
       </div>
+    )
+
+    return (
+      <Swipeable
+        key={group.customer}
+        action={{
+          icon: <Trash2 className="h-4 w-4" />,
+          label: 'Delete',
+          onClick: () => {
+            // Consumers will handle actual deletion via parent callback in future
+            const event = new CustomEvent('delete-customer', { detail: { customer: group.customer } })
+            window.dispatchEvent(event)
+          },
+          className: 'rounded-none',
+        }}
+        className="rounded-3xl"
+      >
+        <div className="rounded-3xl overflow-hidden bg-white">{content}</div>
+      </Swipeable>
     )
   }
 
   const renderAreaRow = (customer: string, area: TreeArea) => {
     const nodeId = `area:${customer}:${area.name}`
-    const isExpanded = expandedNodes[nodeId] ?? true
+    const provided = expandedNodes[nodeId]
+    const defaultExpanded = area.tasks.length > 0
+    const isExpanded = typeof provided === 'boolean' ? provided : defaultExpanded
     const areaTasks = area.tasks
     const handleDragEnd = (event: DragEndEvent) => {
       const { active, over } = event
@@ -266,27 +325,50 @@ export const AreaTasksTree = ({
               <p className="text-xs text-gray-500">{area.tasks.length} task{area.tasks.length === 1 ? '' : 's'}</p>
             </div>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="rounded-full border-[#00339B]/30 bg-white text-xs font-semibold text-[#00339B] hover:bg-[#00339B]/10"
-            onClick={(event) => {
-              event.stopPropagation()
-              onCreateTask({ customer, area: area.name })
-            }}
-          >
-            Add Task
-          </Button>
+          {/* Removed pill Add Task button as requested */}
         </div>
         {isExpanded && (
           <div className="space-y-3 border-t border-gray-100 bg-white px-5 py-4">
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={areaTasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
-                {areaTasks.map((task) => (
-                  <TaskRow key={task.id} task={task} onEditTask={onEditTask} onDeleteTask={onDeleteTask} />
-                ))}
-              </SortableContext>
-            </DndContext>
+            {areaTasks.length === 0 ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onCreateTask({ customer, area: area.name })
+                }}
+                className="w-full rounded-2xl border-2 border-dotted border-gray-300 bg-white/80 px-5 py-6 text-sm font-semibold text-[#00339B] transition hover:border-[#00339B]/60 hover:bg-[#f0f4ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00339B]/40"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Create task
+                </span>
+              </button>
+            ) : (
+              <>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={areaTasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
+                    {areaTasks.map((task) => (
+                      <TaskRow key={task.id} task={task} onEditTask={onEditTask} onDeleteTask={onDeleteTask} />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onCreateTask({ customer, area: area.name })
+                    }}
+                    className="mt-2 w-full rounded-xl border-2 border-dotted border-gray-300 bg-white/80 px-4 py-3 text-xs font-semibold text-[#00339B] transition hover:border-[#00339B]/60 hover:bg-[#f0f4ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00339B]/40"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Plus className="h-3 w-3" />
+                      Add another task
+                    </span>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -295,7 +377,19 @@ export const AreaTasksTree = ({
 
   return (
     <div className="space-y-5 pb-6 pt-3">
-      {tree.map((group) => renderCustomerRow(group))}
+      {extendedWithAreas.map((group) => renderCustomerRow(group))}
+      {onAddCustomer && (
+        <button
+          type="button"
+          onClick={onAddCustomer}
+          className="mt-2 w-full rounded-3xl border-2 border-dotted border-gray-300 bg-white/80 px-6 py-6 text-sm font-semibold text-[#00339B] transition hover:border-[#00339B]/60 hover:bg-[#f6f8ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00339B]/40"
+        >
+          <span className="inline-flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Create new customer
+          </span>
+        </button>
+      )}
     </div>
   )
 }

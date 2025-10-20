@@ -3,6 +3,7 @@ import { supabase, type AreaTask } from './supabase'
 export type CreateAreaTaskInput = {
   customer_name: string
   area: string
+  task_description: string
   task_type?: string | null
   qr_code?: string | null
   active?: boolean
@@ -13,6 +14,7 @@ export type UpdateAreaTaskInput = {
   task_type?: string | null
   area?: string | null
   customer_name?: string
+  task_description?: string
   qr_code?: string | null
   active?: boolean
   sort_order?: number | null
@@ -41,6 +43,7 @@ export async function createAreaTask(input: CreateAreaTaskInput): Promise<AreaTa
     .insert({
       customer_name: input.customer_name,
       area: input.area,
+      task_description: input.task_description,
       task_type: input.task_type ?? null,
       qr_code: input.qr_code ?? null,
       active: input.active ?? true,
@@ -62,6 +65,7 @@ export async function updateAreaTask(id: string, updates: UpdateAreaTaskInput): 
     .from('area_tasks')
     .update({
       ...updates,
+      task_description: updates.task_description ?? undefined,
       task_type: updates.task_type ?? null,
       qr_code: updates.qr_code ?? null,
     })
