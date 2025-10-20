@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Loader2, Trash2 } from 'lucide-react'
+import { Loader2, Trash2, Search } from 'lucide-react'
 import { AreaTasksTree } from './AreaTasksTree'
 import { AreaTaskForm, type AreaTaskFormValues } from './AreaTaskForm'
 import {
@@ -15,10 +15,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import type { AreaTask } from '@/services/supabase'
-import { createAreaTask, deleteAreaTask, fetchAreaTasks, updateAreaTask } from '@/services/areaTasksService'
+import { createAreaTask, deleteAreaTask, fetchAreaTasks, reorderAreaTasks, updateAreaTask } from '@/services/areaTasksService'
 
 type SheetMode = 'create' | 'edit'
 
@@ -32,6 +41,7 @@ export const AreaTasksPage = () => {
   const [prefillData, setPrefillData] = useState<{ customer_name?: string; area?: string }>({})
   const [search, setSearch] = useState('')
   const [pendingDelete, setPendingDelete] = useState<AreaTask | null>(null)
+  const [pendingReorders, setPendingReorders] = useState<Record<string, AreaTask[]>>({})
 
   const tasksQuery = useQuery({
     queryKey: ['area_tasks'],
@@ -114,7 +124,9 @@ export const AreaTasksPage = () => {
   }, [tasksQuery.data])
 
   const filteredTasks = useMemo(() => {
-    if (!search.trim()) return tasksQuery.data ?? []
+    if (!search.trim()) {
+      return tasksQuery.data ?? []
+    }
     const query = search.toLowerCase()
     return (tasksQuery.data ?? []).filter((task) => {
       return [
@@ -128,6 +140,59 @@ export const AreaTasksPage = () => {
         .some((value) => value!.toLowerCase().includes(query))
     })
   }, [tasksQuery.data, search])
+
+  const handleReorderTasks = useCallback(
+    async ({ customer, area, tasks }: { customer: string; area: string; tasks: AreaTask[] }) => {
+      const key = `${customer}::${area}`
+      setPendingReorders((prev) => ({
+        ...prev,
+        [key]: tasks,
+      }))
+      try {
+        await reorderAreaTasks({ customer, area, tasks })
+        setPendingReorders((prev) => {
+          const next = { ...prev }
+          delete next[key]
+          return next
+        })
+        queryClient.invalidateQueries({ queryKey: ['area_tasks'] })
+      } catch (error) {
+        console.error(error)
+        toast({
+          title: 'Could not reorder tasks',
+          description: 'Please try again or contact support if the issue persists.',
+          variant: 'destructive',
+        })
+        setPendingReorders((prev) => {
+          const next = { ...prev }
+          delete next[key]
+          return next
+        })
+      }
+    },
+    [queryClient, toast]
+  )
+
+  const tasksWithPendingOrder = useMemo(() => {
+    if (!Object.keys(pendingReorders).length) return filteredTasks
+
+    const processedAreas = new Set<string>()
+    const result: AreaTask[] = []
+
+    filteredTasks.forEach((task) => {
+      const key = `${task.customer_name?.trim() || 'Unassigned Customer'}::${task.area?.trim() || 'Unassigned Area'}`
+      const override = pendingReorders[key]
+
+      if (override && !processedAreas.has(key)) {
+        result.push(...override)
+        processedAreas.add(key)
+      } else if (!override) {
+        result.push(task)
+      }
+    })
+
+    return result
+  }, [filteredTasks, pendingReorders])
 
   const openCreateSheet = useCallback((prefill?: { customer: string; area: string }) => {
     setSheetMode('create')
@@ -176,7 +241,8 @@ export const AreaTasksPage = () => {
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-4 py-2">
-              <Label htmlFor="area-task-search" className="text-xs font-medium text-gray-500">
+              <Search className="h-4 w-4 text-gray-400" aria-hidden="true" />
+              <Label htmlFor="area-task-search" className="sr-only">
                 Search
               </Label>
               <Input
@@ -187,9 +253,6 @@ export const AreaTasksPage = () => {
                 className="h-8 w-64 border-0 bg-transparent text-sm focus-visible:ring-0"
               />
             </div>
-            <Button onClick={() => openCreateSheet()} className="rounded-full bg-[#00339B] px-5 py-2 text-sm font-semibold hover:bg-[#00297a]">
-              Add Task
-            </Button>
           </div>
         </div>
       </div>
@@ -208,7 +271,7 @@ export const AreaTasksPage = () => {
         </div>
       ) : (
         <AreaTasksTree
-          tasks={filteredTasks}
+          tasks={tasksWithPendingOrder}
           expandedNodes={expandedNodes}
           onToggleNode={(nodeId) =>
             setExpandedNodes((prev) => ({
@@ -219,6 +282,7 @@ export const AreaTasksPage = () => {
           onEditTask={(task) => openEditSheet(task)}
           onDeleteTask={setPendingDelete}
           onCreateTask={({ customer, area }) => openCreateSheet({ customer, area })}
+          onReorderTasks={handleReorderTasks}
         />
       )}
 
@@ -283,4 +347,3 @@ export const AreaTasksPage = () => {
     </div>
   )
 }
-

@@ -87,6 +87,7 @@ interface TaskPhotoGroup {
   area: string | null
   areaKey: string
   customer: string | null
+  dateKey: string
   photos: TaskPhotoRow[]
 }
 
@@ -96,6 +97,8 @@ interface AreaPhotoGroup {
   area: string
   category: string | null
   customer: string | null
+  dateKey: string
+  dateLabel: string
   startedTimestamp: number
   latestAt: string | null
   latestTimestamp: number
@@ -144,6 +147,57 @@ const parseTimestamp = (value?: string | null) => {
   return Number.isNaN(time) ? null : time
 }
 
+const RESERVED_AREA_LABELS = new Set([
+  'bathrooms ablutions',
+  'admin office',
+  'general areas',
+  'warehouse industrial',
+  'kitchen canteen',
+  'reception common',
+  'unassigned area',
+  'unknown area',
+  'area',
+])
+
+const normalizeDisplayLabel = (value?: string | null) => {
+  if (!value) return null
+  const trimmed = value.toString().trim()
+  if (!trimmed) return null
+  if (/^[A-Z0-9_]+$/.test(trimmed) && trimmed.includes('_')) {
+    return null
+  }
+  const cleaned = trimmed.replace(/_/g, ' ').replace(/\s{2,}/g, ' ').trim()
+  if (!cleaned) return null
+  if (RESERVED_AREA_LABELS.has(cleaned.toLowerCase())) {
+    return null
+  }
+  return cleaned
+}
+
+const resolveAreaDisplayLabel = (
+  ...labels: Array<string | null | undefined>
+) => {
+  for (const label of labels) {
+    const normalized = normalizeDisplayLabel(label)
+    if (normalized) {
+      return normalized
+    }
+  }
+  return 'Unknown Area'
+}
+
+const resolveCustomerDisplayLabel = (
+  ...labels: Array<string | null | undefined>
+) => {
+  for (const label of labels) {
+    const normalized = normalizeDisplayLabel(label)
+    if (normalized) {
+      return normalized
+    }
+  }
+  return null
+}
+
 const buildDateKey = (value?: string | null) => {
   const timestamp = parseTimestamp(value)
   if (timestamp === null) return 'unknown-date'
@@ -160,6 +214,15 @@ const buildSessionAnchor = (value?: string | null) => {
   return new Date(timestamp).toISOString()
 }
 
+const formatDateLabelFromKey = (dateKey: string) => {
+  if (!dateKey || dateKey === 'unknown-date') return 'Date unknown'
+  const [year, month, day] = dateKey.split('-').map((part) => Number.parseInt(part, 10))
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return 'Date unknown'
+  const date = new Date(year, month - 1, day)
+  if (Number.isNaN(date.getTime())) return 'Date unknown'
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 const deriveAreaIdentity = (photo: TaskPhotoRow) => {
   const rawLabel = photo.area_name?.trim() || photo.area_type?.trim() || 'Unassigned Area'
   const areaLabel = formatCategoryLabel(rawLabel)
@@ -171,6 +234,14 @@ const deriveAreaIdentity = (photo: TaskPhotoRow) => {
     label: areaLabel,
     customer: photo.customer_name || null,
   }
+}
+
+const buildPhotoDateKey = (photo: TaskPhotoRow) => {
+  const dateBasedKey = buildDateKey(photo.photo_timestamp || photo.started_at)
+  if (dateBasedKey !== 'unknown-date') return dateBasedKey
+  if (photo.photo_timestamp) return buildDateKey(photo.photo_timestamp)
+  if (photo.started_at) return buildDateKey(photo.started_at)
+  return 'unknown-date'
 }
 
 export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, managerName }) => {
@@ -414,6 +485,70 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
       if (tasksRes?.error) console.warn('Tasks load failed', tasksRes.error)
       if (photosRes?.error) console.warn('Photos load failed', photosRes.error)
 
+      const rawTaskRows = tasksRes?.data ?? []
+      const rawPhotoRows = photosRes?.data ?? []
+
+      const qrCodeIds = Array.from(
+        new Set(
+          [
+            ...rawTaskRows.map((row) => row.qr_code_id).filter((id): id is string => Boolean(id)),
+            ...rawPhotoRows.map((row) => row.qr_code_id).filter((id): id is string => Boolean(id)),
+          ],
+        ),
+      )
+
+      type QRMetaRow = {
+        qr_code_id: string
+        building_area?: string | null
+        customer_name?: string | null
+        area_description?: string | null
+      }
+
+      const qrMetadata = new Map<string, { area: string | null; customer: string | null }>()
+
+      if (qrCodeIds.length) {
+        const { data: qrRows, error: qrError } = await supabase
+          .from('building_qr_codes')
+          .select('qr_code_id, building_area, customer_name, area_description')
+          .in('qr_code_id', qrCodeIds)
+
+        if (qrError) {
+          console.warn('Failed to load QR metadata for manager detail view', qrError)
+        } else {
+          ;(qrRows ?? []).forEach((row: QRMetaRow) => {
+            if (!row?.qr_code_id) return
+            const areaLabel = row.building_area?.trim() || row.area_description?.trim() || null
+            const customerLabel = row.customer_name?.trim() || null
+            qrMetadata.set(row.qr_code_id, {
+              area: areaLabel,
+              customer: customerLabel,
+            })
+          })
+        }
+      }
+
+      const tasksWithMetadata: TaskSelectionRow[] = rawTaskRows.map((row) => {
+        const meta = row.qr_code_id ? qrMetadata.get(row.qr_code_id) : undefined
+        const areaLabel = resolveAreaDisplayLabel(meta?.area, row.area_name, row.area_type)
+        const customerLabel = resolveCustomerDisplayLabel(meta?.customer, row.customer_name)
+        return {
+          ...row,
+          area_name: areaLabel,
+          customer_name: customerLabel,
+        }
+      })
+
+      const photosWithMetadata: TaskPhotoRow[] = rawPhotoRows.map((row) => {
+        const meta = row.qr_code_id ? qrMetadata.get(row.qr_code_id) : undefined
+        const areaLabel = resolveAreaDisplayLabel(meta?.area, row.area_name, row.area_type)
+        const customerLabel = resolveCustomerDisplayLabel(meta?.customer, row.customer_name)
+        return {
+          ...row,
+          area_name: areaLabel,
+          customer_name: customerLabel,
+        }
+      })
+
       const attendanceByKey = new Map<string, AttendanceRow>()
       const combineRows = (rows?: AttendanceRow[] | null) => {
         if (!rows) return
@@ -438,8 +573,8 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
       setAttendance(Array.from(attendanceByKey.values()))
       setLogs(logsRes?.data ?? [])
-      setTasks(tasksRes?.data ?? [])
-      const photoRows = photosRes?.data ?? []
+      setTasks(tasksWithMetadata)
+      const photoRows = photosWithMetadata
       setPhotos(photoRows)
 
       // fetch feedback for these photos
@@ -614,9 +749,10 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     todaysTasks.map((row) => {
       const selected = JSON.parse(row.selected_tasks || '[]') as string[]
       const completed = JSON.parse(row.completed_tasks || '[]') as string[]
+      const areaLabel = resolveAreaDisplayLabel(row.area_name, row.area_type)
       return {
         id: row.id,
-        area: row.area_type,
+        area: areaLabel,
         total: selected.length,
         completed: completed.length,
         timestamp: row.timestamp
@@ -630,13 +766,19 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     const groups = new Map<string, TaskPhotoGroup>()
 
     photos.forEach((photo) => {
-      const { key: computedAreaKey, label: areaLabel, customer: areaCustomer } = deriveAreaIdentity(photo)
+      const resolvedAreaLabel = resolveAreaDisplayLabel(photo.area_name, photo.area_type)
+      const resolvedCustomerLabel = resolveCustomerDisplayLabel(photo.customer_name)
+      const { key: computedAreaKey, label: areaLabel, customer: areaCustomer } = deriveAreaIdentity({
+        ...photo,
+        area_name: resolvedAreaLabel,
+        customer_name: resolvedCustomerLabel ?? undefined,
+      })
       const areaTypeTasks = photo.area_type ? AREA_TASKS[photo.area_type as keyof typeof AREA_TASKS] ?? [] : []
       const matchedTask = areaTypeTasks.find((task) => task.id === photo.task_id)
       const taskName = matchedTask?.name || 'Task'
       const category = photo.area_type || matchedTask?.category || null
 
-      const dateKey = buildDateKey(photo.photo_timestamp || photo.started_at)
+      const dateKey = buildPhotoDateKey(photo)
       const areaSessionAnchor = buildSessionAnchor(photo.started_at) || dateKey
       const taskIdentifier = [photo.qr_code_id, photo.task_id, dateKey, areaSessionAnchor, computedAreaKey]
         .filter(Boolean)
@@ -659,6 +801,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           area: areaLabel,
           areaKey: computedAreaKey,
           customer: areaCustomer,
+          dateKey,
           photos: [],
         })
       }
@@ -724,18 +867,22 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     const areas = new Map<string, AreaPhotoGroup>()
 
     taskPhotoGroups.forEach((task) => {
-      const areaKey = task.areaKey || 'unassigned-area'
-      const areaName = task.area || 'Unassigned Area'
-      const areaCustomer = task.customer
+      const baseAreaKey = task.areaKey || 'unassigned-area'
+      const dateKey = task.dateKey || 'unknown-date'
+      const areaGroupKey = `${baseAreaKey}::${dateKey}`
+      const areaName = resolveAreaDisplayLabel(task.area)
+      const areaCustomer = resolveCustomerDisplayLabel(task.customer)
       const areaCategory = task.category
 
-      if (!areas.has(areaKey)) {
-        areas.set(areaKey, {
-          key: areaKey,
-          areaKey,
+      if (!areas.has(areaGroupKey)) {
+        areas.set(areaGroupKey, {
+          key: areaGroupKey,
+          areaKey: baseAreaKey,
           area: areaName,
           category: areaCategory,
           customer: areaCustomer,
+          dateKey,
+          dateLabel: formatDateLabelFromKey(dateKey),
           startedTimestamp: task.startedTimestamp,
           latestAt: task.latestAt,
           latestTimestamp: task.latestTimestamp,
@@ -743,7 +890,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         })
       }
 
-      const areaGroup = areas.get(areaKey)
+      const areaGroup = areas.get(areaGroupKey)
       if (!areaGroup) return
 
       if (!areaGroup.category && areaCategory) {
@@ -769,9 +916,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     return Array.from(areas.values())
       .map((area) => ({
         ...area,
-        tasks: area.tasks
-          .filter((task) => task.areaKey === area.areaKey)
-          .sort((a, b) => b.latestTimestamp - a.latestTimestamp),
+        tasks: [...area.tasks].sort((a, b) => b.latestTimestamp - a.latestTimestamp),
       }))
       .sort((a, b) => (b.latestTimestamp ?? Number.NEGATIVE_INFINITY) - (a.latestTimestamp ?? Number.NEGATIVE_INFINITY))
   }, [taskPhotoGroups])
@@ -986,6 +1131,9 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                             <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500">
                               <MapPin className="h-3 w-3 text-[#00339B]" />
                               <span>{areaGroup.area}</span>
+                              <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#00339B] shadow-sm border border-[#00339B]/20">
+                                {areaGroup.dateLabel}
+                              </span>
                               {areaGroup.customer && (
                                 <span className="rounded-full bg-[#fffbeb] px-2 py-0.5 text-[10px] font-semibold text-[#1f2937]">{areaGroup.customer}</span>
                               )}

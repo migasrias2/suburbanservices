@@ -85,6 +85,7 @@ export type AreaTask = {
   task_type: string | null;
   task_description: string;
   position: number | null;
+  sort_order: number | null;
   active: boolean;
   created_at: string;
   updated_at: string;

@@ -1,5 +1,12 @@
 import { supabase, type Cleaner } from './supabase'
 
+const CLEANER_SUMMARY_FIELDS = 'id, first_name, last_name, created_at, email, mobile_number, is_active' as const
+
+export type CleanerSummary = Pick<
+  Cleaner,
+  'id' | 'first_name' | 'last_name' | 'created_at' | 'email' | 'mobile_number' | 'is_active'
+>
+
 export async function fetchManagerCleanerIds(managerId: string): Promise<string[]> {
   if (!managerId) {
     return []
@@ -20,14 +27,14 @@ export async function fetchManagerCleanerIds(managerId: string): Promise<string[
     .filter((cleanerId): cleanerId is string => Boolean(cleanerId))
 }
 
-export async function fetchCleanersByIds(cleanerIds: string[]): Promise<Cleaner[]> {
+export async function fetchCleanersByIds(cleanerIds: string[]): Promise<CleanerSummary[]> {
   if (!cleanerIds.length) {
     return []
   }
 
   const { data, error } = await supabase
     .from('cleaners')
-    .select('id, first_name, last_name, created_at, email, mobile_number, is_active')
+    .select(CLEANER_SUMMARY_FIELDS)
     .in('id', cleanerIds)
 
   if (error) {
@@ -35,13 +42,13 @@ export async function fetchCleanersByIds(cleanerIds: string[]): Promise<Cleaner[
     throw error
   }
 
-  return data ?? []
+  return (data ?? []) as CleanerSummary[]
 }
 
-export async function fetchAllCleaners(): Promise<Cleaner[]> {
+export async function fetchAllCleaners(): Promise<CleanerSummary[]> {
   const { data, error } = await supabase
     .from('cleaners')
-    .select('id, first_name, last_name, created_at, email, mobile_number, is_active')
+    .select(CLEANER_SUMMARY_FIELDS)
     .order('first_name', { ascending: true })
 
   if (error) {
@@ -49,7 +56,7 @@ export async function fetchAllCleaners(): Promise<Cleaner[]> {
     throw error
   }
 
-  return data ?? []
+  return (data ?? []) as CleanerSummary[]
 }
 
 export type ManagerActivityRow = {
@@ -66,6 +73,45 @@ export type ManagerActivityRow = {
   entry_type: 'log' | 'photo'
 }
 
+const RESERVED_ACTIVITY_LABELS = new Set([
+  'bathrooms ablutions',
+  'admin office',
+  'general areas',
+  'warehouse industrial',
+  'kitchen canteen',
+  'reception common',
+  'unassigned area',
+  'unknown area',
+  'area',
+])
+
+const normalizeActivityLabel = (value?: string | null) => {
+  if (!value) return null
+  const trimmed = value.toString().trim()
+  if (!trimmed) return null
+  if (/^[A-Z0-9_]+$/.test(trimmed) && trimmed.includes('_')) {
+    return null
+  }
+  const cleaned = trimmed.replace(/_/g, ' ').replace(/\s{2,}/g, ' ').trim()
+  if (!cleaned) return null
+  if (RESERVED_ACTIVITY_LABELS.has(cleaned.toLowerCase())) {
+    return null
+  }
+  return cleaned
+}
+
+const resolveActivityDisplayLabel = (
+  ...labels: Array<string | null | undefined>
+) => {
+  for (const label of labels) {
+    const normalized = normalizeActivityLabel(label)
+    if (normalized) {
+      return normalized
+    }
+  }
+  return null
+}
+
 export async function fetchManagerRecentActivity(
   managerId: string,
   limit = 100,
@@ -80,7 +126,7 @@ export async function fetchManagerRecentActivity(
 
   let logsQuery = supabase
     .from('cleaner_logs')
-    .select('id, cleaner_id, action, comments, timestamp, site_id, area_id')
+    .select('id, cleaner_id, action, comments, timestamp, site_id, area_id, qr_code_id, customer_name, site_area')
 
   if (cleanerIds.length) {
     logsQuery = logsQuery.in('cleaner_id', cleanerIds)
@@ -97,14 +143,14 @@ export async function fetchManagerRecentActivity(
 
   let photosQuery = supabase
     .from('uk_cleaner_task_photos')
-    .select('id, cleaner_id, cleaner_name, area_type, qr_code_id, task_id, photo_data, photo_timestamp, created_at')
+    .select('id, cleaner_id, cleaner_name, area_type, qr_code_id, task_id, photo_data, photo_timestamp, created_at, customer_name, site_area, area_name')
 
   if (cleanerIds.length) {
     photosQuery = photosQuery.in('cleaner_id', cleanerIds)
   }
 
   const { data: photoRows, error: photoError } = await photosQuery
-    .order('photo_timestamp', { ascending: false, nullsLast: false })
+    .order('photo_timestamp', { ascending: false, nullsFirst: true })
     .limit(limit)
 
   if (photoError) {
@@ -117,6 +163,15 @@ export async function fetchManagerRecentActivity(
       ...((logRows ?? []).map((row) => row.cleaner_id).filter(Boolean) as string[]),
       ...((photoRows ?? []).map((row) => row.cleaner_id).filter(Boolean) as string[]),
     ])
+  )
+
+  const qrCodeIds = Array.from(
+    new Set(
+      [
+        ...((logRows ?? []).map((row) => row.qr_code_id).filter(Boolean) as string[]),
+        ...((photoRows ?? []).map((row) => row.qr_code_id).filter(Boolean) as string[]),
+      ],
+    ),
   )
 
   const siteIds = Array.from(
@@ -180,13 +235,42 @@ export async function fetchManagerRecentActivity(
     }
   }
 
+  type QRMetadata = {
+    area: string | null
+    customer: string | null
+  }
+
+  const qrMetadataMap = new Map<string, QRMetadata>()
+
+  if (qrCodeIds.length) {
+    const { data: qrRows, error: qrError } = await supabase
+      .from('building_qr_codes')
+      .select('qr_code_id, building_area, customer_name, area_description')
+      .in('qr_code_id', qrCodeIds)
+
+    if (qrError) {
+      console.warn('Failed to load QR metadata for manager activity', qrError)
+    } else {
+      ;(qrRows ?? []).forEach((row) => {
+        if (!row?.qr_code_id) return
+        const areaLabel = row.building_area?.trim() || row.area_description?.trim() || null
+        const customerLabel = row.customer_name?.trim() || null
+        qrMetadataMap.set(row.qr_code_id, {
+          area: areaLabel,
+          customer: customerLabel,
+        })
+      })
+    }
+  }
+
   const entries: ManagerActivityRow[] = []
 
   ;(logRows ?? []).forEach((row) => {
     const cleanerId = row.cleaner_id ?? null
     const nameFromMap = cleanerId ? cleanerNameMap.get(cleanerId) ?? null : null
-    const siteLabel = row.site_id ? siteMap.get(row.site_id) ?? null : null
-    const areaLabel = row.area_id ? areaMap.get(row.area_id) ?? null : null
+    const qrMeta = row.qr_code_id ? qrMetadataMap.get(row.qr_code_id) : undefined
+    const siteLabel = resolveActivityDisplayLabel(qrMeta?.customer, row.customer_name, row.site_id ? siteMap.get(row.site_id) ?? null : null)
+    const areaLabel = resolveActivityDisplayLabel(qrMeta?.area, row.area_id ? areaMap.get(row.area_id) ?? null : null, row.site_area)
     const detailParts: string[] = []
     if (siteLabel) detailParts.push(siteLabel)
     if (areaLabel) detailParts.push(areaLabel)
@@ -212,8 +296,11 @@ export async function fetchManagerRecentActivity(
     const nameFromMap = cleanerId ? cleanerNameMap.get(cleanerId) ?? row.cleaner_name ?? null : row.cleaner_name ?? null
     const photoSource = row.photo_data ?? null
     const timestamp = row.photo_timestamp ?? row.created_at ?? null
+    const qrMeta = row.qr_code_id ? qrMetadataMap.get(row.qr_code_id) : undefined
+    const resolvedSite = resolveActivityDisplayLabel(qrMeta?.customer, row.customer_name, row.site_area)
+    const detailArea = resolveActivityDisplayLabel(qrMeta?.area, row.area_name, row.area_type)
     const detailParts: string[] = []
-    if (row.area_type) detailParts.push(row.area_type)
+    if (detailArea) detailParts.push(detailArea)
     if (row.qr_code_id) detailParts.push(row.qr_code_id)
     if (row.task_id) detailParts.push(row.task_id)
     const detail = detailParts.join(' • ') || 'Task photo'
@@ -225,7 +312,8 @@ export async function fetchManagerRecentActivity(
       action: 'Task Photo Submitted',
       timestamp,
       detail,
-      area: row.area_type ?? null,
+      area: detailArea,
+      site: resolvedSite,
       photo_url: photoSource,
       entry_type: 'photo',
     })

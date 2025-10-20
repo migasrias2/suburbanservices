@@ -395,3 +395,5 @@ export const QRGenerator: React.FC<ManualQRGeneratorProps> = ({ onGenerated }) =
   )
 }
 
+
+
