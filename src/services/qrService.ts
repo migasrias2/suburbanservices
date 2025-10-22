@@ -225,7 +225,7 @@ export class QRService {
       case 'FEEDBACK':
         return `Feedback QR – ${areaName}`
       default:
-        return `Service checklist – ${areaName}`
+        return `${areaName}`
     }
   }
 
@@ -1020,21 +1020,39 @@ export class QRService {
     }
 
     // Try to detect from area name or other metadata
-    const areaName = (qrData.metadata?.areaName || qrData.metadata?.originalText || '').toLowerCase()
-    
-    if (areaName.includes('bathroom') || areaName.includes('toilet') || areaName.includes('ablution')) {
+    const raw = [
+      qrData.metadata?.areaName,
+      qrData.metadata?.originalText,
+      qrData.metadata?.siteName,
+      qrData.metadata?.label,
+      qrData.metadata?.category,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+
+    // Bathrooms / ablutions
+    if (
+      /bathroom|toilet|ablution|restroom|washroom|wc|lavatory|ladies|gents|men's|mens|women|disabled|accessible|urinal/.test(
+        raw,
+      )
+    ) {
       return 'BATHROOMS_ABLUTIONS'
     }
-    if (areaName.includes('office') || areaName.includes('admin') || areaName.includes('meeting')) {
+    // Admin/office/meeting/HR/etc.
+    if (/office|admin|meeting|boardroom|conference|hr|it|finance|accounts|training|sales/.test(raw)) {
       return 'ADMIN_OFFICE'
     }
-    if (areaName.includes('kitchen') || areaName.includes('canteen') || areaName.includes('lunch')) {
+    // Kitchen / canteen / break room
+    if (/kitchen|canteen|break ?room|tea ?room|pantry|lunchroom|staff ?room|coffee/.test(raw)) {
       return 'KITCHEN_CANTEEN'
     }
-    if (areaName.includes('warehouse') || areaName.includes('industrial') || areaName.includes('storage')) {
+    // Warehouse / industrial
+    if (/warehouse|industrial|storage|stores|stock ?room|loading( bay)?|dock|workshop|factory|plant/.test(raw)) {
       return 'WAREHOUSE_INDUSTRIAL'
     }
-    if (areaName.includes('reception') || areaName.includes('lobby') || areaName.includes('entrance')) {
+    // Reception / common
+    if (/reception|lobby|entrance|front desk|foyer|atrium/.test(raw)) {
       return 'RECEPTION_COMMON'
     }
     

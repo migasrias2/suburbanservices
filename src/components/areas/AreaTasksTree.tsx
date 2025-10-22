@@ -38,6 +38,7 @@ export interface AreaTasksTreeProps {
   onAddCustomer?: () => void
   onAddArea?: (payload: { customer: string }) => void
   extraAreasByCustomer?: Record<string, string[]>
+  onDeleteCustomer?: (customer: string) => void
 }
 
 const buildTree = (tasks: AreaTask[]): TreeAreaGroup[] => {
@@ -153,6 +154,7 @@ export const AreaTasksTree = ({
   onAddCustomer,
   onAddArea,
   extraAreasByCustomer,
+  onDeleteCustomer,
 }: AreaTasksTreeProps) => {
   const tree = useMemo(() => buildTree(tasks), [tasks])
   const extendedTree = useMemo(() => {
@@ -263,11 +265,7 @@ export const AreaTasksTree = ({
         action={{
           icon: <Trash2 className="h-4 w-4" />,
           label: 'Delete',
-          onClick: () => {
-            // Consumers will handle actual deletion via parent callback in future
-            const event = new CustomEvent('delete-customer', { detail: { customer: group.customer } })
-            window.dispatchEvent(event)
-          },
+          onClick: () => onDeleteCustomer?.(group.customer),
           className: 'rounded-none',
         }}
         className="rounded-3xl"

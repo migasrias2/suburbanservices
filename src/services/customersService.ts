@@ -2,29 +2,29 @@ import { supabase, type Customer } from "./supabase";
 
 export async function fetchCustomers(): Promise<Customer[]> {
   const adminId = localStorage.getItem('userId');
-  if (!adminId) {
-    // Fallback to public read if not admin session
-    const { data, error } = await supabase
-      .from("customers")
-      .select("*")
-      .order("name", { ascending: true, nullsFirst: false });
+  const query = supabase
+    .from('uk_customers')
+    .select('*')
+    .order('display_name', { ascending: true, nullsFirst: false })
+    .order('name', { ascending: true, nullsFirst: false });
 
+  if (adminId) {
+    // when admin, we rely on RPC (which already reads uk_customers)
+    const { data, error } = await supabase.rpc('admin_list_customers', { p_admin_id: adminId });
     if (error) {
-      console.error("Failed to fetch customers", error);
+      console.error('Failed to fetch customers', error);
       throw error;
     }
-
-    return data ?? [];
+    return (data ?? []) as Customer[];
   }
 
-  const { data, error } = await supabase.rpc('admin_list_customers', { p_admin_id: adminId });
-
+  const { data, error } = await query;
   if (error) {
-    console.error("Failed to fetch customers", error);
+    console.error('Failed to fetch customers', error);
     throw error;
   }
 
-  return data ?? [];
+  return (data ?? []) as Customer[];
 }
 
 export async function createCustomer(name: string): Promise<Customer> {
@@ -33,8 +33,6 @@ export async function createCustomer(name: string): Promise<Customer> {
     throw new Error("Customer name is required");
   }
 
-  // Use admin RPC to bypass RLS safely. The admin id is stored in localStorage
-  // as userId when an admin logs in via admin_login.
   const adminId = localStorage.getItem('userId');
   if (!adminId) {
     throw new Error('Missing admin session');

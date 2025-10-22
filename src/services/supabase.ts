@@ -44,14 +44,16 @@ export type Admin = {
 }
 
 export type Customer = {
-  id: string;
-  name: string;
-  contact_email?: string;
-  contact_phone?: string;
-  address?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  id: string
+  name: string | null
+  display_name?: string | null
+  customer_name?: string | null
+  contact_email?: string | null
+  contact_phone?: string | null
+  address?: string | null
+  is_active?: boolean | null
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 export type Site = {

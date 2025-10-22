@@ -36,11 +36,8 @@ export const Swipeable: React.FC<SwipeableProps> = ({ children, action, classNam
     setOffset(next)
   }
   const onEnd = () => {
-    if (offset < -48) {
-      setOffset(-96)
-    } else {
-      setOffset(0)
-    }
+    const finalOffset = offset < -48 ? -96 : 0
+    setOffset(finalOffset)
     startX.current = null
     if (isSwiping) {
       setBlockClicksUntil(Date.now() + 250)

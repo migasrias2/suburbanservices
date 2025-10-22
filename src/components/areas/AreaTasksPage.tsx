@@ -4,6 +4,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
 } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Trash2, Search, UserPlus } from "lucide-react";
@@ -49,6 +50,7 @@ import {
   updateAreaTask,
 } from "@/services/areaTasksService";
 import { createCustomer, fetchCustomers, softDeleteCustomer } from "@/services/customersService";
+import { backfillDefaultTasksForCustomer } from "@/services/areaTasksService";
 
 type SheetMode = "create" | "edit";
 
@@ -210,27 +212,60 @@ export const AreaTasksPage = () => {
     }
   })
 
-  // Hook up swipe delete action
-  useEffect(() => {
-    const handler = async (e: Event) => {
-      const detail = (e as CustomEvent).detail as { customer: string } | undefined
-      if (!detail?.customer) return
-      const match = customersQuery.data?.find(c => (c.name?.trim() || '') === detail.customer)
-      if (!match?.id) return
-      const confirmed = confirm(`Delete customer "${detail.customer}"? This will hide it from the list.`)
-      if (!confirmed) return
-      try {
-        await softDeleteCustomer(match.id)
-        toast({ title: 'Customer deleted' })
-        queryClient.invalidateQueries({ queryKey: ['customers'] })
+  const backfillMutation = useMutation({
+    mutationFn: async (customer: string) => {
+      return backfillDefaultTasksForCustomer(customer)
+    },
+    onSuccess: ({ added }) => {
+      if (added > 0) {
+        toast({ title: `Added ${added} default task${added === 1 ? '' : 's'}` })
         queryClient.invalidateQueries({ queryKey: ['area_tasks'] })
-      } catch (err) {
-        console.error(err)
-        toast({ title: 'Could not delete customer', variant: 'destructive' })
       }
+    },
+  })
+
+  // Detect customers whose areas appear to have only one task, then auto-backfill once
+  const backfillTriggered = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const rows = tasksQuery.data ?? []
+    if (!rows.length) return
+    const byCustomer = new Map<string, Map<string, number>>()
+    rows.forEach((t) => {
+      const customer = (t.customer_name?.trim() || 'Unassigned Customer')
+      const area = (t.area?.trim() || 'Unassigned Area')
+      if (!byCustomer.has(customer)) byCustomer.set(customer, new Map())
+      const areaMap = byCustomer.get(customer)!
+      areaMap.set(area, (areaMap.get(area) ?? 0) + 1)
+    })
+    byCustomer.forEach((areaCounts, customer) => {
+      if (backfillTriggered.current.has(customer)) return
+      const counts = Array.from(areaCounts.values())
+      if (counts.length >= 5 && counts.every((c) => c <= 1)) {
+        backfillTriggered.current.add(customer)
+        backfillMutation.mutate(customer)
+      }
+    })
+  }, [tasksQuery.data, backfillMutation])
+
+  // Run Avtrade backfill once immediately for admin, then persist a flag to avoid repeats
+
+  const handleDeleteCustomer = useCallback(async (customerName: string) => {
+    const match = customersQuery.data?.find((c) => {
+      const label = c.display_name?.trim() || c.name?.trim() || ''
+      return label.toLowerCase() === customerName.toLowerCase()
+    })
+    if (!match?.id) return
+    const confirmed = confirm(`Delete customer "${customerName}"? This will hide it from the list.`)
+    if (!confirmed) return
+    try {
+      await softDeleteCustomer(match.id)
+      toast({ title: 'Customer deleted' })
+      queryClient.invalidateQueries({ queryKey: ['customers'] })
+      queryClient.invalidateQueries({ queryKey: ['area_tasks'] })
+    } catch (err) {
+      console.error(err)
+      toast({ title: 'Could not delete customer', variant: 'destructive' })
     }
-    window.addEventListener('delete-customer', handler as EventListener)
-    return () => window.removeEventListener('delete-customer', handler as EventListener)
   }, [customersQuery.data, queryClient, toast])
 
   useEffect(() => {
@@ -255,11 +290,21 @@ export const AreaTasksPage = () => {
   }, [tasksQuery.data, expandedInitialized]);
 
   const filteredTasks = useMemo(() => {
+    const rows = tasksQuery.data ?? []
+    const activeCustomers = new Set(
+      (customersQuery.data ?? [])
+        .map((c) => (c.name || '').trim())
+        .filter(Boolean),
+    )
+    const byActive = rows.filter((t) => {
+      const name = (t.customer_name || '').trim()
+      return !activeCustomers.size || activeCustomers.has(name)
+    })
     if (!search.trim()) {
-      return tasksQuery.data ?? [];
+      return byActive
     }
-    const query = search.toLowerCase();
-    return (tasksQuery.data ?? []).filter((task) => {
+    const query = search.toLowerCase()
+    return byActive.filter((task) => {
       return [
         task.customer_name,
         task.area,
@@ -268,9 +313,9 @@ export const AreaTasksPage = () => {
         task.qr_code,
       ]
         .filter(Boolean)
-        .some((value) => value!.toLowerCase().includes(query));
-    });
-  }, [tasksQuery.data, search]);
+        .some((value) => value!.toLowerCase().includes(query))
+    })
+  }, [tasksQuery.data, customersQuery.data, search]);
 
   const handleReorderTasks = useCallback(
     async ({
@@ -480,16 +525,20 @@ export const AreaTasksPage = () => {
           extraCustomers={extraCustomers}
           onAddCustomer={() => setAddCustomerOpen(true)}
           onAddArea={({ customer }) => {
-            const matched = customersQuery.data?.find(c => (c.name?.trim() || '') === customer)
+            const matched = customersQuery.data?.find((c) => {
+              const label = c.display_name?.trim() || c.name?.trim() || ''
+              return label.toLowerCase() === customer.toLowerCase()
+            })
             if (matched?.id) {
-              setAddAreaOpen({ customerId: matched.id, customerName: matched.name || customer })
+              const label = matched.display_name?.trim() || matched.name?.trim() || customer
+              setAddAreaOpen({ customerId: matched.id, customerName: label })
             } else {
-              // If we cannot find by name, ask to create the customer first
               setAddCustomerOpen(true)
               setNewCustomerName(customer)
             }
           }}
           extraAreasByCustomer={extraAreasByCustomer}
+          onDeleteCustomer={handleDeleteCustomer}
         />
       )}
 
@@ -546,6 +595,17 @@ export const AreaTasksPage = () => {
               >
                 {createCustomerMutation.isPending ? "Adding…" : "Add customer"}
               </Button>
+              {!!newCustomerName.trim() && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="rounded-full bg-gray-100 text-gray-700"
+                  onClick={() => backfillMutation.mutate(newCustomerName.trim())}
+                  disabled={backfillMutation.isPending}
+                >
+                  {backfillMutation.isPending ? 'Backfilling…' : 'Backfill defaults'}
+                </Button>
+              )}
             </DialogFooter>
           </form>
         </DialogContent>

@@ -1043,9 +1043,9 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           <div className="grid sm:grid-cols-2 gap-3">
             {filteredCleaners.map((cleaner) => (
               <button
-                key={cleaner.cleaner_name}
+                key={cleaner.cleaner_id || cleaner.id}
                 onClick={() => setSelectedCleaner(cleaner)}
-                className={`rounded-2xl border ${selectedCleaner?.cleaner_name === cleaner.cleaner_name ? 'border-[#00339B] shadow-md' : 'border-gray-100 shadow-sm'} bg-white transition-all text-left p-4 flex items-center gap-4 hover:shadow-md`}
+                className={`rounded-2xl border ${selectedCleaner?.cleaner_id === cleaner.cleaner_id ? 'border-[#00339B] shadow-md' : 'border-gray-100 shadow-sm'} bg-white transition-all text-left p-4 flex items-center gap-4 hover:shadow-md`}
               >
                 <div className={`h-11 w-11 rounded-2xl flex items-center justify-center text-white text-xs font-semibold ${getStatusColor(cleaner.event_type)}`}>
                   {(cleaner.event_type || 'ACTIVE').slice(0, 3).toUpperCase()}

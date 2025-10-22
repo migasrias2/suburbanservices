@@ -1,4 +1,5 @@
 import { supabase, type AreaTask } from './supabase'
+import { QRService } from './qrService'
 
 export type CreateAreaTaskInput = {
   customer_name: string
@@ -21,6 +22,16 @@ export type UpdateAreaTaskInput = {
 }
 
 export async function fetchAreaTasks(): Promise<AreaTask[]> {
+  const adminId = localStorage.getItem('userId')
+  if (adminId) {
+    const { data, error } = await supabase.rpc('admin_list_area_tasks', { p_admin_id: adminId })
+    if (error) {
+      console.error('Failed to fetch area tasks (admin)', error)
+      throw error
+    }
+    return (data ?? []) as AreaTask[]
+  }
+
   const { data, error } = await supabase
     .from('area_tasks')
     .select('*')
@@ -116,6 +127,91 @@ export async function reorderAreaTasks({
     console.error('Failed to reorder area tasks', failed.error)
     throw failed.error
   }
+}
+
+
+// Backfill default tasks for a customer by inferring area categories from QR metadata.
+// Idempotent: it only inserts tasks that do not already exist for an area.
+export async function backfillDefaultTasksForCustomer(customerName: string): Promise<{ added: number }> {
+  const normalizedCustomer = (customerName || '').trim()
+  if (!normalizedCustomer) return { added: 0 }
+
+  // Pull active QR codes for the customer to derive areas and detect types
+  const { data: qrRows, error: qrError } = await supabase
+    .from('building_qr_codes')
+    .select('qr_code_id, customer_name, building_area, area_description, qr_code_url')
+    .ilike('customer_name', `%${normalizedCustomer}%`)
+    .eq('is_active', true)
+
+  if (qrError) {
+    console.error('Failed to load QR rows for backfill', qrError)
+    throw qrError
+  }
+
+  const byArea = new Map<string, { areaLabel: string; areaType: ReturnType<typeof QRService.detectAreaType> }>()
+  ;(qrRows ?? []).forEach((row: any) => {
+    let parsed: any = {}
+    try { parsed = row.qr_code_url ? JSON.parse(row.qr_code_url) : {} } catch {}
+    const areaLabel = (row.building_area || row.area_description || parsed?.metadata?.areaName || '').toString().trim()
+    if (!areaLabel) return
+    const qrData = {
+      id: row.qr_code_id || '',
+      type: 'AREA' as const,
+      metadata: {
+        areaName: areaLabel,
+        siteName: parsed?.metadata?.siteName,
+        label: parsed?.label,
+        category: parsed?.metadata?.category,
+      },
+    }
+    const areaType = QRService.detectAreaType(qrData as any)
+    if (!byArea.has(areaLabel)) {
+      byArea.set(areaLabel, { areaLabel, areaType })
+    }
+  })
+
+  let totalAdded = 0
+  for (const { areaLabel, areaType } of byArea.values()) {
+    // Load existing tasks for this area
+    const { data: existing, error: existingError } = await supabase
+      .from('area_tasks')
+      .select('id, task_description, sort_order')
+      .eq('customer_name', normalizedCustomer)
+      .eq('area', areaLabel)
+
+    if (existingError) {
+      console.warn('Failed to read existing tasks for', normalizedCustomer, areaLabel, existingError)
+      continue
+    }
+
+    const existingNames = new Set((existing ?? []).map((t) => (t.task_description || '').trim().toLowerCase()))
+    const defaults = QRService.getTasksForArea(areaType)
+    const newRows = defaults
+      .filter((t) => !existingNames.has(t.name.trim().toLowerCase()))
+      .map((task, index) => ({
+        customer_name: normalizedCustomer,
+        area: areaLabel,
+        task_description: task.name,
+        task_type: task.category,
+        active: true,
+        sort_order: (existing?.length ?? 0) + index,
+      }))
+
+    if (!newRows.length) continue
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('area_tasks')
+      .insert(newRows)
+      .select('id')
+
+    if (insertError) {
+      console.warn('Insert error while backfilling tasks for', areaLabel, insertError)
+      continue
+    }
+    totalAdded += (inserted?.length ?? 0)
+  }
+
+  return { added: totalAdded }
 }
 
 

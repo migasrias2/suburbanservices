@@ -87,7 +87,7 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
       if (normalizedType === 'TASK') {
         return `Task QR – ${normalizedArea}`
       }
-      return `Service checklist – ${normalizedArea}`
+      return `${normalizedArea}`
     }
 
     try {
