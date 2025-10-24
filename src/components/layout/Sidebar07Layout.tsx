@@ -69,6 +69,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
   const managerMenuItems = [
     { icon: BarChart3, label: 'Dashboard', path: '/manager-dashboard' },
     { icon: Clock, label: 'Recent Activity', path: '/manager-activity' },
+    { icon: BarChart3, label: 'Analytics', path: '/analytics' },
   ]
 
   const adminMenuItems = [
@@ -76,6 +77,8 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
     { icon: QrCode, label: 'QR Generator', path: '/qr-generator' },
     { icon: Building2, label: 'Areas & Tasks', path: '/area-tasks' },
     { icon: Users, label: 'User Management', path: '/admin-dashboard' },
+    { icon: BarChart3, label: 'Analytics', path: '/analytics' },
+    { icon: Clock, label: 'Calendar', path: '/admin-weekly-schedule' },
   ]
 
   const getMenuItems = () => {
@@ -101,6 +104,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
       if (location.pathname === '/qr-generator') return 'QR Generator'
       if (location.pathname === '/area-tasks') return 'Areas & Tasks'
       if (location.pathname === '/admin-dashboard') return 'User Management'
+      if (location.pathname === '/admin-weekly-schedule') return 'Weekly Calendar'
       return 'Admin'
     }
     return userType === 'cleaner' ? 'Cleaner Dashboard' : 'Manager Dashboard'

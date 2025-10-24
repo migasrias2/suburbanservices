@@ -17,6 +17,8 @@ import AreaTasksPage from "./pages/AreaTasksPage";
 import NotFound from "./pages/NotFound";
 import ManagerActivityPage from "./pages/ManagerActivityPage";
 import { Navigate } from "react-router-dom";
+import AnalyticsPage from "./pages/AnalyticsPage";
+import AdminWeeklySchedulePage from "./pages/AdminWeeklySchedulePage";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +43,8 @@ const App = () => (
           <Route path="/manager-dashboard" element={<ManagerDashboardPage />} />
           <Route path="/manager-activity" element={<ManagerActivityPage />} />
           <Route path="/admin-dashboard" element={<ManagerDashboardPage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/admin-weekly-schedule" element={<AdminWeeklySchedulePage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -41,6 +41,7 @@ export interface TaskSelection {
 
 export interface ManualQRCodePayload {
   type: QRCodeData['type']
+  customerId?: string
   customerName: string
   siteName?: string
   siteId?: string
@@ -310,6 +311,10 @@ export class QRService {
       throw new Error('Customer name is required')
     }
 
+    if (!payload.customerId?.trim()) {
+      throw new Error('Customer selection is required')
+    }
+
     const now = new Date().toISOString()
     const metadata = {
       ...payload.metadata,
@@ -366,13 +371,18 @@ export class QRService {
           qr_code_image_path: storageUrl,
           is_active: true,
           created_at: now,
-        }, { onConflict: 'qr_code_id' })
+        }, { onConflict: 'customer_name,building_area' })
 
       if (insertError) {
         throw insertError
       }
 
-      await this.ensureAreaTaskRecord(qrData, trimmedCustomer, metadata.areaName || metadata.siteName || payload.type, payload.description)
+      await this.ensureAreaTaskRecord(
+        qrData,
+        trimmedCustomer,
+        metadata.areaName || metadata.siteName || payload.type,
+        payload.description,
+      )
 
       return {
         qrData,

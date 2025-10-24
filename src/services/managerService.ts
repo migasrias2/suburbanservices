@@ -59,6 +59,25 @@ export async function fetchAllCleaners(): Promise<CleanerSummary[]> {
   return (data ?? []) as CleanerSummary[]
 }
 
+export async function resolveManagerCleanerRoster(managerId?: string | null): Promise<CleanerSummary[]> {
+  const scopedManagerId = managerId ?? ''
+
+  if (!scopedManagerId) {
+    return fetchAllCleaners()
+  }
+
+  try {
+    const cleanerIds = await fetchManagerCleanerIds(scopedManagerId)
+    if (!cleanerIds.length) {
+      return fetchAllCleaners()
+    }
+    return fetchCleanersByIds(cleanerIds)
+  } catch (error) {
+    console.warn('Falling back to full cleaner roster', error)
+    return fetchAllCleaners()
+  }
+}
+
 export type ManagerActivityRow = {
   id: string
   cleaner_id: string | null

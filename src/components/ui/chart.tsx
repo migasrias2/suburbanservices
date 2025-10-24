@@ -156,7 +156,7 @@ const ChartTooltipContent = React.forwardRef<
         return null
       }
 
-      return <div className={cn("font-medium", labelClassName)}>{value}</div>
+      return <div className={cn("text-xs font-medium text-gray-500", labelClassName)}>{value}</div>
     }, [
       label,
       labelFormatter,
@@ -177,7 +177,7 @@ const ChartTooltipContent = React.forwardRef<
       <div
         ref={ref}
         className={cn(
-          "grid min-w-[8rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl",
+          "grid min-w-[9rem] items-start gap-1.5 rounded-[20px] border border-white/80 bg-white px-4 py-3 text-xs text-gray-700 shadow-[0_20px_45px_rgba(15,35,95,0.14)] backdrop-blur",
           className
         )}
       >

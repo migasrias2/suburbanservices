@@ -45,6 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, userType, use
     { icon: Users, label: 'Live Tracking', path: '/manager-dashboard', section: 'overview' },
     { icon: QrCode, label: 'QR Generator', path: '/manager-dashboard', section: 'qr-generator' },
     { icon: FileText, label: 'Reports', path: '/manager-dashboard', section: 'reports' },
+    { icon: BarChart3, label: 'Analytics', path: '/analytics' },
   ]
 
   const menuItems = userType === 'cleaner' ? cleanerMenuItems : managerMenuItems

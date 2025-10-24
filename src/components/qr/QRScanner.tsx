@@ -101,6 +101,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
 
     try {
       setError(null)
+      setLastScan(null)
       setIsScanning(true)
 
       if (qrScanner) {
@@ -350,13 +351,20 @@ export const QRScanner: React.FC<QRScannerProps> = ({
               </div>
             </div>
           )}
-          {!isScanning && (
+          {!isScanning && !lastScan?.success && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center space-y-3">
                 <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
                   <QrCode className="w-8 h-8" style={{ color: '#00339B' }} />
                 </div>
                 <p className="text-gray-600 font-medium">Hold steady and align the QR inside the frame</p>
+              </div>
+            </div>
+          )}
+          {lastScan?.success && (
+            <div className="absolute inset-0 flex items-center justify-center bg-green-500/10">
+              <div className="flex items-center justify-center h-24 w-24 rounded-full bg-green-100 text-green-600">
+                <CheckCircle2 className="h-14 w-14 animate-[scale-in_0.4s_ease-out_forwards]" />
               </div>
             </div>
           )}
@@ -395,28 +403,12 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         {/* Error Display removed per request */}
 
         {/* Success Display */}
-        {lastScan && lastScan.success && (
-          <Alert className="rounded-2xl border-green-200 bg-green-50">
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
-            <AlertDescription>
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="font-medium text-green-900">
-                    {getActionText(lastScan.data.type)}
-                  </span>
-                  {lastScan.data.metadata?.areaName && (
-                    <p className="text-sm text-green-700 mt-1">
-                      Area: {lastScan.data.metadata.areaName}
-                    </p>
-                  )}
-                </div>
-                <Badge className="bg-green-600 text-white">
-                  {lastScan.data.type}
-                </Badge>
-              </div>
-            </AlertDescription>
-          </Alert>
-        )}
+        <style>{`
+          @keyframes scale-in {
+            from { transform: scale(0.6); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+          }
+        `}</style>
       </div>
     </div>
   )

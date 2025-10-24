@@ -48,16 +48,13 @@ export default function QRGeneratorPage() {
     <Sidebar07Layout userType={userType} userName={userName}>
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-semibold text-gray-900 sm:text-4xl">QR Code Generator</h1>
-            <p className="text-gray-600">Create new customer area codes and test them instantly.</p>
-          </div>
+          <h1 className="text-3xl font-semibold text-gray-900 sm:text-4xl">QR Codes</h1>
           {lastCreated && (
             <Button
               onClick={() => navigate('/qr-library')}
               className="rounded-full bg-[#00339B] px-6 text-white shadow-md"
             >
-              View in Library
+              Library
             </Button>
           )}
         </div>
@@ -69,13 +66,10 @@ export default function QRGeneratorPage() {
           }} />
 
           <Card className="border-0 shadow-xl rounded-3xl">
-            <CardHeader className="space-y-2">
+            <CardHeader>
               <CardTitle className="text-xl font-semibold text-gray-900">
-                Test a QR Code
+                Test QR
               </CardTitle>
-              <p className="text-sm text-gray-600">
-                Use the camera to scan and preview how the QR behaves in the cleaner workflow. Preview mode skips database logging.
-              </p>
             </CardHeader>
             <CardContent className="space-y-4">
               <QRScanner
@@ -105,14 +99,6 @@ export default function QRGeneratorPage() {
                           {lastScan.metadata?.floor && <p><strong>Floor:</strong> {lastScan.metadata.floor}</p>}
                           {lastScan.metadata?.category && <p><strong>Category:</strong> {lastScan.metadata.category}</p>}
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="self-start rounded-full border-gray-200"
-                          onClick={() => setLastScan(null)}
-                        >
-                          Clear Result
-                        </Button>
                       </div>
                     </AlertDescription>
                   </Alert>

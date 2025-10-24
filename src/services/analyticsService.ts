@@ -1,0 +1,399 @@
+import { supabase } from './supabase'
+import {
+  fetchManagerCleanerIds,
+  fetchCleanersByIds,
+  fetchAllCleaners,
+  type CleanerSummary,
+} from './managerService'
+import {
+  getScheduleForCleaner,
+  isClockInOnTime,
+} from '../lib/analyticsSchedule'
+import { normalizeCleanerName } from '../lib/identity'
+
+export type AnalyticsRole = 'manager' | 'admin'
+
+export type AnalyticsRange = {
+  start: string
+  end: string
+}
+
+export type AttendanceRecord = {
+  id: number
+  cleaner_uuid: string | null
+  cleaner_name: string
+  customer_name: string | null
+  site_name: string | null
+  clock_in: string | null
+  clock_out: string | null
+}
+
+export type TaskSelectionRecord = {
+  id: number
+  cleaner_id: string
+  cleaner_name: string | null
+  qr_code_id: string | null
+  area_type: string | null
+  selected_tasks: string | null
+  completed_tasks: string | null
+  timestamp: string | null
+}
+
+export type TaskPhotoRecord = {
+  id: number
+  cleaner_id: string
+  cleaner_name: string | null
+  qr_code_id: string | null
+  task_id: string | null
+  area_type: string | null
+  photo_timestamp: string | null
+}
+
+type ComplianceTrendPoint = {
+  date: string
+  compliance: number
+  total: number
+  completed: number
+}
+
+type CleanerRate = {
+  cleanerId: string
+  cleanerName: string
+  rate: number
+  total: number
+  value: number
+}
+
+type AreaDuration = {
+  label: string
+  avgMinutes: number
+  samples: number
+}
+
+type DailyHoursPoint = {
+  date: string
+  hours: number
+}
+
+export type AnalyticsSummary = {
+  roster: CleanerSummary[]
+  totals: {
+    complianceRate: number | null
+    onTimeRate: number | null
+    photoComplianceRate: number | null
+    totalHoursWorked: number
+  }
+  trend: ComplianceTrendPoint[]
+  onTimeByCleaner: CleanerRate[]
+  taskCompletionByArea: AreaDuration[]
+  photoComplianceBreakdown: {
+    withPhoto: number
+    withoutPhoto: number
+  }
+  hoursByDate: DailyHoursPoint[]
+}
+
+export type FetchAnalyticsParams = {
+  managerId?: string | null
+  role: AnalyticsRole
+  range: AnalyticsRange
+}
+
+const toDateKey = (iso?: string | null) => {
+  if (!iso) return 'unknown'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return 'unknown'
+  return d.toISOString().slice(0, 10)
+}
+
+const minutesBetween = (start?: string | null, end?: string | null): number | null => {
+  if (!start || !end) return null
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+  const diff = endDate.getTime() - startDate.getTime()
+  if (!Number.isFinite(diff) || diff <= 0) return null
+  return diff / (1000 * 60)
+}
+
+const hoursBetween = (start?: string | null, end?: string | null): number | null => {
+  const minutes = minutesBetween(start, end)
+  return minutes === null ? null : minutes / 60
+}
+
+const parseTasks = (value?: string | null): string[] => {
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value)
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item): item is string => typeof item === 'string')
+    }
+  } catch (error) {
+    console.warn('Failed to parse task list', error)
+  }
+  return []
+}
+
+const ensureUniqueCleanerSummaries = (records: CleanerSummary[]): CleanerSummary[] => {
+  const map = new Map<string, CleanerSummary>()
+  records.forEach((record) => {
+    map.set(record.id, record)
+  })
+  return Array.from(map.values())
+}
+
+export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAnalyticsParams): Promise<AnalyticsSummary> {
+  const isAdmin = role === 'admin'
+
+  let roster: CleanerSummary[]
+  let cleanerIds: string[] = []
+
+  if (isAdmin) {
+    roster = await fetchAllCleaners()
+    cleanerIds = roster.map((cleaner) => cleaner.id)
+  } else {
+    const managerCleanerIds = await fetchManagerCleanerIds(managerId ?? '')
+    if (managerCleanerIds.length) {
+      roster = await fetchCleanersByIds(managerCleanerIds)
+      cleanerIds = managerCleanerIds
+    } else {
+      roster = await fetchAllCleaners()
+      cleanerIds = roster.map((cleaner) => cleaner.id)
+    }
+  }
+
+  roster = ensureUniqueCleanerSummaries(roster)
+
+  const attendanceQuery = supabase
+    .from('time_attendance')
+    .select('id, cleaner_uuid, cleaner_name, customer_name, site_name, clock_in, clock_out')
+    .gte('clock_in', range.start)
+    .lte('clock_in', range.end)
+
+  if (!isAdmin && cleanerIds.length) {
+    attendanceQuery.in('cleaner_uuid', cleanerIds)
+  }
+
+  let selectionsQuery = supabase
+    .from('uk_cleaner_task_selections')
+    .select('id, cleaner_id, cleaner_name, qr_code_id, area_type, selected_tasks, completed_tasks, timestamp')
+    .gte('timestamp', range.start)
+    .lte('timestamp', range.end)
+
+  if (!isAdmin && cleanerIds.length) {
+    selectionsQuery = selectionsQuery.in('cleaner_id', cleanerIds)
+  }
+
+  let photosQuery = supabase
+    .from('uk_cleaner_task_photos')
+    .select('id, cleaner_id, cleaner_name, qr_code_id, task_id, area_type, photo_timestamp')
+    .gte('photo_timestamp', range.start)
+    .lte('photo_timestamp', range.end)
+
+  if (!isAdmin && cleanerIds.length) {
+    photosQuery = photosQuery.in('cleaner_id', cleanerIds)
+  }
+
+  const [attendanceRes, selectionsRes, photosRes] = await Promise.all([
+    attendanceQuery,
+    selectionsQuery,
+    photosQuery,
+  ])
+
+  if (attendanceRes.error) {
+    throw attendanceRes.error
+  }
+  if (selectionsRes.error) {
+    throw selectionsRes.error
+  }
+  if (photosRes.error) {
+    throw photosRes.error
+  }
+
+  const attendance = (attendanceRes.data ?? []) as AttendanceRecord[]
+  const selections = (selectionsRes.data ?? []) as TaskSelectionRecord[]
+  const photos = (photosRes.data ?? []) as TaskPhotoRecord[]
+
+  const rosterNames = new Map<string, string>()
+  roster.forEach((cleaner) => {
+    rosterNames.set(cleaner.id, normalizeCleanerName(`${cleaner.first_name ?? ''} ${cleaner.last_name ?? ''}`))
+  })
+
+  const complianceByDate = new Map<string, { total: number; completed: number }>()
+  let totalAttendance = 0
+  let totalCompleted = 0
+  let totalOnTime = 0
+  let totalOnTimeEligible = 0
+  let totalHoursWorked = 0
+
+  const onTimeByCleaner = new Map<string, { onTime: number; total: number }>()
+  const hoursByDate = new Map<string, number>()
+
+  attendance.forEach((row) => {
+    const dateKey = toDateKey(row.clock_in ?? row.clock_out)
+    if (!complianceByDate.has(dateKey)) {
+      complianceByDate.set(dateKey, { total: 0, completed: 0 })
+    }
+    const dateAggregate = complianceByDate.get(dateKey)!
+    dateAggregate.total += 1
+    totalAttendance += 1
+
+    const isCompleted = Boolean(row.clock_in && row.clock_out)
+    if (isCompleted) {
+      dateAggregate.completed += 1
+      totalCompleted += 1
+    }
+
+    const cleanerId = row.cleaner_uuid ?? ''
+    const cleanerName = cleanerId ? rosterNames.get(cleanerId) ?? normalizeCleanerName(row.cleaner_name) : normalizeCleanerName(row.cleaner_name)
+
+    const hours = hoursBetween(row.clock_in, row.clock_out)
+    if (hours) {
+      totalHoursWorked += hours
+      const dateTotal = hoursByDate.get(dateKey) ?? 0
+      hoursByDate.set(dateKey, dateTotal + hours)
+    }
+
+    const schedule = getScheduleForCleaner(cleanerName)
+    if (schedule) {
+      totalOnTimeEligible += 1
+      const onTime = isClockInOnTime(row.clock_in, cleanerName)
+      if (onTime) {
+        totalOnTime += 1
+      }
+      const cleanerKey = cleanerId || cleanerName
+      const cleanerAggregate = onTimeByCleaner.get(cleanerKey) ?? { onTime: 0, total: 0 }
+      cleanerAggregate.total += 1
+      if (onTime) {
+        cleanerAggregate.onTime += 1
+      }
+      onTimeByCleaner.set(cleanerKey, cleanerAggregate)
+    }
+  })
+
+  const trend: ComplianceTrendPoint[] = Array.from(complianceByDate.entries())
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([date, value]) => ({
+      date,
+      compliance: value.total ? Math.round((value.completed / value.total) * 100) : 0,
+      total: value.total,
+      completed: value.completed,
+    }))
+
+  const onTimeRates: CleanerRate[] = Array.from(onTimeByCleaner.entries()).map(([cleanerKey, value]) => {
+    const cleanerName = rosterNames.get(cleanerKey) ?? cleanerKey
+    return {
+      cleanerId: cleanerKey,
+      cleanerName,
+      rate: value.total ? Math.round((value.onTime / value.total) * 100) : 0,
+      total: value.total,
+      value: value.onTime,
+    }
+  })
+
+  const hoursByDateSeries: DailyHoursPoint[] = Array.from(hoursByDate.entries())
+    .map(([date, value]) => ({
+      date,
+      hours: Number(value.toFixed(2)),
+    }))
+    .sort((a, b) => (a.date < b.date ? -1 : 1))
+
+  const photosByCleaner = new Map<string, TaskPhotoRecord[]>()
+  photos.forEach((photo) => {
+    const key = photo.cleaner_id || photo.cleaner_name || 'unknown'
+    if (!photosByCleaner.has(key)) {
+      photosByCleaner.set(key, [])
+    }
+    photosByCleaner.get(key)!.push(photo)
+  })
+
+  let totalTasksWithPhotos = 0
+  let totalTasksWithoutPhotos = 0
+
+  const areaDurations = new Map<string, { totalMinutes: number; samples: number }>()
+
+  selections.forEach((selection) => {
+    const selectedTasks = parseTasks(selection.selected_tasks)
+    const completedTasks = parseTasks(selection.completed_tasks)
+    if (!selectedTasks.length) {
+      return
+    }
+
+    const cleanerKey = selection.cleaner_id || selection.cleaner_name || 'unknown'
+    const relatedPhotos = photosByCleaner.get(cleanerKey) ?? []
+
+    selectedTasks.forEach((taskId) => {
+      const hasPhoto = relatedPhotos.some((photo) => {
+        if (taskId && photo.task_id) {
+          return photo.task_id === taskId
+        }
+        if (selection.qr_code_id && photo.qr_code_id) {
+          return selection.qr_code_id === photo.qr_code_id
+        }
+        return false
+      })
+
+      if (hasPhoto) {
+        totalTasksWithPhotos += 1
+      } else {
+        totalTasksWithoutPhotos += 1
+      }
+    })
+
+    completedTasks.forEach((taskId) => {
+      const matchingPhoto = relatedPhotos
+        .filter((photo) => photo.task_id === taskId || (selection.qr_code_id && selection.qr_code_id === photo.qr_code_id))
+        .sort((a, b) => {
+          const timeA = new Date(a.photo_timestamp ?? 0).getTime()
+          const timeB = new Date(b.photo_timestamp ?? 0).getTime()
+          return timeA - timeB
+        })[0]
+
+      const minutes = minutesBetween(selection.timestamp, matchingPhoto?.photo_timestamp)
+      if (minutes !== null) {
+        const areaKey = selection.area_type || 'Unknown Area'
+        if (!areaDurations.has(areaKey)) {
+          areaDurations.set(areaKey, { totalMinutes: 0, samples: 0 })
+        }
+        const aggregate = areaDurations.get(areaKey)!
+        aggregate.totalMinutes += minutes
+        aggregate.samples += 1
+      }
+    })
+  })
+
+  const taskCompletionByArea: AreaDuration[] = Array.from(areaDurations.entries()).map(([label, value]) => ({
+    label,
+    avgMinutes: value.samples ? Number((value.totalMinutes / value.samples).toFixed(1)) : 0,
+    samples: value.samples,
+  }))
+
+  const complianceRate = totalAttendance
+    ? Number(((totalCompleted / totalAttendance) * 100).toFixed(1))
+    : null
+
+  const onTimeRate = totalOnTimeEligible
+    ? Number(((totalOnTime / totalOnTimeEligible) * 100).toFixed(1))
+    : null
+
+  const photoComplianceRate = totalTasksWithPhotos + totalTasksWithoutPhotos
+    ? Number((totalTasksWithPhotos / (totalTasksWithPhotos + totalTasksWithoutPhotos) * 100).toFixed(1))
+    : null
+
+  return {
+    roster,
+    totals: {
+      complianceRate,
+      onTimeRate,
+      photoComplianceRate,
+      totalHoursWorked: Number(totalHoursWorked.toFixed(2)),
+    },
+    trend,
+    onTimeByCleaner: onTimeRates.sort((a, b) => b.rate - a.rate),
+    taskCompletionByArea: taskCompletionByArea.sort((a, b) => b.avgMinutes - a.avgMinutes),
+    photoComplianceBreakdown: {
+      withPhoto: totalTasksWithPhotos,
+      withoutPhoto: totalTasksWithoutPhotos,
+    },
+    hoursByDate: hoursByDateSeries,
+  }
+}
