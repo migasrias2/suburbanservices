@@ -188,6 +188,57 @@ export default function Login() {
     resetForm()
   }
 
+  const handleDemoLogin = async (userType: string, name: string) => {
+    setLoading(true)
+    try {
+      const loginData = {
+        mobile_number: '+44', // Placeholder, replace with actual demo number
+        username: 'demo', // Placeholder, replace with actual demo username
+        password: 'demo123', // Placeholder, replace with actual demo password
+        user_type: userType
+      }
+
+      const result = await authService.loginUser(loginData)
+
+      if (result.success && result.user) {
+        const normalizedName = setStoredCleanerName(name)
+
+        // Store user session
+        localStorage.setItem('userType', result.user.user_type)
+        localStorage.setItem('userId', result.user.id)
+        setStoredCleanerName(normalizedName)
+
+        // Navigate based on user type
+        switch (result.user.user_type) {
+          case 'cleaner':
+            navigate('/clock-in')
+            break
+          case 'manager':
+            navigate('/manager-dashboard')
+            break
+          case 'admin':
+            navigate('/admin-dashboard')
+            break
+        }
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Demo Login Failed",
+          description: result.error || "Invalid demo credentials"
+        })
+      }
+    } catch (err) {
+      console.error('Demo Login error:', err)
+      toast({
+        variant: "destructive",
+        title: "Demo Login Error",
+        description: "Demo login failed. Please try again."
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div
       className="relative min-h-screen flex items-center justify-center p-6"
@@ -627,6 +678,13 @@ export default function Login() {
                 )}
               </TabsContent>
             </Tabs>
+            <Button
+              onClick={() => handleDemoLogin('operations', 'Operations Lead')}
+              className="w-full rounded-full"
+              variant="outline"
+            >
+              Demo Ops Login
+            </Button>
           </CardContent>
         </Card>
 

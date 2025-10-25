@@ -19,6 +19,9 @@ import { useToast } from '@/components/ui/use-toast'
 import { fetchCustomers } from '@/services/customersService'
 import type { Customer } from '@/services/supabase'
 
+const appBaseUrl = (import.meta.env.VITE_PUBLIC_APP_URL?.replace(/\/$/, '') || window.location.origin)
+const assistBaseUrl = `${appBaseUrl}/bathroom-assist`
+
 const initialPayload: ManualQRCodePayload = {
   type: 'AREA',
   customerId: '',
@@ -105,6 +108,15 @@ export const QRGenerator: React.FC<ManualQRGeneratorProps> = ({ onGenerated }) =
         areaName: formData.areaName?.trim() || '',
       }
 
+      if (payload.type === 'FEEDBACK' && payload.metadata?.assistBathroom) {
+        const params = new URLSearchParams({
+          customer: payload.customerName,
+          bathroom: payload.areaName || payload.metadata.assistBathroom,
+          qr: payload.metadata.qrCodeId || ''
+        })
+        payload.rawValue = `${assistBaseUrl}?${params.toString()}`
+      }
+
       const manualResult = await QRService.createManualQRCode(payload)
       setResult(manualResult)
       onGenerated?.(manualResult)
@@ -180,7 +192,7 @@ export const QRGenerator: React.FC<ManualQRGeneratorProps> = ({ onGenerated }) =
                   <Command className="rounded-2xl bg-white text-gray-700 [&_[cmdk-input-wrapper]]:border-b-0 [&_[cmdk-input-wrapper]]:px-0">
                     <CommandList className="max-h-56">
                       <CommandGroup className="space-y-1 p-1.5">
-                        {(['AREA', 'CLOCK_IN', 'CLOCK_OUT', 'TASK', 'FEEDBACK'] as ManualQRCodePayload['type'][]).map(type => (
+                        {(['AREA', 'CLOCK_IN', 'CLOCK_OUT', 'TASK', 'FEEDBACK', 'RAW'] as ManualQRCodePayload['type'][]).map(type => (
                           <CommandItem
                             key={type}
                             value={type}
@@ -270,6 +282,10 @@ export const QRGenerator: React.FC<ManualQRGeneratorProps> = ({ onGenerated }) =
                   setFormData(prev => ({
                     ...prev,
                     areaName: event.target.value,
+                    metadata: {
+                      ...(prev.metadata || {}),
+                      assistBathroom: event.target.value
+                    }
                   }))
                 }
                 className="h-12 rounded-2xl border-gray-200 bg-gray-50/70 px-4 text-gray-700"

@@ -53,6 +53,7 @@ export interface ManualQRCodePayload {
   label?: string
   notes?: string
   metadata?: Record<string, any>
+  rawValue?: string
 }
 
 export interface ManualQRCodeResult {
@@ -337,7 +338,9 @@ export class QRService {
       metadata,
     }
 
-    const dataUrl = await this.generateQRCode(qrData)
+    const qrValue = payload.rawValue || JSON.stringify(qrData)
+
+    const dataUrl = await this.generateQRCode(qrValue)
 
     try {
       const bucket = supabase.storage.from('qr-codes')
@@ -422,10 +425,10 @@ export class QRService {
   /**
    * Generate QR code for different purposes
    */
-  static async generateQRCode(data: QRCodeData): Promise<string> {
+  static async generateQRCode(data: QRCodeData | string): Promise<string> {
     try {
-      const qrData = JSON.stringify(data)
-      const qrCodeDataURL = await QRCode.toDataURL(qrData, {
+      const qrValue = typeof data === 'string' ? data : JSON.stringify(data)
+      const qrCodeDataURL = await QRCode.toDataURL(qrValue, {
         width: 400,
         margin: 2,
         color: {

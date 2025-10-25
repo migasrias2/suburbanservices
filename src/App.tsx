@@ -19,6 +19,7 @@ import ManagerActivityPage from "./pages/ManagerActivityPage";
 import { Navigate } from "react-router-dom";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import AdminWeeklySchedulePage from "./pages/AdminWeeklySchedulePage";
+import BathroomAssistReportPage from "./pages/BathroomAssistReportPage";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,7 @@ const App = () => (
           <Route path="/admin-dashboard" element={<ManagerDashboardPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/admin-weekly-schedule" element={<AdminWeeklySchedulePage />} />
+          <Route path="/bathroom-assist" element={<BathroomAssistReportPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

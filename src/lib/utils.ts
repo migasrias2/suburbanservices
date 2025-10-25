@@ -23,3 +23,17 @@ export const toIsoRange = (range: DateRange): { start: string; end: string } => 
   start: range.start.toISOString(),
   end: range.end.toISOString(),
 })
+
+export const capitalizeWords = (value: string) =>
+  value.replace(/[-_]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
+
+export const formatRelativeTime = (date: string | Date) => {
+  const target = typeof date === 'string' ? new Date(date) : date
+  const diff = target.getTime() - Date.now()
+  const minutes = Math.round(diff / (1000 * 60))
+  if (minutes <= 1) return 'in a minute'
+  if (minutes < 60) return `in ${minutes} minutes`
+  const hours = Math.round(minutes / 60)
+  if (hours === 1) return 'in 1 hour'
+  return `in ${hours} hours`
+}

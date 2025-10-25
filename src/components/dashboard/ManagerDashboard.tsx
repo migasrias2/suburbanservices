@@ -8,6 +8,9 @@ import { Input } from '../ui/input'
 import { fetchAllCleaners, fetchCleanersByIds, fetchManagerCleanerIds } from '../../services/managerService'
 import { AREA_TASKS } from '../../services/qrService'
 import { normalizeCleanerName } from '../../lib/identity'
+import { AssistRequestService } from '../../services/assistRequestService'
+import { Badge } from '../ui/badge'
+import { ScrollArea } from '../ui/scroll-area'
 
 interface ManagerDashboardProps {
   managerId: string
@@ -103,6 +106,22 @@ interface AreaPhotoGroup {
   latestAt: string | null
   latestTimestamp: number
   tasks: TaskPhotoGroup[]
+}
+
+interface BathroomAssistRequest {
+  id: string
+  location_label: string
+  customer_name: string | null
+  reported_at: string
+  accepted_at: string | null
+  resolved_at: string | null
+  status: 'pending' | 'accepted' | 'resolved' | 'escalated'
+  notes: string | null
+  materials_used: string | null
+  resolved_by_name: string | null
+  accepted_by_name: string | null
+  before_media: string[] | null
+  after_media: string[] | null
 }
 
 const statusColors: Record<string, string> = {
@@ -262,6 +281,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const [photoFeedbackMap, setPhotoFeedbackMap] = useState<Record<number, 'up' | 'down' | null>>({})
   const [isSavingFeedback, setIsSavingFeedback] = useState(false)
   const [expandedAttendanceId, setExpandedAttendanceId] = useState<number | null>(null)
+  const [assistRequests, setAssistRequests] = useState<BathroomAssistRequest[]>([])
 
   useEffect(() => {
     if (activePhotoIndex !== null) {
@@ -398,6 +418,10 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     }
 
     loadCleaners()
+    AssistRequestService.listResolved({ limit: 12 }).then(setAssistRequests).catch((error) => {
+      console.error('Failed to load bathroom assist summary', error)
+      setAssistRequests([])
+    })
   }, [managerId])
 
   useEffect(() => {
@@ -920,6 +944,22 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
       }))
       .sort((a, b) => (b.latestTimestamp ?? Number.NEGATIVE_INFINITY) - (a.latestTimestamp ?? Number.NEGATIVE_INFINITY))
   }, [taskPhotoGroups])
+
+  const assistCards = useMemo(() => assistRequests.map((request) => ({
+    id: request.id,
+    location: request.location_label,
+    customer: request.customer_name,
+    reportedAt: request.reported_at,
+    acceptedAt: request.accepted_at,
+    resolvedAt: request.resolved_at,
+    status: request.status,
+    notes: request.notes,
+    materials: request.materials_used,
+    handledBy: request.resolved_by_name || request.accepted_by_name || 'Cleaner',
+    beforeMedia: Array.isArray(request.before_media) ? request.before_media : [],
+    afterMedia: Array.isArray(request.after_media) ? request.after_media : [],
+    escalated: request.status === 'escalated'
+  })), [assistRequests])
 
   const areasToday = taskSummaries.length
   const photosCount = todaysPhotos.length

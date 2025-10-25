@@ -146,3 +146,43 @@ export type UKOperationsManager = Manager;
 export type QRCodeData = QRCode;
 export type UKCleanerLog = CleanerLog;
 export type UKSite = Site;
+
+export type BathroomAssistRequest = {
+  id: string
+  qr_code_id?: string | null
+  customer_name: string
+  location_label: string
+  status: 'pending' | 'accepted' | 'resolved' | 'escalated' | 'cancelled'
+  issue_type: string
+  issue_description?: string | null
+  reported_by?: string | null
+  reported_contact?: string | null
+  reported_at: string
+  accepted_at?: string | null
+  accepted_by?: string | null
+  accepted_by_name?: string | null
+  resolved_at?: string | null
+  resolved_by?: string | null
+  resolved_by_name?: string | null
+  escalated_at?: string | null
+  escalation_reason?: string | null
+  escalate_after?: string | null
+  before_media: any
+  after_media: any
+  notes?: string | null
+  materials_used?: string | null
+  metadata: Record<string, any>
+  created_at: string
+  updated_at: string
+}
+
+export type BathroomAssistEvent = {
+  id: number
+  request_id: string
+  event_type: string
+  actor_role?: string | null
+  actor_id?: string | null
+  actor_name?: string | null
+  payload: Record<string, any>
+  created_at: string
+}

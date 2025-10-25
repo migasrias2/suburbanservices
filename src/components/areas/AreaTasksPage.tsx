@@ -91,6 +91,11 @@ export const AreaTasksPage = () => {
     queryFn: fetchCustomers,
   });
 
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["area_tasks"] })
+    queryClient.invalidateQueries({ queryKey: ["customers"] })
+  }, [queryClient])
+
   const createMutation = useMutation({
     mutationFn: createAreaTask,
     onSuccess: () => {
