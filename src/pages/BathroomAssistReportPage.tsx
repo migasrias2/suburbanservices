@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { supabase } from '@/services/supabase'
+import { AssistRequestService } from '@/services/assistRequestService'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -184,42 +185,24 @@ const BathroomAssistReportPage: React.FC = () => {
         })
       }
 
-      const { data, error: insertError } = await supabase
-        .from('bathroom_assist_requests')
-        .insert({
-          qr_code_id: qrCodeId || null,
-          customer_name: customer,
-          location_label: bathroomLabel || 'Bathroom',
-          issue_type: issueType,
-          issue_description: description.trim() || null,
-          reported_by: reporterName.trim() || null,
-          reported_contact: contactInfo.trim() || null,
-          before_media: uploadedMedia,
-          metadata: {
-            source: 'public_form',
-            query: Object.fromEntries(params.entries()),
-            browser: typeof navigator !== 'undefined' ? navigator.userAgent : undefined
-          },
-          escalate_after: new Date(Date.now() + 15 * 60 * 1000).toISOString()
-        })
-        .select('id')
-        .single()
-
-      if (insertError) throw insertError
-
-      await supabase.from('bathroom_assist_events').insert({
-        request_id: data.id,
-        event_type: 'reported',
-        actor_role: 'staff',
-        actor_name: reporterName || 'Anonymous',
-        payload: {
-          issue: issueType,
-          description: description.trim() || null,
-          attachments: uploadedMedia.map(file => ({ url: file.url, name: file.name }))
-        }
+      const record = await AssistRequestService.create({
+        qrCodeId: qrCodeId || undefined,
+        customerName: customer,
+        locationLabel: bathroomLabel || 'Bathroom',
+        issueType: issueType,
+        issueDescription: description.trim() || undefined,
+        reportedBy: reporterName.trim() || undefined,
+        reportedContact: contactInfo.trim() || undefined,
+        beforeMedia: uploadedMedia,
+        metadata: {
+          source: 'public_form',
+          query: Object.fromEntries(params.entries()),
+          browser: typeof navigator !== 'undefined' ? navigator.userAgent : undefined
+        },
+        escalateAfter: new Date(Date.now() + 15 * 60 * 1000).toISOString()
       })
 
-      setSubmittedRequestId(data.id)
+      setSubmittedRequestId(record.id)
       toast({
         title: 'Request sent',
         description: 'Thanks! The cleaning team has been notified.'
