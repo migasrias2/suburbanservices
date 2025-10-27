@@ -9,9 +9,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/hooks/use-toast'
-import { Loader2, Clock, MapPin, Camera, CheckCircle2, AlertCircle, UploadCloud, Trash2 } from 'lucide-react'
+import { Loader2, Camera, CheckCircle2, AlertCircle, UploadCloud, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Label } from '@/components/ui/label'
 
@@ -27,12 +26,12 @@ interface LocalMedia extends AssistMedia {
   error?: string
 }
 
-const statusColors: Record<BathroomAssistRequest['status'], string> = {
-  pending: 'bg-amber-100 text-amber-700',
-  accepted: 'bg-blue-100 text-blue-700',
-  resolved: 'bg-emerald-100 text-emerald-700',
-  escalated: 'bg-red-100 text-red-700',
-  cancelled: 'bg-gray-100 text-gray-700'
+const statusStyles: Record<BathroomAssistRequest['status'], string> = {
+  pending: 'bg-amber-50 text-amber-700 border border-amber-200',
+  accepted: 'bg-blue-50 text-blue-700 border border-blue-200',
+  resolved: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  escalated: 'bg-red-50 text-red-700 border border-red-200',
+  cancelled: 'bg-gray-50 text-gray-600 border border-gray-200'
 }
 
 const storageBucket = 'bathroom-assist'
@@ -47,17 +46,25 @@ const dataUrlFromFile = (file: File) =>
     reader.readAsDataURL(file)
   })
 
+const formatTime = (value: string) =>
+  new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+const humanStatus: Record<BathroomAssistRequest['status'], string> = {
+  pending: 'Pending',
+  accepted: 'In progress',
+  resolved: 'Resolved',
+  escalated: 'Escalated',
+  cancelled: 'Cancelled'
+}
+
 const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cleanerName }) => {
   const [requests, setRequests] = useState<BathroomAssistRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedRequest, setSelectedRequest] = useState<BathroomAssistRequest | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
-  const [notes, setNotes] = useState('')
-  const [materials, setMaterials] = useState('')
   const [afterPhotos, setAfterPhotos] = useState<LocalMedia[]>([])
+  const [beforePhotos, setBeforePhotos] = useState<LocalMedia[]>([])
   const [resolving, setResolving] = useState(false)
-
-  const customerName = useMemo(() => requests[0]?.customer_name || '', [requests])
 
   const loadRequests = async () => {
     setLoading(true)
@@ -89,9 +96,8 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
 
   const openDetail = (request: BathroomAssistRequest) => {
     setSelectedRequest(request)
-    setNotes('')
-    setMaterials('')
     setAfterPhotos([])
+    setBeforePhotos([])
     setDetailOpen(true)
   }
 
@@ -99,9 +105,8 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
     setDetailOpen(false)
     setSelectedRequest(null)
     setResolving(false)
-    setNotes('')
-    setMaterials('')
     setAfterPhotos([])
+    setBeforePhotos([])
   }
 
   const handleAccept = async (request: BathroomAssistRequest) => {
@@ -115,12 +120,17 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
     }
   }
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+    target: 'before' | 'after'
+  ) => {
     const fileList = event.target.files
     if (!fileList) return
 
     const files = Array.from(fileList)
-    const slots = MAX_MEDIA - afterPhotos.length
+    const current = target === 'before' ? beforePhotos : afterPhotos
+    const setState = target === 'before' ? setBeforePhotos : setAfterPhotos
+    const slots = MAX_MEDIA - current.length
     const selected = files.slice(0, slots)
 
     const previews: LocalMedia[] = []
@@ -138,7 +148,7 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
 
       previews.push({
         id: crypto.randomUUID(),
-        type: 'after',
+        type: target,
         name: file.name,
         size: file.size,
         preview: await dataUrlFromFile(file),
@@ -149,9 +159,9 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
 
     if (previews.length === 0) return
 
-    setAfterPhotos(prev => [...prev, ...previews])
+    setState(prev => [...prev, ...previews])
 
-    const bucketPath = `after/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}`
+    const bucketPath = `${target}/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}`
 
     for (const media of previews) {
       try {
@@ -163,17 +173,18 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
         })
         if (error) throw error
         const { data: publicUrlData } = supabase.storage.from(storageBucket).getPublicUrl(data.path)
-        setAfterPhotos(prev => prev.map(item => (item.id === media.id ? { ...item, url: publicUrlData.publicUrl, uploading: false } : item)))
+        setState(prev => prev.map(item => (item.id === media.id ? { ...item, url: publicUrlData.publicUrl, uploading: false } : item)))
       } catch (uploadError) {
         console.error(uploadError)
-        setAfterPhotos(prev => prev.map(item => (item.id === media.id ? { ...item, error: 'Failed to upload', uploading: false } : item)))
+        setState(prev => prev.map(item => (item.id === media.id ? { ...item, error: 'Failed to upload', uploading: false } : item)))
         toast({ title: 'Upload failed', description: 'Could not upload one of the photos.', variant: 'destructive' })
       }
     }
   }
 
-  const removeAfterPhoto = (id: string) => {
-    setAfterPhotos(prev => prev.filter(photo => photo.id !== id))
+  const removePhoto = (id: string, target: 'before' | 'after') => {
+    const setState = target === 'before' ? setBeforePhotos : setAfterPhotos
+    setState(prev => prev.filter(photo => photo.id !== id))
   }
 
   const handleResolve = async () => {
@@ -181,8 +192,15 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
 
     setResolving(true)
     try {
-      const media = afterPhotos.filter(photo => photo.url && !photo.error).map(photo => ({
+      const mediaAfter = afterPhotos.filter(photo => photo.url && !photo.error).map(photo => ({
         type: 'after' as const,
+        url: photo.url,
+        name: photo.name,
+        size: photo.size
+      }))
+
+      const mediaBefore = beforePhotos.filter(photo => photo.url && !photo.error).map(photo => ({
+        type: 'before' as const,
         url: photo.url,
         name: photo.name,
         size: photo.size
@@ -192,9 +210,8 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
         requestId: selectedRequest.id,
         cleanerId,
         cleanerName,
-        notes: notes.trim() || undefined,
-        materialsUsed: materials.trim() || undefined,
-        afterMedia: media
+        afterMedia: mediaAfter,
+        beforeMedia: mediaBefore
       })
 
       toast({ title: 'Request resolved', description: `${selectedRequest.location_label} marked complete.` })
@@ -211,14 +228,65 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
   const pending = requests.filter(request => request.status === 'pending')
   const accepted = requests.filter(request => request.status === 'accepted')
 
+  const renderRequestCard = (request: BathroomAssistRequest, type: 'pending' | 'accepted') => {
+    const containerStyles = type === 'pending'
+      ? 'border-amber-100 bg-white/90 shadow-sm hover:shadow-lg hover:border-amber-200'
+      : 'border-blue-100 bg-white/90 shadow-sm hover:shadow-lg hover:border-blue-200'
+
+    return (
+      <button
+        key={request.id}
+        className={cn(
+          'w-full text-left rounded-3xl border transition p-5 flex flex-col gap-2',
+          containerStyles
+        )}
+        onClick={() => openDetail(request)}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-gray-900 leading-tight">{request.location_label}</p>
+            <p className="text-xs text-gray-500 capitalize">{request.issue_type.replace(/_/g, ' ')} · {formatTime(request.reported_at)}</p>
+          </div>
+          {type === 'pending' ? (
+            <Button
+              size="sm"
+              className="rounded-full bg-[#00339B] px-5 text-xs font-semibold text-white shadow-md shadow-blue-200 transition hover:bg-[#002c82] hover:shadow-lg hover:-translate-y-[1px]"
+              onClick={(event) => {
+                event.stopPropagation()
+                handleAccept(request)
+              }}
+            >
+              Accept job
+            </Button>
+          ) : (
+            <Badge className={cn('rounded-full px-3 py-1 text-xs font-medium', statusStyles[request.status])}>
+              {humanStatus[request.status]}
+            </Badge>
+          )}
+        </div>
+        {request.issue_description ? (
+          <p className="text-xs text-gray-600 rounded-2xl bg-gray-50 px-3 py-2">
+            {request.issue_description}
+          </p>
+        ) : null}
+      </button>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <Card className="border-0 shadow-xl rounded-3xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3 text-2xl font-semibold text-[#00339B]">
-            <Camera className="h-6 w-6" />
-            Bathroom Assist Requests
-          </CardTitle>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-2xl font-semibold text-[#00339B]">
+                Bathroom Assist Requests
+              </CardTitle>
+              <p className="mt-1 text-sm text-gray-500">
+                Live queue of staff reports. Tap a request to view details and close it out.
+              </p>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -235,61 +303,24 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
           ) : (
             <div className="grid gap-6 lg:grid-cols-2">
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <Badge variant="outline" className="rounded-full px-3 py-1 bg-amber-50 text-amber-700 border-amber-200">
-                    Pending ({pending.length})
-                  </Badge>
-                </h3>
-                <ScrollArea className="h-[420px] pr-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-[0.18em]">Pending</h3>
+                  <span className="text-xs font-medium text-gray-400">{pending.length}</span>
+                </div>
+                <ScrollArea className="h-[380px] pr-2">
                   <div className="space-y-4">
-                    {pending.map(request => (
-                      <button
-                        key={request.id}
-                        className="w-full text-left rounded-2xl border border-amber-100 bg-amber-50/60 hover:bg-amber-100 transition p-4 flex flex-col gap-3"
-                        onClick={() => openDetail(request)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Badge className={cn('rounded-full', statusColors[request.status])}>{request.status}</Badge>
-                            <span className="text-sm text-gray-500">{new Date(request.reported_at).toLocaleTimeString()}</span>
-                          </div>
-                          <Button size="sm" variant="outline" className="rounded-full" onClick={(event) => { event.stopPropagation(); handleAccept(request) }}>
-                            Accept
-                          </Button>
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">{request.location_label}</p>
-                          <p className="text-sm text-gray-600">{request.issue_type.replace(/_/g, ' ')}</p>
-                        </div>
-                      </button>
-                    ))}
+                    {pending.map((request) => renderRequestCard(request, 'pending'))}
                   </div>
                 </ScrollArea>
               </div>
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <Badge variant="outline" className="rounded-full px-3 py-1 bg-blue-50 text-blue-700 border-blue-200">
-                    Accepted ({accepted.length})
-                  </Badge>
-                </h3>
-                <ScrollArea className="h-[420px] pr-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-[0.18em]">In progress</h3>
+                  <span className="text-xs font-medium text-gray-400">{accepted.length}</span>
+                </div>
+                <ScrollArea className="h-[380px] pr-2">
                   <div className="space-y-4">
-                    {accepted.map(request => (
-                      <button
-                        key={request.id}
-                        className="w-full text-left rounded-2xl border border-blue-100 bg-blue-50 hover:bg-blue-100 transition p-4 flex flex-col gap-3"
-                        onClick={() => openDetail(request)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <Badge className={cn('rounded-full', statusColors[request.status])}>In progress</Badge>
-                          <span className="text-sm text-gray-500">Accepted {request.accepted_at ? new Date(request.accepted_at).toLocaleTimeString() : ''}</span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">{request.location_label}</p>
-                          <p className="text-sm text-gray-600">{request.issue_type.replace(/_/g, ' ')}</p>
-                        </div>
-                      </button>
-                    ))}
+                    {accepted.map((request) => renderRequestCard(request, 'accepted'))}
                   </div>
                 </ScrollArea>
               </div>
@@ -299,97 +330,127 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
       </Card>
 
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-2xl rounded-3xl">
+        <DialogContent className="max-w-2xl rounded-3xl border-0 shadow-2xl">
           {selectedRequest ? (
-            <div className="space-y-6">
-              <DialogHeader className="space-y-3">
-                <DialogTitle className="text-2xl font-bold text-[#00339B] flex items-center gap-3">
-                  <Camera className="h-6 w-6" />
+            <div className="space-y-5">
+              <DialogHeader className="space-y-2">
+                <DialogTitle className="text-xl font-semibold text-gray-900">
                   {selectedRequest.location_label}
                 </DialogTitle>
-                <DialogDescription className="text-gray-600">
-                  Issue reported {new Date(selectedRequest.reported_at).toLocaleString()} · {selectedRequest.issue_type.replace(/_/g, ' ')}
+                <DialogDescription className="text-sm text-gray-500">
+                  {humanStatus[selectedRequest.status]} · {selectedRequest.issue_type.replace(/_/g, ' ')} · {selectedRequest.accepted_at ? `Accepted ${formatTime(selectedRequest.accepted_at)}` : `Reported ${formatTime(selectedRequest.reported_at)}`}
                 </DialogDescription>
               </DialogHeader>
 
-              <Card className="border border-gray-100 rounded-3xl bg-gray-50/60">
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex flex-wrap gap-3">
-                    <Badge className={cn('rounded-full', statusColors[selectedRequest.status])}>{selectedRequest.status}</Badge>
-                    <Badge className="rounded-full bg-blue-100 text-blue-700 flex items-center gap-1">
-                      <Clock className="h-4 w-4" /> {selectedRequest.accepted_at ? `Accepted ${new Date(selectedRequest.accepted_at).toLocaleTimeString()}` : 'Waiting acceptance'}
-                    </Badge>
-                    <Badge className="rounded-full bg-green-100 text-green-700 flex items-center gap-1">
-                      <MapPin className="h-4 w-4" /> {selectedRequest.customer_name}
-                    </Badge>
-                  </div>
-                  {selectedRequest.issue_description ? (
-                    <p className="text-sm text-gray-700">{selectedRequest.issue_description}</p>
-                  ) : null}
-                  {selectedRequest.before_media && Array.isArray(selectedRequest.before_media) && selectedRequest.before_media.length > 0 ? (
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <Camera className="h-4 w-4" /> Before photos
-                      </h4>
-                      <div className="grid grid-cols-2 gap-3">
-                        {selectedRequest.before_media.map((media: any, index: number) => (
-                          <a key={index} href={media.url || media} target="_blank" rel="noreferrer">
-                            <img src={media.url || media} alt="Before" className="rounded-2xl border object-cover h-32 w-full" />
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
+              {selectedRequest.issue_description ? (
+                <p className="rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                  {selectedRequest.issue_description}
+                </p>
+              ) : null}
 
-              <Separator />
+              {selectedRequest.before_media && Array.isArray(selectedRequest.before_media) && selectedRequest.before_media.length > 0 ? (
+                <section className="space-y-3">
+                  <h4 className="text-sm font-semibold text-gray-700">Existing photos</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    {selectedRequest.before_media.map((media: any, index: number) => (
+                      <a key={index} href={media.url || media} target="_blank" rel="noreferrer">
+                        <img src={media.url || media} alt="Before" className="h-28 w-full rounded-2xl border object-cover shadow-sm" />
+                      </a>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
               <section className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-gray-700">Materials used (optional)</Label>
-                    <Input value={materials} onChange={event => setMaterials(event.target.value)} placeholder="e.g. replaced toilet paper" className="rounded-2xl" />
+                    <Label className="text-sm font-semibold text-gray-700">Before photos (optional)</Label>
+                    <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-blue-200 bg-blue-50/60 p-5 text-center text-sm text-blue-600 transition hover:border-blue-300 hover:bg-blue-50 cursor-pointer">
+                      <UploadCloud className="h-6 w-6" />
+                      Tap to add before photos
+                      <Input type="file" multiple accept={ACCEPTED_TYPES.join(',')} className="hidden" onChange={(event) => handleFileSelect(event, 'before')} />
+                    </label>
+                    {beforePhotos.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        {beforePhotos.map(photo => (
+                          <div key={photo.id} className="relative overflow-hidden rounded-3xl border border-blue-100 bg-white shadow-sm">
+                            <img src={photo.preview} alt={photo.name} className="h-28 w-full object-cover" />
+                            <div className="absolute top-2 left-2 rounded-full bg-blue-600/90 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-white">
+                              Before
+                            </div>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="destructive"
+                              className="absolute top-2 right-2 h-7 w-7 rounded-full"
+                              onClick={() => removePhoto(photo.id, 'before')}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                            {photo.uploading ? (
+                              <div className="absolute inset-0 flex items-center justify-center bg-white/70">
+                                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                              </div>
+                            ) : null}
+                            {photo.error ? (
+                              <div className="absolute inset-x-0 bottom-0 bg-red-600 text-white text-xs text-center py-1">
+                                Upload failed
+                              </div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-gray-700">Notes for customer (optional)</Label>
-                    <Textarea value={notes} onChange={event => setNotes(event.target.value)} rows={3} className="rounded-2xl" />
+                    <Label className="text-sm font-semibold text-gray-700">After photos</Label>
+                    <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-green-200 bg-green-50/60 p-5 text-center text-sm text-green-600 transition hover:border-green-300 hover:bg-green-50 cursor-pointer">
+                      <UploadCloud className="h-6 w-6" />
+                      Tap to add proof photos
+                      <Input type="file" multiple accept={ACCEPTED_TYPES.join(',')} className="hidden" onChange={(event) => handleFileSelect(event, 'after')} />
+                    </label>
+                    {afterPhotos.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        {afterPhotos.map(photo => (
+                          <div key={photo.id} className="relative overflow-hidden rounded-3xl border border-green-100 bg-white shadow-sm">
+                            <img src={photo.preview} alt={photo.name} className="h-28 w-full object-cover" />
+                            <div className="absolute top-2 left-2 rounded-full bg-green-600/90 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-white">
+                              After
+                            </div>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="destructive"
+                              className="absolute top-2 right-2 h-7 w-7 rounded-full"
+                              onClick={() => removePhoto(photo.id, 'after')}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                            {photo.uploading ? (
+                              <div className="absolute inset-0 flex items-center justify-center bg-white/70">
+                                <Loader2 className="h-5 w-5 animate-spin text-green-600" />
+                              </div>
+                            ) : null}
+                            {photo.error ? (
+                              <div className="absolute inset-x-0 bottom-0 bg-red-600 text-white text-xs text-center py-1">
+                                Upload failed
+                              </div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-gray-700">After photos</Label>
-                  <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-green-200 bg-green-50/60 p-6 cursor-pointer hover:border-green-300 hover:bg-green-50 transition">
-                    <UploadCloud className="h-8 w-8 text-green-600" />
-                    <span className="text-sm text-green-700">Tap to upload proof photos</span>
-                    <Input type="file" multiple accept={ACCEPTED_TYPES.join(',')} className="hidden" onChange={handleFileSelect} />
-                  </label>
-                  {afterPhotos.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {afterPhotos.map(photo => (
-                        <div key={photo.id} className="relative">
-                          <img src={photo.preview} alt={photo.name} className="rounded-2xl border object-cover h-32 w-full" />
-                          <Button type="button" size="icon" variant="destructive" className="absolute -top-2 -right-2 h-7 w-7 rounded-full" onClick={() => removeAfterPhoto(photo.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                          {photo.uploading ? (
-                            <div className="absolute inset-0 bg-white/60 flex items-center justify-center rounded-2xl">
-                              <Loader2 className="h-6 w-6 animate-spin text-green-600" />
-                            </div>
-                          ) : null}
-                          {photo.error ? (
-                            <div className="absolute inset-x-0 bottom-0 bg-red-600 text-white text-xs text-center py-1 rounded-b-2xl">
-                              Upload failed
-                            </div>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
                 </div>
               </section>
 
-              <Button onClick={handleResolve} disabled={resolving || afterPhotos.some(photo => photo.uploading)} className="w-full rounded-full py-4 text-lg font-semibold">
+              <Separator />
+
+              <Button
+                onClick={handleResolve}
+                disabled={resolving || afterPhotos.some(photo => photo.uploading) || beforePhotos.some(photo => photo.uploading)}
+                className="w-full rounded-full bg-[#00339B] py-4 text-lg font-semibold text-white shadow-sm transition hover:bg-[#002c82]"
+              >
                 {resolving ? (
                   <span className="flex items-center justify-center gap-2">
                     <Loader2 className="h-5 w-5 animate-spin" />

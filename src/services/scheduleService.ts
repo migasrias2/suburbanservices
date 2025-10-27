@@ -87,3 +87,4 @@ export async function fetchWeeklyVisits(): Promise<WeeklyVisit[]> {
   return mapAttendanceToVisits(visits, attendanceRows)
 }
 
+

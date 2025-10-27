@@ -244,3 +244,4 @@ export const getMockVisitsForWeek = (): MockVisit[] => {
   return MOCK_VISITS
 }
 
+

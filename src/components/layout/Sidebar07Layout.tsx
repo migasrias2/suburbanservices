@@ -11,7 +11,8 @@ import {
   User,
   BarChart3,
   Users,
-  QrCode
+  QrCode,
+  Camera
 } from 'lucide-react'
 import {
   Sidebar,
@@ -64,6 +65,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
 
   const cleanerMenuItems = [
     { icon: Clock, label: 'Clock In', path: '/clock-in' },
+    { icon: Camera, label: 'Assistance', path: '/cleaner-assistance' },
   ]
 
   const managerMenuItems = [

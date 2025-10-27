@@ -129,27 +129,29 @@ export class AssistRequestService {
   }
 
   static async create(input: CreateAssistRequestInput) {
-    const { data, error } = await supabase
+    const id = crypto.randomUUID()
+    const row = {
+      id,
+      qr_code_id: input.qrCodeId || null,
+      customer_name: input.customerName,
+      location_label: input.locationLabel,
+      issue_type: input.issueType,
+      issue_description: input.issueDescription || null,
+      reported_by: input.reportedBy || null,
+      reported_contact: input.reportedContact || null,
+      before_media: sanitizeMedia(input.beforeMedia),
+      metadata: input.metadata || {},
+      escalate_after: input.escalateAfter || null
+    }
+
+    const { error } = await supabase
       .from<BathroomAssistRequest>('bathroom_assist_requests')
-      .insert({
-        qr_code_id: input.qrCodeId || null,
-        customer_name: input.customerName,
-        location_label: input.locationLabel,
-        issue_type: input.issueType,
-        issue_description: input.issueDescription || null,
-        reported_by: input.reportedBy || null,
-        reported_contact: input.reportedContact || null,
-        before_media: sanitizeMedia(input.beforeMedia),
-        metadata: input.metadata || {},
-        escalate_after: input.escalateAfter || null
-      })
-      .select('*')
-      .single()
+      .insert(row, { returning: 'minimal' })
 
     if (error) throw error
 
     await this.logEvent({
-      request_id: data.id,
+      request_id: id,
       event_type: 'reported',
       actor_role: 'staff',
       actor_name: input.reportedBy || 'Anonymous',
@@ -164,7 +166,7 @@ export class AssistRequestService {
       customerName: input.customerName
     })
 
-    return data
+    return { id }
   }
 
   static async accept(input: AcceptAssistRequestInput) {

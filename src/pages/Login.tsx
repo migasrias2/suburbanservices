@@ -678,13 +678,6 @@ export default function Login() {
                 )}
               </TabsContent>
             </Tabs>
-            <Button
-              onClick={() => handleDemoLogin('operations', 'Operations Lead')}
-              className="w-full rounded-full"
-              variant="outline"
-            >
-              Demo Ops Login
-            </Button>
           </CardContent>
         </Card>
 

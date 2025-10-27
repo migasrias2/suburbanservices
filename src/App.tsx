@@ -33,6 +33,7 @@ const App = () => (
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/cleaner-dashboard" element={<CleanerDashboardPage />} />
+          <Route path="/cleaner-assistance" element={<CleanerDashboardPage />} />
           <Route path="/clock-in" element={<ClockInPage />} />
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/scanner" element={<ScannerPage />} />
