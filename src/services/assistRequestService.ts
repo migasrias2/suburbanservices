@@ -47,6 +47,12 @@ export type ListRecentOptions = {
   limit?: number
 }
 
+export type BathroomAssistHistoryFilters = {
+  customerName: string
+  locationLabel: string
+  limit?: number
+}
+
 const sanitizeMedia = (media?: AssistMedia[] | null) =>
   (media || []).map((item) => ({
     ...item,
@@ -126,6 +132,28 @@ export class AssistRequestService {
     const { data, error } = await query
     if (error) throw error
     return data
+  }
+
+  static async getRecentResolvedHistory(filters: BathroomAssistHistoryFilters) {
+    if (!filters.customerName || !filters.locationLabel) {
+      return []
+    }
+
+    const { data, error } = await supabase
+      .from<BathroomAssistRequest>('bathroom_assist_requests')
+      .select('*')
+      .eq('customer_name', filters.customerName)
+      .eq('location_label', filters.locationLabel)
+      .not('resolved_at', 'is', null)
+      .order('resolved_at', { ascending: false, nullsFirst: false })
+      .limit(filters.limit ?? 3)
+
+    if (error) {
+      console.error('Failed to load bathroom assist history', error)
+      throw error
+    }
+
+    return data ?? []
   }
 
   static async create(input: CreateAssistRequestInput) {
