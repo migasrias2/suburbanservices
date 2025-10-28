@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
-import { supabase } from '@/services/supabase'
+import { supabase, BathroomAssistRequest } from '@/services/supabase'
 import { AssistRequestService } from '@/services/assistRequestService'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,8 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { CheckCircle2, Loader2, AlertCircle, UploadCloud, CalendarClock, RefreshCcw } from 'lucide-react'
-import type { BathroomAssistRequest } from '@/services/supabase'
+import { CheckCircle2, Loader2, AlertCircle, UploadCloud } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
 
@@ -95,28 +94,42 @@ const BathroomAssistReportPage: React.FC = () => {
   const [submittedRequestId, setSubmittedRequestId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [history, setHistory] = useState<BathroomAssistRequest[]>([])
-  const [historyStatus, setHistoryStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
+  const [historyError, setHistoryError] = useState<string | null>(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
 
-  const refreshHistory = useCallback(async () => {
-    if (!customer || !bathroomLabel) {
-      setHistory([])
-      setHistoryStatus('idle')
-      return
+  useEffect(() => {
+    if (!customer || !bathroomLabel) return
+
+    let cancelled = false
+    const loadHistory = async () => {
+      setHistoryLoading(true)
+      setHistoryError(null)
+      try {
+        const data = await AssistRequestService.listResolved({
+          customerName: customer,
+          locationLabel: bathroomLabel,
+          status: ['resolved'],
+          limit: 3
+        })
+        if (!cancelled) {
+          setHistory(data.filter(item => item.resolved_at))
+        }
+      } catch (historyLoadError) {
+        console.error(historyLoadError)
+        if (!cancelled) {
+          setHistoryError('Could not load cleaning history. Please try again later.')
+        }
+      } finally {
+        if (!cancelled) {
+          setHistoryLoading(false)
+        }
+      }
     }
 
-    setHistoryStatus('loading')
-    try {
-      const records = await AssistRequestService.getRecentResolvedHistory({
-        customerName: customer,
-        locationLabel: bathroomLabel,
-        limit: 3
-      })
-      setHistory(records)
-      setHistoryStatus('loaded')
-    } catch (historyError) {
-      console.error(historyError)
-      setHistory([])
-      setHistoryStatus('error')
+    loadHistory()
+
+    return () => {
+      cancelled = true
     }
   }, [customer, bathroomLabel])
 
@@ -173,10 +186,6 @@ const BathroomAssistReportPage: React.FC = () => {
     setFiles([])
     setError(null)
   }
-
-  useEffect(() => {
-    refreshHistory()
-  }, [refreshHistory])
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -275,6 +284,15 @@ const BathroomAssistReportPage: React.FC = () => {
     )
   }
 
+  const formatHistoryEntry = (value: string) =>
+    new Date(value).toLocaleString(undefined, {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+
   if (submittedRequestId) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center p-6">
@@ -337,85 +355,32 @@ const BathroomAssistReportPage: React.FC = () => {
             </Badge>
           </div>
 
-          <section className="space-y-4 rounded-2xl border border-blue-100 bg-blue-50/40 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 flex items-center justify-center rounded-full bg-white text-[#00339B] shadow-sm">
-                  <CalendarClock className="h-5 w-5" />
-                </div>
-                <div className="text-left">
-                  <p className="text-sm font-semibold text-blue-900">Last cleaned history</p>
-                  <p className="text-xs text-blue-700">
-                    See the three most recent times this restroom was serviced.
-                  </p>
-                </div>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                className="rounded-full text-xs text-blue-700 hover:bg-white"
-                onClick={refreshHistory}
-                aria-label="Refresh cleaning history"
-              >
-                <RefreshCcw className="mr-2 h-4 w-4" />
-                Refresh
-              </Button>
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-gray-700">Last Cleaning Check</p>
+              {historyLoading ? (
+                <span className="text-xs text-gray-400">Loading…</span>
+              ) : historyError ? (
+                <span className="text-xs text-red-500">{historyError}</span>
+              ) : null}
             </div>
-
-            {historyStatus === 'loading' ? (
-              <div className="flex items-center justify-center py-6">
-                <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-              </div>
-            ) : null}
-
-            {historyStatus === 'error' ? (
-              <div className="rounded-2xl border border-red-200 bg-white/80 p-4 text-left">
-                <p className="text-sm font-medium text-red-700">Could not load cleaning history.</p>
-                <p className="text-xs text-red-500">Please try refreshing.</p>
-              </div>
-            ) : null}
-
-            {historyStatus === 'loaded' && history.length === 0 ? (
-              <div className="rounded-2xl border border-blue-100 bg-white/80 p-4 text-left">
-                <p className="text-sm font-medium text-blue-900">No cleanings recorded yet.</p>
-                <p className="text-xs text-blue-600">
-                  Once the cleaning team logs a resolution, it will appear here automatically.
-                </p>
-              </div>
-            ) : null}
-
-            {history.length > 0 ? (
-              <div className="overflow-hidden rounded-2xl border border-white/70 bg-white/90 shadow-inner">
-                <div className="grid grid-cols-3 bg-blue-100/50 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700">
-                  <div className="px-3 py-3 text-left">Resolved</div>
-                  <div className="px-3 py-3 text-left">Handled By</div>
-                  <div className="px-3 py-3 text-left">Notes</div>
-                </div>
-                <div className="divide-y divide-blue-50/80">
-                  {history.map(request => (
-                    <div key={request.id} className="grid grid-cols-3 text-sm text-gray-700">
-                      <div className="px-3 py-3">
-                        <p className="font-medium text-gray-900">
-                          {request.resolved_at ? new Date(request.resolved_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {request.resolved_at ? new Date(request.resolved_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                        </p>
-                      </div>
-                      <div className="px-3 py-3">
-                        <p className="font-medium text-gray-900">{request.resolved_by_name || request.accepted_by_name || 'Cleaner'}</p>
-                        <p className="text-xs text-gray-500 capitalize">{request.status.replace(/_/g, ' ')}</p>
-                      </div>
-                      <div className="px-3 py-3">
-                        <p className="line-clamp-2 text-xs text-gray-600">
-                          {request.notes || request.issue_description || 'No notes available'}
-                        </p>
-                      </div>
+            <div className="rounded-2xl border border-red-200 overflow-hidden">
+              <div className="grid grid-cols-1">
+                <div className="bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 uppercase tracking-wide">Time</div>
+                {historyLoading ? (
+                  <div className="px-4 py-3 text-sm text-gray-500 border-t border-red-200">Fetching recent cleanings…</div>
+                ) : history.length > 0 ? (
+                  history.map(request => (
+                    <div key={request.id} className="px-4 py-3 text-sm text-gray-700 border-t border-red-200">
+                      {formatHistoryEntry(request.resolved_at as string)}
+                      {request.resolved_by_name ? ` · ${request.resolved_by_name}` : ''}
                     </div>
-                  ))}
-                </div>
+                  ))
+                ) : historyError ? null : (
+                  <div className="px-4 py-3 text-sm text-gray-500 border-t border-red-200">No recent cleanings recorded.</div>
+                )}
               </div>
-            ) : null}
+            </div>
           </section>
 
           {error ? (

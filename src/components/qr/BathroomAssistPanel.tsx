@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { supabase, BathroomAssistRequest } from '@/services/supabase'
 import { AssistRequestService, AssistMedia } from '@/services/assistRequestService'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
-import { Loader2, Camera, CheckCircle2, AlertCircle, UploadCloud, Trash2 } from 'lucide-react'
+import { Loader2, CheckCircle2, AlertCircle, UploadCloud, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Label } from '@/components/ui/label'
 
@@ -65,6 +65,9 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
   const [afterPhotos, setAfterPhotos] = useState<LocalMedia[]>([])
   const [beforePhotos, setBeforePhotos] = useState<LocalMedia[]>([])
   const [resolving, setResolving] = useState(false)
+  const [history, setHistory] = useState<BathroomAssistRequest[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
 
   const loadRequests = async () => {
     setLoading(true)
@@ -107,6 +110,9 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
     setResolving(false)
     setAfterPhotos([])
     setBeforePhotos([])
+    setHistory([])
+    setHistoryError(null)
+    setHistoryLoading(false)
   }
 
   const handleAccept = async (request: BathroomAssistRequest) => {
@@ -227,6 +233,46 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
 
   const pending = requests.filter(request => request.status === 'pending')
   const accepted = requests.filter(request => request.status === 'accepted')
+
+  useEffect(() => {
+    if (!detailOpen || !selectedRequest) {
+      return
+    }
+
+    let cancelled = false
+
+    const loadHistory = async () => {
+      setHistoryLoading(true)
+      setHistoryError(null)
+      try {
+        const data = await AssistRequestService.listResolved({
+          customerName: selectedRequest.customer_name,
+          locationLabel: selectedRequest.location_label,
+          status: ['resolved'],
+          limit: 3
+        })
+
+        if (!cancelled) {
+          setHistory(data.filter(item => item.resolved_at))
+        }
+      } catch (error) {
+        console.error(error)
+        if (!cancelled) {
+          setHistoryError('Unable to load recent cleaning history.')
+        }
+      } finally {
+        if (!cancelled) {
+          setHistoryLoading(false)
+        }
+      }
+    }
+
+    loadHistory()
+
+    return () => {
+      cancelled = true
+    }
+  }, [detailOpen, selectedRequest])
 
   const renderRequestCard = (request: BathroomAssistRequest, type: 'pending' | 'accepted') => {
     const containerStyles = type === 'pending'
@@ -463,6 +509,38 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
                   </span>
                 )}
               </Button>
+
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold text-gray-700">Last cleaning checks</h4>
+                {historyLoading ? (
+                  <span className="text-xs text-gray-400">Loading…</span>
+                ) : historyError ? (
+                  <span className="text-xs text-red-500">{historyError}</span>
+                ) : null}
+              </div>
+              <div className="rounded-2xl border border-red-200 overflow-hidden">
+                <div className="bg-red-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-red-700">Time</div>
+                {historyLoading ? (
+                  <div className="px-4 py-3 text-sm text-gray-500 border-t border-red-200">Fetching recent cleanings…</div>
+                ) : history.length > 0 ? (
+                  history.map(entry => (
+                    <div key={entry.id} className="px-4 py-3 text-sm text-gray-700 border-t border-red-200">
+                      {new Date(entry.resolved_at || '').toLocaleString(undefined, {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                      {entry.resolved_by_name ? ` · ${entry.resolved_by_name}` : ''}
+                    </div>
+                  ))
+                ) : historyError ? null : (
+                  <div className="px-4 py-3 text-sm text-gray-500 border-t border-red-200">No recent cleanings recorded.</div>
+                )}
+              </div>
+            </section>
             </div>
           ) : null}
         </DialogContent>
