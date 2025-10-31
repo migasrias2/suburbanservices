@@ -9,7 +9,7 @@ import {
   getScheduleForCleaner,
   isClockInOnTime,
 } from '../lib/analyticsSchedule'
-import { normalizeCleanerName } from '../lib/identity'
+import { normalizeCleanerName, normalizeCleanerNumericId } from '../lib/identity'
 
 export type AnalyticsRole = 'manager' | 'admin'
 
@@ -20,6 +20,7 @@ export type AnalyticsRange = {
 
 export type AttendanceRecord = {
   id: number
+  cleaner_id: string | number | null
   cleaner_uuid: string | null
   cleaner_name: string
   customer_name: string | null
@@ -93,6 +94,22 @@ export type AnalyticsSummary = {
   hoursByDate: DailyHoursPoint[]
 }
 
+export type DashboardSnapshot = {
+  date: string
+  isCurrentDay: boolean
+  cleanersOnline: number | null
+  areasCleaned: number
+  photosTaken: number
+  hoursWorked: number
+  attendanceCount: number
+}
+
+export type DashboardSnapshotParams = {
+  managerId?: string | null
+  role: AnalyticsRole
+  dayIso: string
+}
+
 export type FetchAnalyticsParams = {
   managerId?: string | null
   role: AnalyticsRole
@@ -141,20 +158,198 @@ const ensureUniqueCleanerSummaries = (records: CleanerSummary[]): CleanerSummary
   return Array.from(map.values())
 }
 
+const parseLocalDayIso = (dayIso: string): Date => {
+  const [year, month, day] = dayIso.split('-').map((value) => Number.parseInt(value, 10))
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    throw new Error(`Invalid dayIso provided: ${dayIso}`)
+  }
+  const localDate = new Date(year, month - 1, day)
+  if (Number.isNaN(localDate.getTime())) {
+    throw new Error(`Invalid dayIso provided: ${dayIso}`)
+  }
+  return localDate
+}
+
+const toDayBounds = (dayIso: string): { start: string; end: string } => {
+  const base = parseLocalDayIso(dayIso)
+  const start = new Date(base)
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(base)
+  end.setHours(23, 59, 59, 999)
+  return { start: start.toISOString(), end: end.toISOString() }
+}
+
+const isSameCalendarDay = (left: Date, right: Date): boolean =>
+  left.getFullYear() === right.getFullYear() &&
+  left.getMonth() === right.getMonth() &&
+  left.getDate() === right.getDate()
+
+const buildCleanerScope = async (managerId: string | undefined | null, role: AnalyticsRole) => {
+  const isAdmin = role === 'admin'
+  let roster: CleanerSummary[]
+  let scopedCleanerIds: string[] = []
+
+  if (isAdmin) {
+    roster = await fetchAllCleaners()
+  } else {
+    scopedCleanerIds = await fetchManagerCleanerIds(managerId ?? '')
+    if (scopedCleanerIds.length) {
+      roster = await fetchCleanersByIds(scopedCleanerIds)
+    } else {
+      roster = await fetchAllCleaners()
+    }
+  }
+
+  roster = ensureUniqueCleanerSummaries(roster)
+
+  const restrictToManaged = role !== 'admin' && scopedCleanerIds.length > 0
+  const cleanerIdSet = new Set(scopedCleanerIds.filter(Boolean))
+  const numericCleanerIdSet = new Set(
+    scopedCleanerIds
+      .map((id) => normalizeCleanerNumericId(id))
+      .filter((value): value is number => value !== null),
+  )
+
+  const rosterNameSet = new Set<string>()
+
+  roster.forEach((cleaner) => {
+    const name = normalizeCleanerName(`${cleaner.first_name ?? ''} ${cleaner.last_name ?? ''}`)
+    rosterNameSet.add(name)
+  })
+
+  const matchesCleanerScope = (row: { cleaner_id?: string | number | null; cleaner_name?: string | null }) => {
+    if (!restrictToManaged) return true
+
+    if (row.cleaner_id !== null && row.cleaner_id !== undefined) {
+      const stringId = String(row.cleaner_id)
+      if (cleanerIdSet.has(stringId)) {
+        return true
+      }
+      const numericId = normalizeCleanerNumericId(stringId)
+      if (numericId !== null && numericCleanerIdSet.has(numericId)) {
+        return true
+      }
+    }
+
+    if (row.cleaner_name) {
+      const normalizedName = normalizeCleanerName(row.cleaner_name)
+      if (rosterNameSet.has(normalizedName)) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  return {
+    roster,
+    matchesCleanerScope,
+    restrictToManaged,
+  }
+}
+
+export async function fetchDashboardSnapshot({ managerId, role, dayIso }: DashboardSnapshotParams): Promise<DashboardSnapshot> {
+  const day = parseLocalDayIso(dayIso)
+
+  const today = new Date()
+  const isCurrentDay = isSameCalendarDay(day, today)
+  const { start, end } = toDayBounds(dayIso)
+
+  const scope = await buildCleanerScope(managerId ?? undefined, role)
+
+  const attendanceQuery = supabase
+    .from('time_attendance')
+    .select('id, cleaner_id, cleaner_uuid, cleaner_name, clock_in, clock_out')
+    .gte('clock_in', start)
+    .lte('clock_in', end)
+
+  const selectionsQuery = supabase
+    .from('uk_cleaner_task_selections')
+    .select('id, cleaner_id, cleaner_name, completed_tasks, timestamp')
+    .gte('timestamp', start)
+    .lte('timestamp', end)
+
+  const photosQuery = supabase
+    .from('uk_cleaner_task_photos')
+    .select('id, cleaner_id, cleaner_name, photo_timestamp')
+    .gte('photo_timestamp', start)
+    .lte('photo_timestamp', end)
+
+  const [attendanceRes, selectionsRes, photosRes] = await Promise.all([attendanceQuery, selectionsQuery, photosQuery])
+
+  if (attendanceRes.error) {
+    throw attendanceRes.error
+  }
+  if (selectionsRes.error) {
+    throw selectionsRes.error
+  }
+  if (photosRes.error) {
+    throw photosRes.error
+  }
+
+  const attendanceRows = (attendanceRes.data ?? []).filter((row) =>
+    scope.matchesCleanerScope({ cleaner_id: row.cleaner_uuid ?? row.cleaner_id, cleaner_name: row.cleaner_name }),
+  )
+  const selectionRows = (selectionsRes.data ?? []).filter((row) =>
+    scope.matchesCleanerScope({ cleaner_id: row.cleaner_id, cleaner_name: row.cleaner_name }),
+  )
+  const photoRows = (photosRes.data ?? []).filter((row) =>
+    scope.matchesCleanerScope({ cleaner_id: row.cleaner_id, cleaner_name: row.cleaner_name }),
+  )
+
+  let cleanersOnline: number | null = null
+  if (isCurrentDay) {
+    const activeAttendanceKeys = new Set<string>()
+
+    attendanceRows.forEach((row) => {
+      if (!row.clock_in) return
+      if (row.clock_out) return
+      const key = row.cleaner_uuid ?? row.cleaner_id ?? row.cleaner_name
+      if (!key) return
+      activeAttendanceKeys.add(String(key))
+    })
+
+    cleanersOnline = activeAttendanceKeys.size
+  }
+
+  const areasCleaned = selectionRows.reduce((count, row) => {
+    const completed = parseTasks(row.completed_tasks)
+    return completed.length > 0 ? count + 1 : count
+  }, 0)
+
+  const photosTaken = photoRows.length
+
+  const hoursWorked = attendanceRows.reduce((total, row) => {
+    const hours = hoursBetween(row.clock_in, row.clock_out)
+    return hours ? total + hours : total
+  }, 0)
+
+  return {
+    date: day.toISOString(),
+    isCurrentDay,
+    cleanersOnline,
+    areasCleaned,
+    photosTaken,
+    hoursWorked: Number(hoursWorked.toFixed(2)),
+    attendanceCount: attendanceRows.length,
+  }
+}
+
 export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAnalyticsParams): Promise<AnalyticsSummary> {
   const isAdmin = role === 'admin'
 
   let roster: CleanerSummary[]
   let cleanerIds: string[] = []
+  let managerScopedCleanerIds: string[] = []
 
   if (isAdmin) {
     roster = await fetchAllCleaners()
     cleanerIds = roster.map((cleaner) => cleaner.id)
   } else {
-    const managerCleanerIds = await fetchManagerCleanerIds(managerId ?? '')
-    if (managerCleanerIds.length) {
-      roster = await fetchCleanersByIds(managerCleanerIds)
-      cleanerIds = managerCleanerIds
+    managerScopedCleanerIds = await fetchManagerCleanerIds(managerId ?? '')
+    if (managerScopedCleanerIds.length) {
+      roster = await fetchCleanersByIds(managerScopedCleanerIds)
+      cleanerIds = managerScopedCleanerIds
     } else {
       roster = await fetchAllCleaners()
       cleanerIds = roster.map((cleaner) => cleaner.id)
@@ -163,15 +358,19 @@ export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAna
 
   roster = ensureUniqueCleanerSummaries(roster)
 
+  const restrictToManagedCleaners = !isAdmin && managerScopedCleanerIds.length > 0
+  const filterCleanerIds = restrictToManagedCleaners ? managerScopedCleanerIds : []
+  const cleanerIdSet = new Set(filterCleanerIds.filter(Boolean))
+  const numericCleanerIds = filterCleanerIds
+    .map((id) => normalizeCleanerNumericId(id))
+    .filter((value): value is number => value !== null)
+  const numericCleanerIdSet = new Set(numericCleanerIds)
+
   const attendanceQuery = supabase
     .from('time_attendance')
-    .select('id, cleaner_uuid, cleaner_name, customer_name, site_name, clock_in, clock_out')
+    .select('id, cleaner_id, cleaner_uuid, cleaner_name, customer_name, site_name, clock_in, clock_out')
     .gte('clock_in', range.start)
     .lte('clock_in', range.end)
-
-  if (!isAdmin && cleanerIds.length) {
-    attendanceQuery.in('cleaner_uuid', cleanerIds)
-  }
 
   let selectionsQuery = supabase
     .from('uk_cleaner_task_selections')
@@ -209,14 +408,72 @@ export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAna
     throw photosRes.error
   }
 
-  const attendance = (attendanceRes.data ?? []) as AttendanceRecord[]
-  const selections = (selectionsRes.data ?? []) as TaskSelectionRecord[]
-  const photos = (photosRes.data ?? []) as TaskPhotoRecord[]
+  const rawAttendance = (attendanceRes.data ?? []) as AttendanceRecord[]
+  const rawSelections = (selectionsRes.data ?? []) as TaskSelectionRecord[]
+  const rawPhotos = (photosRes.data ?? []) as TaskPhotoRecord[]
 
   const rosterNames = new Map<string, string>()
+  const rosterNameSet = new Set<string>()
   roster.forEach((cleaner) => {
-    rosterNames.set(cleaner.id, normalizeCleanerName(`${cleaner.first_name ?? ''} ${cleaner.last_name ?? ''}`))
+    const normalizedName = normalizeCleanerName(`${cleaner.first_name ?? ''} ${cleaner.last_name ?? ''}`)
+    rosterNames.set(cleaner.id, normalizedName)
+    rosterNameSet.add(normalizedName)
   })
+
+  type ScopedCleanerRow = {
+    cleaner_uuid?: string | null
+    cleaner_id?: string | number | null
+    cleaner_name?: string | null
+  }
+
+  const matchesCleanerScope = (row: ScopedCleanerRow): boolean => {
+    if (!restrictToManagedCleaners) {
+      return true
+    }
+
+    const candidateUuid = row.cleaner_uuid ?? null
+    if (candidateUuid && cleanerIdSet.has(candidateUuid)) {
+      return true
+    }
+
+    const rawCleanerId = row.cleaner_id
+    if (rawCleanerId !== null && rawCleanerId !== undefined) {
+      const cleanerIdString = String(rawCleanerId)
+      if (cleanerIdSet.has(cleanerIdString)) {
+        return true
+      }
+      const numericCandidate = normalizeCleanerNumericId(cleanerIdString)
+      if (numericCandidate !== null && numericCleanerIdSet.has(numericCandidate)) {
+        return true
+      }
+    }
+
+    if (candidateUuid) {
+      const numericFromUuid = normalizeCleanerNumericId(candidateUuid)
+      if (numericFromUuid !== null && numericCleanerIdSet.has(numericFromUuid)) {
+        return true
+      }
+    }
+
+    if (row.cleaner_name) {
+      const normalizedRowName = normalizeCleanerName(row.cleaner_name)
+      if (rosterNameSet.has(normalizedRowName)) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  const attendance = restrictToManagedCleaners ? rawAttendance.filter((row) => matchesCleanerScope(row)) : rawAttendance
+  const selections = restrictToManagedCleaners
+    ? rawSelections.filter((row) =>
+        matchesCleanerScope({ cleaner_id: row.cleaner_id, cleaner_name: row.cleaner_name ?? null })
+      )
+    : rawSelections
+  const photos = restrictToManagedCleaners
+    ? rawPhotos.filter((row) => matchesCleanerScope({ cleaner_id: row.cleaner_id, cleaner_name: row.cleaner_name ?? null }))
+    : rawPhotos
 
   const complianceByDate = new Map<string, { total: number; completed: number }>()
   let totalAttendance = 0
@@ -243,8 +500,10 @@ export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAna
       totalCompleted += 1
     }
 
-    const cleanerId = row.cleaner_uuid ?? ''
-    const cleanerName = cleanerId ? rosterNames.get(cleanerId) ?? normalizeCleanerName(row.cleaner_name) : normalizeCleanerName(row.cleaner_name)
+    const cleanerIdFromRow = row.cleaner_uuid ?? (row.cleaner_id !== null && row.cleaner_id !== undefined ? String(row.cleaner_id) : '')
+    const cleanerName = cleanerIdFromRow
+      ? rosterNames.get(cleanerIdFromRow) ?? normalizeCleanerName(row.cleaner_name)
+      : normalizeCleanerName(row.cleaner_name)
 
     const hours = hoursBetween(row.clock_in, row.clock_out)
     if (hours) {
@@ -260,7 +519,7 @@ export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAna
       if (onTime) {
         totalOnTime += 1
       }
-      const cleanerKey = cleanerId || cleanerName
+      const cleanerKey = cleanerIdFromRow || cleanerName
       const cleanerAggregate = onTimeByCleaner.get(cleanerKey) ?? { onTime: 0, total: 0 }
       cleanerAggregate.total += 1
       if (onTime) {
@@ -287,6 +546,23 @@ export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAna
       rate: value.total ? Math.round((value.onTime / value.total) * 100) : 0,
       total: value.total,
       value: value.onTime,
+    }
+  })
+
+  roster.forEach((cleaner) => {
+    const rosterId = cleaner.id
+    const rosterName = normalizeCleanerName(`${cleaner.first_name ?? ''} ${cleaner.last_name ?? ''}`)
+    const hasById = onTimeByCleaner.has(rosterId)
+    const hasByName = onTimeByCleaner.has(rosterName)
+
+    if (!hasById && !hasByName) {
+      onTimeRates.push({
+        cleanerId: rosterId,
+        cleanerName: rosterName,
+        rate: 0,
+        total: 0,
+        value: 0,
+      })
     }
   })
 

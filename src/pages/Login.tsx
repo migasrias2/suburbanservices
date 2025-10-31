@@ -32,6 +32,18 @@ export default function Login() {
   const [regPassword, setRegPassword] = useState('')
   const [regConfirmPassword, setRegConfirmPassword] = useState('')
 
+  const resetForm = () => {
+    setMobile('+44')
+    setUsername('')
+    setPassword('')
+    setRegMobile('+44')
+    setRegFirstName('')
+    setRegLastName('')
+    setRegEmail('')
+    setRegPassword('')
+    setRegConfirmPassword('')
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -89,6 +101,16 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
 
+    if (activeTab !== 'cleaner') {
+      toast({
+        variant: "destructive",
+        title: "Registration Restricted",
+        description: "Only cleaner accounts can be created from this screen."
+      })
+      setLoading(false)
+      return
+    }
+
     // Validation
     if (!regMobile || !regFirstName.trim() || !regLastName.trim() || !regPassword.trim()) {
       toast({
@@ -127,7 +149,7 @@ export default function Login() {
         last_name: regLastName,
         email: regEmail,
         password: regPassword,
-        user_type: activeTab
+        user_type: 'cleaner'
       }
 
       const result = await authService.registerUser(userData)
@@ -165,23 +187,8 @@ export default function Login() {
     }
   }
 
-  const resetForm = () => {
-    setMobile('+44')
-    setUsername('')
-    setPassword('')
-    setRegMobile('+44')
-    setRegFirstName('')
-    setRegLastName('')
-    setRegEmail('')
-    setRegPassword('')
-    setRegConfirmPassword('')
-    setError(null)
-    setSuccess(null)
-  }
-
   const toggleMode = () => {
-    // Prevent entering register mode on Admin tab
-    if (activeTab === 'admin') {
+    if (activeTab !== 'cleaner') {
       return
     }
     setIsRegisterMode(!isRegisterMode)
@@ -241,7 +248,7 @@ export default function Login() {
 
   return (
     <div
-      className="relative min-h-screen flex items-center justify-center p-6"
+      className="relative min-h-screen flex items-center justify-center p-4 sm:p-6"
       style={{
         backgroundImage: 'url("/cropped-view-of-african-american-cleaner-moving-vacuum-cleaner-in-office%20(1).jpg")',
         backgroundSize: 'cover',
@@ -268,54 +275,69 @@ export default function Login() {
         {/* Alerts */}
 
         {/* Auth Card */}
-        <Card className="rounded-3xl shadow-xl border-0 bg-white">
-          <CardContent className="p-8">
+        <Card className="rounded-3xl border border-white/30 bg-white/90 backdrop-blur-xl shadow-2xl shadow-blue-950/30">
+          <CardContent className="p-8 sm:p-10">
             {/* Header with mode toggle */}
             <div className="text-center mb-6">
-              {isRegisterMode ? (
-                <div className="flex items-center justify-center mb-4">
+              {activeTab === 'cleaner' ? (
+                isRegisterMode ? (
+                  <div className="flex items-center justify-center mb-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleMode}
+                    className="gap-2 text-[#0b2f6b] hover:text-[#07204a] hover:bg-[#0b2f6b]/10 rounded-full px-3 py-2"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      Back to Sign In
+                    </Button>
+                  </div>
+                ) : (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={toggleMode}
-                    className="gap-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-full px-3 py-2"
+                    className="gap-2 text-[#0b2f6b] hover:text-[#07204a] hover:bg-[#0b2f6b]/10 rounded-full px-4 py-2 mb-2"
                   >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to Sign In
+                    <UserPlus className="h-4 w-4" />
+                    Create Account
                   </Button>
-                </div>
+                )
               ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={toggleMode}
-                  className="gap-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-full px-4 py-2 mb-4"
-                >
-                  <UserPlus className="h-4 w-4" />
-                  Create Account
-                </Button>
+                <p className="text-sm font-medium text-[#0b2f6b]/60">Sign in with your existing credentials.</p>
               )}
             </div>
 
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'cleaner' | 'manager' | 'admin')} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 bg-gray-50 rounded-xl p-0.5 mb-6">
+            <Tabs
+              value={activeTab}
+              onValueChange={(value) => {
+                const nextTab = value as 'cleaner' | 'manager' | 'admin'
+                setActiveTab(nextTab)
+                if (nextTab !== 'cleaner') {
+                  setIsRegisterMode(false)
+                }
+                resetForm()
+              }}
+              className="w-full"
+            >
+              <TabsList className="grid w-full grid-cols-3 rounded-2xl p-1 mb-6 bg-[#0b2f6b]/8 backdrop-blur border border-[#0b2f6b]/20">
                 <TabsTrigger 
                   value="cleaner" 
-                  className="rounded-lg text-sm font-normal py-2 px-3 data-[state=active]:bg-white data-[state=active]:shadow-none transition-all"
+                  className="rounded-xl text-sm font-medium py-2.5 px-3 text-[#0b2f6b]/80 transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0b2f6b] data-[state=active]:to-[#021540] data-[state=active]:text-white data-[state=active]:shadow-lg"
                 >
                   <Users className="h-4 w-4 mr-1.5" />
                   Cleaner
                 </TabsTrigger>
                 <TabsTrigger 
                   value="manager" 
-                  className="rounded-lg text-sm font-normal py-2 px-3 data-[state=active]:bg-white data-[state=active]:shadow-none transition-all"
+                  className="rounded-xl text-sm font-medium py-2.5 px-3 text-[#0b2f6b]/80 transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0b2f6b] data-[state=active]:to-[#021540] data-[state=active]:text-white data-[state=active]:shadow-lg"
                 >
                   <UserCheck className="h-4 w-4 mr-1.5" />
                   Manager
                 </TabsTrigger>
                 <TabsTrigger 
                   value="admin" 
-                  className="rounded-lg text-sm font-normal py-2 px-3 data-[state=active]:bg-white data-[state=active]:shadow-none transition-all"
+                  className="rounded-xl text-sm font-medium py-2.5 px-3 text-[#0b2f6b]/80 transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0b2f6b] data-[state=active]:to-[#021540] data-[state=active]:text-white data-[state=active]:shadow-lg"
                 >
                   <Shield className="h-4 w-4 mr-1.5" />
                   Admin
@@ -327,32 +349,32 @@ export default function Login() {
                 {isRegisterMode ? (
                   <form onSubmit={handleRegister} className="space-y-5">
                     <div className="text-center mb-6">
-                      <h3 className="text-lg font-semibold text-gray-900">Create Cleaner Account</h3>
-                      <p className="text-gray-500 text-sm mt-1">Fill in your details to get started</p>
+                      <h3 className="text-lg font-semibold text-[#0b2f6b]">Create Cleaner Account</h3>
+                      <p className="text-[#0b2f6b]/60 text-sm mt-1">Fill in your details to get started</p>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
-                        <Label htmlFor="reg-first-name" className="text-gray-500 font-normal text-sm">First Name</Label>
+                        <Label htmlFor="reg-first-name" className="text-[#0b2f6b]/80 font-medium text-sm">First Name</Label>
                         <Input
                           id="reg-first-name"
                           type="text"
                           value={regFirstName}
                           onChange={(e) => setRegFirstName(e.target.value)}
                           placeholder="John"
-                          className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 text-sm"
+                          className="rounded-xl border-[#0b2f6b]/20 bg-white/90 focus:border-[#0b2f6b]/40 focus:ring-2 focus:ring-[#0b2f6b]/30 h-11 text-sm text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
                           required
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="reg-last-name" className="text-gray-500 font-normal text-sm">Last Name</Label>
+                        <Label htmlFor="reg-last-name" className="text-[#0b2f6b]/80 font-medium text-sm">Last Name</Label>
                         <Input
                           id="reg-last-name"
                           type="text"
                           value={regLastName}
                           onChange={(e) => setRegLastName(e.target.value)}
                           placeholder="Doe"
-                          className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 text-sm"
+                          className="rounded-xl border-[#0b2f6b]/20 bg-white/90 focus:border-[#0b2f6b]/40 focus:ring-2 focus:ring-[#0b2f6b]/30 h-11 text-sm text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
                           required
                         />
                       </div>
@@ -368,19 +390,19 @@ export default function Login() {
                     />
 
                     <div className="space-y-2">
-                      <Label htmlFor="reg-email" className="text-gray-500 font-normal text-sm">Email <span className="text-gray-400 font-normal">(Optional)</span></Label>
+                      <Label htmlFor="reg-email" className="text-[#0b2f6b]/80 font-medium text-sm">Email <span className="text-[#0b2f6b]/50 font-normal">(Optional)</span></Label>
                       <Input
                         id="reg-email"
                         type="email"
                         value={regEmail}
                         onChange={(e) => setRegEmail(e.target.value)}
                         placeholder="john.doe@example.com"
-                        className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 text-sm"
+                        className="rounded-xl border-[#0b2f6b]/20 bg-white/90 focus:border-[#0b2f6b]/40 focus:ring-2 focus:ring-[#0b2f6b]/30 h-11 text-sm text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="reg-password" className="text-gray-500 font-normal text-sm">Password</Label>
+                      <Label htmlFor="reg-password" className="text-[#0b2f6b]/80 font-medium text-sm">Password</Label>
                       <div className="relative">
                         <Input
                           id="reg-password"
@@ -388,14 +410,14 @@ export default function Login() {
                           value={regPassword}
                           onChange={(e) => setRegPassword(e.target.value)}
                           placeholder="Enter your password"
-                          className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 pr-12 text-sm"
+                          className="rounded-xl border-[#0b2f6b]/20 bg-white/90 focus:border-[#0b2f6b]/40 focus:ring-2 focus:ring-[#0b2f6b]/30 h-11 pr-12 text-sm text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
                           required
                         />
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-gray-400 hover:text-gray-600"
+                          className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-[#0b2f6b]/40 hover:text-[#0b2f6b]"
                           onClick={() => setShowPassword(!showPassword)}
                         >
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -404,21 +426,21 @@ export default function Login() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="reg-confirm-password" className="text-gray-500 font-normal text-sm">Confirm Password</Label>
+                      <Label htmlFor="reg-confirm-password" className="text-[#0b2f6b]/80 font-medium text-sm">Confirm Password</Label>
                       <Input
                         id="reg-confirm-password"
                         type={showPassword ? "text" : "password"}
                         value={regConfirmPassword}
                         onChange={(e) => setRegConfirmPassword(e.target.value)}
                         placeholder="Confirm your password"
-                        className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 text-sm"
+                        className="rounded-xl border-[#0b2f6b]/20 bg-white/90 focus:border-[#0b2f6b]/40 focus:ring-2 focus:ring-[#0b2f6b]/30 h-11 text-sm text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
                         required
                       />
                     </div>
 
                     <Button 
                       type="submit" 
-                      className="w-full h-11 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-normal shadow-sm hover:shadow-md transition-all duration-200" 
+                      className="w-full h-11 rounded-xl bg-gradient-to-r from-[#0b2f6b] to-[#021540] hover:from-[#07204a] hover:to-[#010a27] text-white font-semibold shadow-lg shadow-[#0b2f6b]/30 transition-all duration-200" 
                       disabled={loading}
                     >
                       {loading ? 'Creating Account...' : 'Create Account'}
@@ -435,7 +457,7 @@ export default function Login() {
                       required
                     />
                     <div className="space-y-2">
-                      <Label htmlFor="password" className="text-gray-500 font-normal text-sm">Password</Label>
+                      <Label htmlFor="password" className="text-[#0b2f6b]/80 font-medium text-sm">Password</Label>
                       <div className="relative">
                         <Input
                           id="password"
@@ -443,14 +465,14 @@ export default function Login() {
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           placeholder="Enter your password"
-                          className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 pr-12 text-sm"
+                          className="rounded-xl border-[#0b2f6b]/20 bg-white/90 focus:border-[#0b2f6b]/40 focus:ring-2 focus:ring-[#0b2f6b]/30 h-11 pr-12 text-sm text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
                           required
                         />
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-gray-400 hover:text-gray-600"
+                          className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-[#0b2f6b]/40 hover:text-[#0b2f6b]"
                           onClick={() => setShowPassword(!showPassword)}
                         >
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -459,7 +481,7 @@ export default function Login() {
                     </div>
                     <Button 
                       type="submit" 
-                      className="w-full h-11 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-normal shadow-sm hover:shadow-md transition-all duration-200" 
+                      className="w-full h-11 rounded-xl bg-gradient-to-r from-[#0b2f6b] to-[#021540] hover:from-[#07204a] hover:to-[#010a27] text-white font-semibold shadow-lg shadow-[#0b2f6b]/30 transition-all duration-200" 
                       disabled={loading}
                     >
                       {loading ? 'Signing in...' : 'Sign in as Cleaner'}
@@ -469,222 +491,104 @@ export default function Login() {
               </TabsContent>
 
               <TabsContent value="manager" className="mt-0">
-                {isRegisterMode ? (
-                  <form onSubmit={handleRegister} className="space-y-5">
-                    <div className="text-center mb-6">
-                      <h3 className="text-lg font-semibold text-gray-900">Create Manager Account</h3>
-                      <p className="text-gray-500 text-sm mt-1">Fill in your details to get started</p>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-first-name-mgr" className="text-gray-500 font-normal text-sm">First Name</Label>
-                        <Input
-                          id="reg-first-name-mgr"
-                          type="text"
-                          value={regFirstName}
-                          onChange={(e) => setRegFirstName(e.target.value)}
-                          placeholder="John"
-                          className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 text-sm"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-last-name-mgr" className="text-gray-500 font-normal text-sm">Last Name</Label>
-                        <Input
-                          id="reg-last-name-mgr"
-                          type="text"
-                          value={regLastName}
-                          onChange={(e) => setRegLastName(e.target.value)}
-                          placeholder="Doe"
-                          className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 text-sm"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <PhoneInput
-                      id="reg-mobile-mgr"
-                      label="Mobile Number"
-                      placeholder="Enter your phone number"
-                      value={regMobile}
-                      onChange={setRegMobile}
-                      required
-                    />
-
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-email-mgr" className="text-gray-500 font-normal text-sm">Email <span className="text-gray-400 font-normal">(Optional)</span></Label>
+                <form onSubmit={handleLogin} className="space-y-5">
+                  <PhoneInput
+                    id="mobile-mgr"
+                    label="Mobile Number"
+                    placeholder="Enter your phone number"
+                    value={mobile}
+                    onChange={setMobile}
+                    required
+                  />
+                  <div className="space-y-2">
+                    <Label htmlFor="password-mgr" className="text-[#0b2f6b]/80 font-medium text-sm">Password</Label>
+                    <div className="relative">
                       <Input
-                        id="reg-email-mgr"
-                        type="email"
-                        value={regEmail}
-                        onChange={(e) => setRegEmail(e.target.value)}
-                        placeholder="john.doe@example.com"
-                        className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 text-sm"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-password-mgr" className="text-gray-500 font-normal text-sm">Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="reg-password-mgr"
-                          type={showPassword ? "text" : "password"}
-                          value={regPassword}
-                          onChange={(e) => setRegPassword(e.target.value)}
-                          placeholder="Enter your password"
-                          className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 pr-12 text-sm"
-                          required
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-gray-400 hover:text-gray-600"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-confirm-password-mgr" className="text-gray-500 font-normal text-sm">Confirm Password</Label>
-                      <Input
-                        id="reg-confirm-password-mgr"
+                        id="password-mgr"
                         type={showPassword ? "text" : "password"}
-                        value={regConfirmPassword}
-                        onChange={(e) => setRegConfirmPassword(e.target.value)}
-                        placeholder="Confirm your password"
-                        className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 text-sm"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Enter your password"
+                        className="rounded-xl border-[#0b2f6b]/20 bg-white/90 focus:border-[#0b2f6b]/40 focus:ring-2 focus:ring-[#0b2f6b]/30 h-11 pr-12 text-sm text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
                         required
                       />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-[#0b2f6b]/40 hover:text-[#0b2f6b]"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
                     </div>
-
-                    <Button 
-                      type="submit" 
-                      className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200" 
-                      disabled={loading}
-                    >
-                      {loading ? 'Creating Account...' : 'Create Manager Account'}
-                    </Button>
-                  </form>
-                ) : (
-                  <form onSubmit={handleLogin} className="space-y-5">
-                    <PhoneInput
-                      id="mobile-mgr"
-                      label="Mobile Number"
-                      placeholder="Enter your phone number"
-                      value={mobile}
-                      onChange={setMobile}
-                      required
-                    />
-                    <div className="space-y-2">
-                      <Label htmlFor="password-mgr" className="text-gray-500 font-normal text-sm">Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="password-mgr"
-                          type={showPassword ? "text" : "password"}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Enter your password"
-                          className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 pr-12 text-sm"
-                          required
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-gray-400 hover:text-gray-600"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </div>
-                    <Button 
-                      type="submit" 
-                      className="w-full h-11 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-normal shadow-sm hover:shadow-md transition-all duration-200" 
-                      disabled={loading}
-                    >
-                      {loading ? 'Signing in...' : 'Sign in as Manager'}
-                    </Button>
-                  </form>
-                )}
+                  </div>
+                  <Button 
+                    type="submit" 
+                    className="w-full h-11 rounded-xl bg-gradient-to-r from-[#0b2f6b] to-[#021540] hover:from-[#07204a] hover:to-[#010a27] text-white font-semibold shadow-lg shadow-[#0b2f6b]/30 transition-all duration-200" 
+                    disabled={loading}
+                  >
+                    {loading ? 'Signing in...' : 'Sign in as Manager'}
+                  </Button>
+                </form>
+                <p className="mt-4 text-xs text-center text-[#0b2f6b]/60">Manager accounts are provisioned by administrators.</p>
               </TabsContent>
 
               <TabsContent value="admin" className="mt-0">
-                {isRegisterMode ? (
-                  <div className="space-y-5 text-center">
-                    <div className="text-center mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">Admin Registration Disabled</h3>
-                      <p className="text-gray-500 text-sm mt-1">Please contact a system administrator to create admin users.</p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsRegisterMode(false)}
-                      className="gap-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-full px-3 py-2 mx-auto"
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                      Back to Sign In
-                    </Button>
+                <form onSubmit={handleLogin} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="username-admin" className="text-[#0b2f6b]/80 font-medium text-sm">Username</Label>
+                    <Input
+                      id="username-admin"
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Enter your username"
+                      className="rounded-xl border-[#0b2f6b]/20 bg-white/90 focus:border-[#0b2f6b]/40 focus:ring-2 focus:ring-[#0b2f6b]/30 h-11 text-sm text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
+                      required
+                    />
                   </div>
-                ) : (
-                  <form onSubmit={handleLogin} className="space-y-5">
-                    <div className="space-y-2">
-                      <Label htmlFor="username-admin" className="text-gray-500 font-normal text-sm">Username</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="password-admin" className="text-[#0b2f6b]/80 font-medium text-sm">Password</Label>
+                    <div className="relative">
                       <Input
-                        id="username-admin"
-                        type="text"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        placeholder="Enter your username"
-                        className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 text-sm"
+                        id="password-admin"
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Enter your password"
+                        className="rounded-xl border-[#0b2f6b]/20 bg-white/90 focus:border-[#0b2f6b]/40 focus:ring-2 focus:ring-[#0b2f6b]/30 h-11 pr-12 text-sm text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
                         required
                       />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-[#0b2f6b]/40 hover:text-[#0b2f6b]"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="password-admin" className="text-gray-500 font-normal text-sm">Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="password-admin"
-                          type={showPassword ? "text" : "password"}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Enter your password"
-                          className="rounded-xl border-gray-100 focus:border-gray-300 focus:ring-gray-200/50 h-11 pr-12 text-sm"
-                          required
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-gray-400 hover:text-gray-600"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </div>
-                    <Button 
-                      type="submit" 
-                      className="w-full h-11 rounded-xl bg-gray-900 hover:bg-gray-800 text-white font-normal shadow-sm hover:shadow-md transition-all duration-200" 
-                      disabled={loading}
-                    >
-                      {loading ? 'Signing in...' : 'Sign in as Admin'}
-                    </Button>
-                  </form>
-                )}
+                  </div>
+                  <Button 
+                    type="submit" 
+                    className="w-full h-11 rounded-xl bg-gradient-to-r from-[#0b2f6b] to-[#021540] hover:from-[#07204a] hover:to-[#010a27] text-white font-semibold shadow-lg shadow-[#0b2f6b]/30 transition-all duration-200" 
+                    disabled={loading}
+                  >
+                    {loading ? 'Signing in...' : 'Sign in as Admin'}
+                  </Button>
+                </form>
+                <p className="mt-4 text-xs text-center text-[#0b2f6b]/60">Admin access is managed centrally. Please contact system support for assistance.</p>
               </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
 
         {/* Footer */}
-        <div className="text-center text-xs text-gray-400 space-y-2">
-          <p className="font-medium">QR Code Application v1.0</p>
-          <p className="flex items-center justify-center gap-2 text-gray-300">
+        <div className="text-center text-xs text-blue-100/80 space-y-2">
+          <p className="font-semibold">QR Code Application v1.0</p>
+          <p className="flex items-center justify-center gap-2 text-blue-100/70">
             <span>Real-time tracking</span>
             <span>•</span>
             <span>GPS enabled</span>

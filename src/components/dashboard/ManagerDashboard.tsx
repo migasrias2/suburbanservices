@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Users, Image as ImageIcon, ArrowLeft, ArrowRight, Clock, MapPin, Search, ChevronDown, ChevronLeft, ChevronRight, ThumbsUp, ThumbsDown, X } from 'lucide-react'
+import { format } from 'date-fns'
+import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+import { Image as ImageIcon, ArrowRight, Clock, MapPin, Search, ChevronDown, ChevronLeft, ChevronRight, ThumbsUp, ThumbsDown, X, CalendarDays } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -8,13 +11,20 @@ import { Input } from '../ui/input'
 import { fetchAllCleaners, fetchCleanersByIds, fetchManagerCleanerIds } from '../../services/managerService'
 import { AREA_TASKS } from '../../services/qrService'
 import { normalizeCleanerName } from '../../lib/identity'
+import { defaultAnalyticsRange, toIsoRange } from '../../lib/utils'
 import { AssistRequestService } from '../../services/assistRequestService'
+import { fetchAnalyticsSummary, fetchDashboardSnapshot, type AnalyticsRole } from '../../services/analyticsService'
 import { Badge } from '../ui/badge'
-import { ScrollArea } from '../ui/scroll-area'
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
+import { Calendar } from '../ui/calendar'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '../ui/dialog'
+import { HoursWorkedAreaChart } from '../analytics/HoursWorkedAreaChart'
+import { SidebarTrigger } from '@/components/ui/sidebar'
 
 interface ManagerDashboardProps {
   managerId: string
   managerName: string
+  role: AnalyticsRole
 }
 
 interface CleanerListItem {
@@ -142,6 +152,20 @@ const formatDateTime = (iso: string | null) =>
 const formatDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '—'
 const formatTimeOnly = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—')
+const calculateHoursBetween = (start?: string | null, end?: string | null) => {
+  if (!start || !end) return 0
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+  const diff = endDate.getTime() - startDate.getTime()
+  if (!Number.isFinite(diff) || diff <= 0) return 0
+  return diff / (1000 * 60 * 60)
+}
+
+const normalizeToStartOfDay = (date: Date) => {
+  const copy = new Date(date)
+  copy.setHours(0, 0, 0, 0)
+  return copy
+}
 const formatCategoryLabel = (category?: string | null) => {
   if (!category) return 'General'
   const normalized = category
@@ -263,15 +287,19 @@ const buildPhotoDateKey = (photo: TaskPhotoRow) => {
   return 'unknown-date'
 }
 
-export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, managerName }) => {
+export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, managerName, role }) => {
+  const navigate = useNavigate()
   const [isListLoading, setIsListLoading] = useState(true)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [cleaners, setCleaners] = useState<CleanerListItem[]>([])
   const [selectedCleaner, setSelectedCleaner] = useState<CleanerListItem | null>(null)
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [attendance, setAttendance] = useState<AttendanceRow[]>([])
   const [logs, setLogs] = useState<CleanerLogRow[]>([])
   const [tasks, setTasks] = useState<TaskSelectionRow[]>([])
   const [photos, setPhotos] = useState<TaskPhotoRow[]>([])
+  const [dailyAttendance, setDailyAttendance] = useState<AttendanceRow[]>([])
+  const [isDailyAttendanceLoading, setIsDailyAttendanceLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null)
@@ -282,6 +310,13 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const [isSavingFeedback, setIsSavingFeedback] = useState(false)
   const [expandedAttendanceId, setExpandedAttendanceId] = useState<number | null>(null)
   const [assistRequests, setAssistRequests] = useState<BathroomAssistRequest[]>([])
+  const [selectedDate, setSelectedDate] = useState<Date>(() => normalizeToStartOfDay(new Date()))
+  const [isAutoDate, setIsAutoDate] = useState(true)
+  const [now, setNow] = useState<Date>(() => new Date())
+  const [todayRefreshKey, setTodayRefreshKey] = useState(0)
+
+  const isSameDay = (left: Date, right: Date) =>
+    left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth() && left.getDate() === right.getDate()
 
   useEffect(() => {
     if (activePhotoIndex !== null) {
@@ -295,6 +330,17 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
       }
     }
   }, [activePhotoIndex])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const interval = window.setInterval(() => {
+      setNow(new Date())
+    }, 60_000)
+
+    return () => {
+      window.clearInterval(interval)
+    }
+  }, [])
 
   useEffect(() => {
     const loadCleaners = async () => {
@@ -423,6 +469,14 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
       setAssistRequests([])
     })
   }, [managerId])
+
+  useEffect(() => {
+    if (!isAutoDate) return
+    const todayStart = normalizeToStartOfDay(now)
+    if (!isSameDay(selectedDate, todayStart)) {
+      setSelectedDate(todayStart)
+    }
+  }, [isAutoDate, now, selectedDate])
 
   useEffect(() => {
     if (!selectedCleaner) return
@@ -633,24 +687,183 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     return cleaners.filter((cleaner) => cleaner.cleaner_name.toLowerCase().includes(query))
   }, [cleaners, search])
 
-  const attendanceDisplayRows = useMemo(() => {
-    const sorted = [...attendance].sort((a, b) => {
-      const aTime = a.clock_in ? new Date(a.clock_in).getTime() : Number.NEGATIVE_INFINITY
-      const bTime = b.clock_in ? new Date(b.clock_in).getTime() : Number.NEGATIVE_INFINITY
-      return bTime - aTime
-    })
+  const managedCleanerIds = useMemo(() => {
+    const ids = cleaners
+      .map((cleaner) => cleaner.cleaner_id)
+      .filter((id): id is string => Boolean(id))
+      .map((id) => id.trim())
+    return Array.from(new Set(ids))
+  }, [cleaners])
 
-    const activeEntries = sorted.filter((row) => row.clock_in && !row.clock_out)
-    const completedEntries = sorted.filter((row) => row.clock_in && row.clock_out)
-    const otherEntries = sorted.filter((row) => !row.clock_in && row.clock_out)
+  const managedCleanerNames = useMemo(() => {
+    const names = cleaners
+      .map((cleaner) => normalizeCleanerName(cleaner.cleaner_name))
+      .filter((name): name is string => Boolean(name))
+    return Array.from(new Set(names))
+  }, [cleaners])
 
-    return [...activeEntries, ...completedEntries, ...otherEntries]
-  }, [attendance])
+  const managedCleanerIdsKey = useMemo(() => managedCleanerIds.join('|'), [managedCleanerIds])
+  const managedCleanerNamesKey = useMemo(() => managedCleanerNames.join('|'), [managedCleanerNames])
 
-  const selectedAttendancePreview = useMemo(() => attendanceDisplayRows.slice(0, 8), [attendanceDisplayRows])
+  useEffect(() => {
+    const loadDailyAttendance = async () => {
+      setIsDailyAttendanceLoading(true)
+
+      try {
+        const dayStart = normalizeToStartOfDay(selectedDate)
+        const dayEnd = new Date(dayStart)
+        dayEnd.setDate(dayEnd.getDate() + 1)
+
+        const startIso = dayStart.toISOString()
+        const endIso = dayEnd.toISOString()
+
+        const selectColumns = 'id, cleaner_id, cleaner_uuid, cleaner_name, customer_name, site_name, clock_in, clock_out'
+
+        let clockInQuery = supabase
+          .from('time_attendance')
+          .select(selectColumns)
+          .gte('clock_in', startIso)
+          .lt('clock_in', endIso)
+          .order('clock_in', { ascending: false })
+
+        let clockOutQuery = supabase
+          .from('time_attendance')
+          .select(selectColumns)
+          .gte('clock_out', startIso)
+          .lt('clock_out', endIso)
+          .order('clock_out', { ascending: false })
+
+        if (role !== 'admin' && managedCleanerIds.length) {
+          clockInQuery = clockInQuery.in('cleaner_id', managedCleanerIds)
+          clockOutQuery = clockOutQuery.in('cleaner_id', managedCleanerIds)
+        }
+
+        const [clockInRes, clockOutRes] = await Promise.all([clockInQuery, clockOutQuery])
+
+        if (clockInRes.error) {
+          throw clockInRes.error
+        }
+
+        if (clockOutRes.error) {
+          throw clockOutRes.error
+        }
+
+        const allRows = [...(clockInRes.data ?? []), ...(clockOutRes.data ?? [])]
+
+        const cleanerIdSet = new Set(managedCleanerIds.map(String))
+        const cleanerNameSet = new Set(managedCleanerNames)
+
+        const scopedRows = allRows.filter((row) => {
+          if (role === 'admin') return true
+
+          const candidateId = row.cleaner_id ?? row.cleaner_uuid
+          if (candidateId && cleanerIdSet.has(String(candidateId).trim())) {
+            return true
+          }
+
+          const normalizedName = normalizeCleanerName(row.cleaner_name ?? '')
+          if (normalizedName && cleanerNameSet.has(normalizedName)) {
+            return true
+          }
+
+          return false
+        })
+
+        const attendanceMap = new Map<string, AttendanceRow>()
+
+        const getRowKey = (row: AttendanceRow & { cleaner_uuid?: string | null }) => {
+          if (row.id !== null && row.id !== undefined) {
+            return `id::${row.id}`
+          }
+
+          const cleanerIdentity = row.cleaner_uuid ?? row.cleaner_id ?? row.cleaner_name
+          const clockInKey = row.clock_in ? new Date(row.clock_in).getTime() : 'no-clock-in'
+          return `fallback::${cleanerIdentity ?? 'unknown'}::${clockInKey}`
+        }
+
+        scopedRows.forEach((row) => {
+          const cleanerName = normalizeCleanerName(row.cleaner_name ?? 'Cleaner')
+          const parsedCleanerId = (() => {
+            if (typeof row.cleaner_id === 'number') return row.cleaner_id
+            if (row.cleaner_id === null || row.cleaner_id === undefined) return null
+            const numeric = Number.parseInt(String(row.cleaner_id), 10)
+            return Number.isNaN(numeric) ? null : numeric
+          })()
+
+          const baseRecord: AttendanceRow = {
+            id: row.id,
+            cleaner_id: parsedCleanerId,
+            cleaner_name: cleanerName,
+            clock_in: row.clock_in ?? null,
+            clock_out: row.clock_out ?? null,
+            site_name: row.site_name ?? null,
+            customer_name: row.customer_name ?? null,
+          }
+
+          const key = getRowKey({ ...baseRecord, cleaner_uuid: row.cleaner_uuid })
+          const existing = attendanceMap.get(key)
+
+          if (!existing) {
+            attendanceMap.set(key, baseRecord)
+            return
+          }
+
+          if (!existing.clock_in && baseRecord.clock_in) {
+            existing.clock_in = baseRecord.clock_in
+          }
+          if (!existing.clock_out && baseRecord.clock_out) {
+            existing.clock_out = baseRecord.clock_out
+          }
+          if (!existing.site_name && baseRecord.site_name) {
+            existing.site_name = baseRecord.site_name
+          }
+          if (!existing.customer_name && baseRecord.customer_name) {
+            existing.customer_name = baseRecord.customer_name
+          }
+          if (!existing.cleaner_id && baseRecord.cleaner_id) {
+            existing.cleaner_id = baseRecord.cleaner_id
+          }
+
+          attendanceMap.set(key, existing)
+        })
+
+        setDailyAttendance(Array.from(attendanceMap.values()))
+      } catch (error) {
+        console.error('Failed to load daily attendance', error)
+        setDailyAttendance([])
+      } finally {
+        setIsDailyAttendanceLoading(false)
+      }
+    }
+
+    if (!managerId) return
+    if (role !== 'admin' && !managedCleanerIds.length && !managedCleanerNames.length && cleaners.length) {
+      setDailyAttendance([])
+      setIsDailyAttendanceLoading(false)
+      return
+    }
+
+    if (role !== 'admin' && !cleaners.length && isListLoading) {
+      return
+    }
+
+    loadDailyAttendance()
+  }, [
+    cleaners.length,
+    isListLoading,
+    managedCleanerIds,
+    managedCleanerIdsKey,
+    managedCleanerNames,
+    managedCleanerNamesKey,
+    managerId,
+    role,
+    selectedDate,
+    todayRefreshKey,
+  ])
+
   const selectedLogsPreview = useMemo(() => logs.slice(0, 15), [logs])
 
-  const todayKey = useMemo(() => new Date().toDateString(), [])
+  const todayKey = useMemo(() => now.toDateString(), [now])
 
   const todaysTasks = useMemo(() => tasks.filter((task) => task.timestamp && new Date(task.timestamp).toDateString() === todayKey), [tasks, todayKey])
   const todaysPhotos = useMemo(() => photos.filter((photo) => photo.photo_timestamp && new Date(photo.photo_timestamp).toDateString() === todayKey), [photos, todayKey])
@@ -658,6 +871,34 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     () => attendance.filter((row) => (row.clock_in && new Date(row.clock_in).toDateString() === todayKey) || (row.clock_out && new Date(row.clock_out).toDateString() === todayKey)),
     [attendance, todayKey]
   )
+
+  const cleanerAttendanceDisplayRows = useMemo(() => {
+    if (!attendance.length) return []
+
+    const sorted = [...attendance].sort((a, b) => {
+      const aTime = a.clock_in ? new Date(a.clock_in).getTime() : Number.NEGATIVE_INFINITY
+      const bTime = b.clock_in ? new Date(b.clock_in).getTime() : Number.NEGATIVE_INFINITY
+      return bTime - aTime
+    })
+
+    const seen = new Set<string>()
+    const deduped = sorted.filter((row) => {
+      const key = [row.cleaner_name, row.clock_in, row.clock_out, row.site_name, row.customer_name].join('::')
+      if (seen.has(key)) {
+        return false
+      }
+      seen.add(key)
+      return true
+    })
+
+    const activeEntries = deduped.filter((row) => row.clock_in && !row.clock_out)
+    const completedEntries = deduped.filter((row) => row.clock_in && row.clock_out)
+    const otherEntries = deduped.filter((row) => !row.clock_in && row.clock_out)
+
+    return [...activeEntries, ...completedEntries, ...otherEntries]
+  }, [attendance])
+
+  const selectedAttendancePreview = useMemo(() => cleanerAttendanceDisplayRows.slice(0, 8), [cleanerAttendanceDisplayRows])
 
   const isPlaceholderLabel = (value?: string | null) => {
     if (!value) return false
@@ -682,6 +923,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     const clockInLabel = row.clock_in ? formatTime(row.clock_in) : '—'
     const clockOutLabel = row.clock_out ? formatTime(row.clock_out) : '—'
     const dateLabel = formatDate(row.clock_out ?? row.clock_in)
+    const cleanerDisplayName = normalizeCleanerName(row.cleaner_name || 'Cleaner')
 
     const toggleExpanded = () => {
       if (!isCompleted) return
@@ -691,26 +933,33 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     return (
       <div key={row.id} className="space-y-2">
         <div
-          className={`rounded-[32px] border border-gray-200 bg-gray-100 px-6 py-5 transition ${
-            isCompleted ? 'cursor-pointer hover:border-gray-300 hover:bg-gray-100/90' : ''
+          className={`rounded-[28px] border border-blue-100 bg-white/80 px-6 py-5 shadow-sm transition ${
+            isCompleted ? 'cursor-pointer hover:border-blue-200 hover:bg-blue-50/70' : ''
           }`}
           onClick={toggleExpanded}
         >
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">{siteLabel}</p>
-              <div className="flex items-center gap-6 text-sm text-gray-900">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8aa5ff]">{siteLabel}</p>
+              <div className="flex items-center gap-6 text-sm text-[#00339B]">
                 <div className="text-left">
                   <p className="font-semibold leading-tight">Clocked in</p>
-                  <p className="text-gray-600 leading-tight">{clockInLabel}</p>
+                  <p className="text-slate-500 leading-tight">{clockInLabel}</p>
                 </div>
-                <ArrowRight className="h-4 w-4 text-gray-500" />
+                <ArrowRight className="h-4 w-4 text-[#8aa5ff]" />
                 <div className="text-left">
                   <p className="font-semibold leading-tight">{isCompleted ? 'Clocked out' : 'On site'}</p>
-                  <p className="text-gray-600 leading-tight">{isCompleted ? clockOutLabel : '—'}</p>
+                  <p className="text-slate-500 leading-tight">{isCompleted ? clockOutLabel : '—'}</p>
                 </div>
               </div>
-              <p className="text-xs text-gray-500">{dateLabel}</p>
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <span className="font-semibold text-[#00339B]">{cleanerDisplayName}</span>
+                {dateLabel && (
+                  <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-[#00339B]">
+                    {dateLabel}
+                  </span>
+                )}
+              </div>
             </div>
             {isCompleted ? (
               <button
@@ -719,14 +968,14 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                   event.stopPropagation()
                   toggleExpanded()
                 }}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-600 transition hover:bg-gray-50"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-blue-200 bg-white text-[#00339B] transition hover:bg-blue-50"
                 aria-expanded={isExpanded}
                 aria-label="Toggle attendance details"
               >
                 <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
               </button>
             ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-blue-100 bg-white text-[#8aa5ff]">
                 <ArrowRight className="h-4 w-4" />
               </div>
             )}
@@ -735,33 +984,33 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
         {isCompleted && isExpanded && (
           <div className="space-y-2 pl-4 sm:pl-8">
-            <div className="flex items-center justify-between gap-4 rounded-[28px] border border-gray-200 bg-gray-100 px-5 py-4">
-              <div className="flex items-center gap-4 text-sm text-gray-900">
+            <div className="flex items-center justify-between gap-4 rounded-[24px] border border-blue-100 bg-blue-50/40 px-5 py-4">
+              <div className="flex items-center gap-4 text-sm text-[#00339B]">
                 <div className="text-left">
                   <p className="font-semibold leading-tight">Clocked in</p>
-                  <p className="text-gray-600 leading-tight">{clockInLabel}</p>
+                  <p className="text-slate-500 leading-tight">{clockInLabel}</p>
                 </div>
-                <ArrowRight className="h-4 w-4 text-gray-500" />
+                <ArrowRight className="h-4 w-4 text-[#8aa5ff]" />
                 <div className="text-left">
                   <p className="font-semibold leading-tight">On site</p>
-                  <p className="text-gray-600 leading-tight">—</p>
+                  <p className="text-slate-500 leading-tight">—</p>
                 </div>
               </div>
-              <span className="text-xs text-gray-500">{dateLabel}</span>
+              <span className="text-xs text-slate-500">{dateLabel}</span>
             </div>
-            <div className="flex items-center justify-between gap-4 rounded-[28px] border border-gray-200 bg-gray-100 px-5 py-4">
-              <div className="flex items-center gap-4 text-sm text-gray-900">
+            <div className="flex items-center justify-between gap-4 rounded-[24px] border border-blue-100 bg-blue-50/40 px-5 py-4">
+              <div className="flex items-center gap-4 text-sm text-[#00339B]">
                 <div className="text-left">
                   <p className="font-semibold leading-tight">On site</p>
-                  <p className="text-gray-600 leading-tight">—</p>
+                  <p className="text-slate-500 leading-tight">—</p>
                 </div>
-                <ArrowRight className="h-4 w-4 text-gray-500" />
+                <ArrowRight className="h-4 w-4 text-[#8aa5ff]" />
                 <div className="text-left">
                   <p className="font-semibold leading-tight">Clocked out</p>
-                  <p className="text-gray-600 leading-tight">{clockOutLabel}</p>
+                  <p className="text-slate-500 leading-tight">{clockOutLabel}</p>
                 </div>
               </div>
-              <span className="text-xs text-gray-500">{dateLabel}</span>
+              <span className="text-xs text-slate-500">{dateLabel}</span>
             </div>
           </div>
         )}
@@ -965,6 +1214,233 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const photosCount = todaysPhotos.length
   const recordsCount = todaysAttendance.length
 
+  const greetingPeriod = useMemo(() => {
+    const currentHour = now.getHours()
+    if (currentHour < 12) return 'morning'
+    if (currentHour < 18) return 'afternoon'
+    return 'evening'
+  }, [now])
+
+  const selectedDateLabel = useMemo(() => format(selectedDate, 'EEE, MMM d, yyyy'), [selectedDate])
+
+  const isSelectedDateToday = useMemo(() => isSameDay(selectedDate, normalizeToStartOfDay(now)), [selectedDate, now])
+
+  useEffect(() => {
+    if (!isSelectedDateToday) return
+    setTodayRefreshKey((key) => key + 1)
+  }, [isSelectedDateToday, now])
+
+  const attendanceDisplayRows = useMemo(() => {
+    if (!dailyAttendance.length) return []
+
+    const dayStart = normalizeToStartOfDay(selectedDate)
+    const dayEnd = new Date(dayStart)
+    dayEnd.setDate(dayEnd.getDate() + 1)
+
+    const isWithinSelectedDay = (iso?: string | null) => {
+      if (!iso) return false
+      const timestamp = new Date(iso)
+      if (Number.isNaN(timestamp.getTime())) return false
+      return timestamp >= dayStart && timestamp < dayEnd
+    }
+
+    const overlapsSelectedDay = (row: AttendanceRow) => {
+      const clockInDate = row.clock_in ? new Date(row.clock_in) : null
+      const clockOutDate = row.clock_out ? new Date(row.clock_out) : null
+
+      if (isWithinSelectedDay(row.clock_in) || isWithinSelectedDay(row.clock_out)) {
+        return true
+      }
+
+      if (clockInDate && clockOutDate) {
+        return clockInDate < dayEnd && clockOutDate >= dayStart
+      }
+
+      return false
+    }
+
+    const filtered = dailyAttendance.filter(overlapsSelectedDay)
+
+    const getSortTime = (row: AttendanceRow) => {
+      const clockInTime = row.clock_in ? new Date(row.clock_in).getTime() : Number.NEGATIVE_INFINITY
+      const clockOutTime = row.clock_out ? new Date(row.clock_out).getTime() : Number.NEGATIVE_INFINITY
+      return Math.max(clockInTime, clockOutTime)
+    }
+
+    const sorted = [...filtered].sort((a, b) => getSortTime(b) - getSortTime(a))
+
+    const seen = new Set<string>()
+    const deduped = sorted.filter((row) => {
+      const key = [row.cleaner_name, row.clock_in, row.clock_out, row.site_name, row.customer_name].join('::')
+      if (seen.has(key)) {
+        return false
+      }
+      seen.add(key)
+      return true
+    })
+
+    const activeEntries = deduped.filter((row) => row.clock_in && !row.clock_out)
+    const completedEntries = deduped.filter((row) => row.clock_in && row.clock_out)
+    const otherEntries = deduped.filter((row) => !row.clock_in && row.clock_out)
+
+    return [...activeEntries, ...completedEntries, ...otherEntries]
+  }, [dailyAttendance, selectedDate])
+
+  const cleanersOnlineApprox = useMemo(() => {
+    if (!isSelectedDateToday) return null
+    const activeKeys = new Set<string>()
+    todaysAttendance.forEach((row) => {
+      if (!row.clock_in) return
+      if (row.clock_out) return
+      const key = row.cleaner_id !== null && row.cleaner_id !== undefined ? String(row.cleaner_id) : row.cleaner_name
+      if (!key) return
+      activeKeys.add(key)
+    })
+    return activeKeys.size
+  }, [isSelectedDateToday, todaysAttendance])
+
+  const hoursWorkedApprox = useMemo(() => {
+    if (!isSelectedDateToday) return 0
+    const totalHours = todaysAttendance.reduce((sum, row) => sum + calculateHoursBetween(row.clock_in, row.clock_out), 0)
+    return Number(totalHours.toFixed(1))
+  }, [isSelectedDateToday, todaysAttendance])
+
+  const hoursTrendRange = useMemo(() => {
+    const baseRange = defaultAnalyticsRange(14)
+    const isoRange = toIsoRange(baseRange)
+    const formatterOptions: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' }
+    const startLabel = baseRange.start.toLocaleDateString(undefined, formatterOptions)
+    const endLabel = baseRange.end.toLocaleDateString(undefined, formatterOptions)
+    return {
+      iso: isoRange,
+      label: `${startLabel} - ${endLabel}`,
+    }
+  }, [])
+
+  const hoursTrendQuery = useQuery({
+    queryKey: ['manager-dashboard-hours-trend', role, managerId, hoursTrendRange.iso.start, hoursTrendRange.iso.end],
+    queryFn: () =>
+      fetchAnalyticsSummary({
+        managerId,
+        role,
+        range: hoursTrendRange.iso,
+      }),
+    staleTime: 5 * 60 * 1000,
+    enabled: Boolean(managerId),
+  })
+
+  const selectedDayIso = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate])
+
+  const snapshotQuery = useQuery({
+    queryKey: ['manager-dashboard-snapshot', role, managerId, selectedDayIso],
+    queryFn: () =>
+      fetchDashboardSnapshot({
+        managerId,
+        role,
+        dayIso: selectedDayIso,
+      }),
+    enabled: Boolean(managerId),
+    staleTime: 60 * 1000,
+  })
+
+  const { refetch: refetchSnapshot } = snapshotQuery
+
+  useEffect(() => {
+    if (!isSelectedDateToday) return
+    refetchSnapshot()
+  }, [isSelectedDateToday, refetchSnapshot, todayRefreshKey])
+
+  const snapshot = snapshotQuery.data
+
+  const snapshotIsCurrentDay = snapshot?.isCurrentDay ?? isSelectedDateToday
+  const displayedAreasCount = snapshot?.areasCleaned ?? areasToday
+  const displayedPhotosCount = snapshot?.photosTaken ?? photosCount
+  const displayedHoursWorked = snapshot?.hoursWorked ?? (snapshotIsCurrentDay ? hoursWorkedApprox : 0)
+  const displayedAttendanceCount = snapshot?.attendanceCount ?? recordsCount
+
+  const handleResetDate = () => {
+    const todayStart = normalizeToStartOfDay(now)
+    setSelectedDate(todayStart)
+    setIsAutoDate(true)
+  }
+
+  const handleSelectDate = (date: Date | undefined) => {
+    if (!date) return
+    const normalizedDate = normalizeToStartOfDay(date)
+    setSelectedDate(normalizedDate)
+    setIsAutoDate(isSameDay(normalizedDate, normalizeToStartOfDay(now)))
+  }
+
+  const handleGoToAnalytics = () => {
+    navigate('/analytics')
+  }
+
+  const handleCleanerSelect = (cleaner: CleanerListItem) => {
+    setSelectedCleaner(cleaner)
+    setIsDetailModalOpen(true)
+  }
+
+  const metricCards = useMemo(() => {
+    const isLoading = snapshotQuery.isLoading
+    const isError = snapshotQuery.isError
+
+    const toDisplayNumber = (value: unknown): number | null => {
+      if (value === null || value === undefined) return null
+      if (typeof value === 'number') return Number.isFinite(value) ? value : null
+      const parsed = Number(value)
+      return Number.isFinite(parsed) ? parsed : null
+    }
+
+    const cleanersOnlineBase = snapshot?.cleanersOnline ?? (snapshotIsCurrentDay ? cleanersOnlineApprox ?? 0 : null)
+    const areasCleanedBase = displayedAreasCount
+    const photosTakenBase = displayedPhotosCount
+    const hoursWorkedBase = displayedHoursWorked
+
+    const cleanersOnlineValue = isLoading ? undefined : toDisplayNumber(cleanersOnlineBase)
+    const areasCleanedValue = isLoading ? undefined : toDisplayNumber(areasCleanedBase)
+    const photosTakenValue = isLoading ? undefined : toDisplayNumber(photosTakenBase)
+    const hoursWorkedValue = isLoading ? undefined : toDisplayNumber(hoursWorkedBase)
+
+    const unavailableLabel = isError ? 'Unable to load metric' : 'Live metric only available for today'
+    const helperOrError = (defaultText: string) => (isError ? 'Unable to load metric' : defaultText)
+
+    return [
+      {
+        key: 'cleaners-online',
+        label: 'Cleaners online',
+        value: cleanersOnlineValue,
+        helper: snapshotIsCurrentDay ? 'Active now' : unavailableLabel,
+      },
+      {
+        key: 'areas-cleaned',
+        label: 'Areas cleaned',
+        value: areasCleanedValue,
+        helper: helperOrError('Completed area submissions'),
+      },
+      {
+        key: 'photos-taken',
+        label: 'Photos taken',
+        value: photosTakenValue,
+        helper: helperOrError('Task photo uploads'),
+      },
+      {
+        key: 'hours-worked',
+        label: 'Hours worked',
+        value: hoursWorkedValue,
+        helper: helperOrError('Total hours logged'),
+      },
+    ]
+  }, [
+    snapshotQuery.isLoading,
+    snapshotQuery.isError,
+    snapshot,
+    snapshotIsCurrentDay,
+    cleanersOnlineApprox,
+    displayedAreasCount,
+    displayedPhotosCount,
+    displayedHoursWorked,
+  ])
+
   const toggleGroup = (key: string) => {
     setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }))
   }
@@ -1028,244 +1504,472 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
   if (isListLoading) {
     return (
-      <div className="flex justify-center items-center min-h-64">
-        <div className="h-10 w-10 border-2 border-[#00339B] border-t-transparent rounded-full animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-[#f4f4f4]">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#00339B] border-t-transparent" />
       </div>
     )
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 lg:p-10 space-y-6">
-        <div>
-        <h1 className="text-3xl font-semibold text-[#00339B]">Team Activity</h1>
-        <p className="text-sm text-gray-500">Welcome back, {managerName}</p>
-      </div>
-
-      <Card className="rounded-3xl border border-gray-100 bg-white shadow-sm">
-        <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <CardTitle className="flex items-center gap-3 text-lg font-semibold text-gray-900">
-            <div className="h-11 w-11 rounded-2xl bg-blue-100 flex items-center justify-center">
-              <Users className="h-5 w-5" style={{ color: '#00339B' }} />
-            </div>
-            <span>Cleaners</span>
-          </CardTitle>
-          <div className="flex w-full md:w-80 items-center gap-2 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-2">
-            <Search className="h-4 w-4 text-gray-400" />
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search cleaners..."
-              className="h-8 border-0 bg-transparent px-0 text-sm focus-visible:ring-0"
-            />
-          </div>
-          <div className="grid grid-cols-3 gap-3 w-full md:w-auto">
-            <Card className="rounded-2xl border border-gray-100 shadow-none bg-blue-50/70">
-              <CardContent className="py-3 px-4">
-                <p className="text-[11px] uppercase tracking-wide text-blue-600">Areas Today</p>
-                <p className="text-lg font-semibold text-[#00339B]">{areasToday}</p>
-          </CardContent>
-        </Card>
-            <Card className="rounded-2xl border border-gray-100 shadow-none bg-emerald-50/70">
-              <CardContent className="py-3 px-4">
-                <p className="text-[11px] uppercase tracking-wide text-emerald-600">Photos</p>
-                <p className="text-lg font-semibold text-emerald-700">{photosCount}</p>
-          </CardContent>
-        </Card>
-            <Card className="rounded-2xl border border-gray-100 shadow-none bg-slate-50/70">
-              <CardContent className="py-3 px-4">
-                <p className="text-[11px] uppercase tracking-wide text-slate-600">Records</p>
-                <p className="text-lg font-semibold text-slate-700">{recordsCount}</p>
-          </CardContent>
-        </Card>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-3">
-            {filteredCleaners.map((cleaner) => (
-              <button
-                key={cleaner.cleaner_id || cleaner.id}
-                onClick={() => setSelectedCleaner(cleaner)}
-                className={`rounded-2xl border ${selectedCleaner?.cleaner_id === cleaner.cleaner_id ? 'border-[#00339B] shadow-md' : 'border-gray-100 shadow-sm'} bg-white transition-all text-left p-4 flex items-center gap-4 hover:shadow-md`}
-              >
-                <div className={`h-11 w-11 rounded-2xl flex items-center justify-center text-white text-xs font-semibold ${getStatusColor(cleaner.event_type)}`}>
-                  {(cleaner.event_type || 'ACTIVE').slice(0, 3).toUpperCase()}
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-900">{cleaner.cleaner_name}</p>
-                  <p className="text-xs text-gray-500">{cleaner.site_area || 'No area logged'}</p>
-                </div>
-                <div className="text-[11px] text-gray-400 whitespace-nowrap">
-                  {formatTime(cleaner.timestamp)}
-                </div>
-              </button>
-            ))}
-            </div>
-          {filteredCleaners.length === 0 && (
-            <div className="text-center text-sm text-gray-500 py-8 rounded-2xl border border-dashed">No cleaners found. Adjust your search.</div>
-          )}
-          </CardContent>
-        </Card>
-
-      {selectedCleaner && (
-        <Card className="rounded-3xl border border-gray-100 bg-white shadow-lg">
-          <CardHeader className="space-y-3">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => setSelectedCleaner(null)} className="rounded-full border border-gray-200">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <div>
-                <CardTitle className="text-xl font-semibold text-gray-900">{selectedCleaner.cleaner_name}</CardTitle>
-                <p className="text-xs text-gray-500">{selectedCleaner.customer_name || 'Customer'}</p>
+    <>
+      <div className="mx-auto flex w/full max-w-7xl flex-col gap-8 px-6 pt-10 pb-24 xl:px-12">
+        <section className="rounded-[36px] border border-white/60 bg-white/80 p-6 shadow-[0_34px_90px_rgba(0,51,155,0.12)] backdrop-blur-md md:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex w-full items-start gap-4">
+              <SidebarTrigger className="mt-1 h-10 w-10 shrink-0 rounded-2xl bg-white/80 text-gray-600 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-gray-900 sm:h-11 sm:w-11" />
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#8aa5ff]">Good {greetingPeriod}</p>
+                <h1 className="text-3xl font-semibold text-[#00339B] sm:text-4xl">Welcome back, {managerName}</h1>
               </div>
-      </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-          <div className="grid md:grid-cols-2 gap-6">
-              <Card className="rounded-2xl border border-gray-100 shadow-sm">
-                <CardHeader>
-                  <CardTitle className="text-sm font-semibold">Time & Attendance</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
-                    {selectedAttendancePreview.map(renderAttendanceCard)}
-                    {selectedAttendancePreview.length === 0 && (
-                      <div className="text-xs text-gray-500">No attendance entries recorded.</div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 mt-2 lg:mt-3">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="flex items-center gap-3 rounded-full border border-blue-100 bg-white/80 px-4 py-2 text-sm font-semibold text-[#00339B] shadow-sm transition hover:bg-blue-50"
+                  >
+                    <CalendarDays className="h-4 w-4" />
+                    <span>{selectedDateLabel}</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar mode="single" selected={selectedDate} onSelect={handleSelectDate} initialFocus />
+                </PopoverContent>
+              </Popover>
+              <Button
+                type="button"
+                onClick={handleResetDate}
+                disabled={isSelectedDateToday}
+                variant="ghost"
+                className="rounded-full border border-blue-200 bg-blue-50/70 px-4 py-2 text-sm font-semibold text-[#00339B] transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Today
+              </Button>
+            </div>
+          </div>
+          <p className="mt-5 max-w-3xl text-sm text-slate-500">
+            Oversee live cleaners, submissions, and assistance updates from your manager control centre.
+          </p>
+        </section>
 
-              <Card className="rounded-2xl border border-gray-100 shadow-sm">
-                <CardHeader>
-                  <CardTitle className="text-sm font-semibold">Areas & Tasks</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
-                    {taskSummaries.map((task) => (
-                      <div key={task.id} className="p-3 border border-gray-100 rounded-xl">
-                        <p className="text-sm font-semibold text-gray-900">{task.area}</p>
-                        <p className="text-xs text-gray-500">{formatDateTime(task.timestamp)}</p>
-                        <p className="text-xs text-gray-600 mt-1">Tasks completed: {task.completed}/{task.total}</p>
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {metricCards.map((metric) => {
+            const isNumber = typeof metric.value === 'number'
+            const displayValue = isNumber
+              ? metric.value.toLocaleString(undefined, {
+                  maximumFractionDigits: Number(metric.value) % 1 === 0 ? 0 : 1,
+                })
+              : metric.value === null
+                ? '—'
+                : ''
+            return (
+              <div
+                key={metric.key}
+                className="group relative overflow-hidden rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_22px_50px_rgba(0,51,155,0.08)] backdrop-blur transition hover:-translate-y-1 hover:shadow-[0_30px_70px_rgba(0,51,155,0.18)]"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-[#00339B]/10 via-[#5f80ff]/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                <div className="relative flex flex-col gap-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#8aa5ff]">{metric.label}</span>
+                  <span className="text-3xl font-semibold text-[#00339B]">
+                    {metric.value === undefined ? (
+                      <span className="inline-flex h-8 w-12 animate-pulse rounded-full bg-blue-100/70" />
+                    ) : (
+                      displayValue
+                    )}
+                  </span>
+                  <span className="text-xs text-slate-500">{metric.helper}</span>
+                </div>
+              </div>
+            )
+          })}
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-2">
+          <Card className="rounded-[36px] border border-white/70 bg-white/80 shadow-[0_26px_70px_rgba(0,51,155,0.1)] backdrop-blur">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-xl font-semibold text-[#00339B]">Activity</CardTitle>
+              <p className="text-sm text-slate-500">Latest cleaner logs and bathroom assist updates.</p>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              <div>
+                <div className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1">
+                  {selectedLogsPreview.length ? (
+                    selectedLogsPreview.map((log) => (
+                      <div
+                        key={log.id}
+                        className="flex items-start gap-3 rounded-[24px] border border-blue-100 bg-blue-50/50 p-4 shadow-sm"
+                      >
+                        <div
+                          className={`flex h-10 w-10 items-center justify-center rounded-2xl text-[10px] font-semibold uppercase text-white ${getStatusColor(log.action)}`}
+                        >
+                          {log.action.slice(0, 3).toUpperCase()}
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-[#0f235f]">{log.action}</p>
+                          <p className="text-xs text-slate-500">{log.site_area || '—'}</p>
+                          <p className="text-[11px] text-slate-400">{formatDateTime(log.timestamp)}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-6 text-center text-sm text-slate-500">
+                      No recent activity recorded.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {assistCards.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8aa5ff]">Assistance</p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    {assistCards.slice(0, 4).map((assist) => (
+                      <div key={assist.id} className="rounded-[24px] border border-blue-100 bg-blue-50/40 p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-semibold text-[#00339B]">{assist.location}</span>
+                          <Badge className="rounded-full bg-white/80 text-xs uppercase tracking-wide text-[#00339B]">
+                            {assist.status}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">{assist.customer ?? 'Unknown customer'}</p>
+                        <p className="mt-3 text-[11px] text-slate-400">Reported {formatDateTime(assist.reportedAt)}</p>
+                        {assist.resolvedAt && (
+                          <p className="text-[11px] text-emerald-600">Resolved {formatDateTime(assist.resolvedAt)}</p>
+                        )}
                       </div>
                     ))}
-                    {taskSummaries.length === 0 && <div className="text-xs text-gray-500">No task submissions yet.</div>}
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-            <div className="space-y-3">
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-                <ImageIcon className="h-4 w-4 text-[#00339B]" /> Task Photos
-              </h3>
-              {areaPhotoGroups.length === 0 ? (
-                <div className="text-xs text-gray-500">No photos uploaded yet.</div>
+          <Card className="rounded-[36px] border border-white/70 bg-white/80 shadow-[0_26px_70px_rgba(0,51,155,0.1)] backdrop-blur">
+            <CardHeader className="space-y-4 pb-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div className="space-y-2">
+                  <CardTitle className="text-xl font-semibold text-[#00339B]">Analytics</CardTitle>
+                  <p className="text-sm text-slate-500">Total hours trend pulled from attendance.</p>
+                </div>
+                <span className="text-[11px] font-medium text-slate-400">{hoursTrendRange.label}</span>
+              </div>
+            </CardHeader>
+          <CardContent className="space-y-6 pb-4">
+            <div>
+              {hoursTrendQuery.isLoading ? (
+                <div className="rounded-[24px] border border-blue-100 bg-white/70 p-6">
+                  <div className="flex h-48 items-center justify-center">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#00339B] border-t-transparent" />
+                  </div>
+                </div>
+              ) : hoursTrendQuery.isError ? (
+                <div className="rounded-[24px] border border-rose-200 bg-rose-50/70 p-6 text-center text-sm text-rose-600">
+                  Unable to load hours trend right now.
+                </div>
+              ) : hoursTrendQuery.data?.hoursByDate?.length ? (
+                <HoursWorkedAreaChart summary={hoursTrendQuery.data} layout="inline" />
               ) : (
-                <div className="space-y-4">
-                  {areaPhotoGroups.map((areaGroup) => {
-                    const isAreaExpanded = expandedGroups[areaGroup.key] ?? true
-                    return (
-                      <div key={areaGroup.key} className="rounded-[32px] border border-transparent bg-transparent p-6">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500">
-                              <MapPin className="h-3 w-3 text-[#00339B]" />
-                              <span>{areaGroup.area}</span>
-                              <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#00339B] shadow-sm border border-[#00339B]/20">
-                                {areaGroup.dateLabel}
-                              </span>
-                              {areaGroup.customer && (
-                                <span className="rounded-full bg-[#fffbeb] px-2 py-0.5 text-[10px] font-semibold text-[#1f2937]">{areaGroup.customer}</span>
-                              )}
-                              <span className="rounded-full bg-[#e0e7ff] px-2 py-0.5 text-[10px] font-semibold text-[#1f2937]">
-                                {areaGroup.tasks.reduce((sum, task) => sum + task.photos.length, 0)} photos
-                              </span>
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => toggleGroup(areaGroup.key)}
-                            className="rounded-full border border-gray-200 text-gray-600 hover:bg-white"
-                            aria-label={isAreaExpanded ? 'Collapse area' : 'Expand area'}
-                          >
-                            <ChevronDown className={`h-4 w-4 transition-transform ${isAreaExpanded ? 'rotate-180' : ''}`} />
-                          </Button>
-                        </div>
-
-                        <div className={`mt-5 overflow-hidden transition-all duration-300 ${isAreaExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                            {areaGroup.tasks.map((taskGroup) => {
-                              const taskKey = `${areaGroup.key}::${taskGroup.key}`
-                              const thumbnail = taskGroup.photos[0]
-                              if (!thumbnail) return null
-
-                              return (
-                                <button
-                                  key={taskKey}
-                                  onClick={() => openPhotoModal(taskGroup.photos, 0, taskGroup.taskName, taskGroup.startedAt)}
-                                  className="group relative aspect-square w-full overflow-hidden rounded-[28px] border border-white/70 bg-white/60 shadow-[0_16px_34px_rgba(15,35,95,0.06)] transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_50px_rgba(15,35,95,0.12)]"
-                                  aria-label={`View photo for ${taskGroup.taskName}`}
-                                >
-                                  <img
-                                    src={thumbnail.photo_data}
-                                    alt={taskGroup.taskName}
-                                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-                                  />
-
-                                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0f235f]/90 via-[#0f235f]/40 to-transparent p-4 text-white">
-                                    <h4 className="text-sm font-semibold leading-tight line-clamp-2">{taskGroup.taskName}</h4>
-                                    <div className="mt-2 flex items-center justify-between text-[11px] text-white/80">
-                                      <span className="flex items-center gap-1">
-                                        <Clock className="h-3 w-3" />
-                                        {thumbnail.photo_timestamp ? formatDateTime(thumbnail.photo_timestamp) : 'Time not recorded'}
-                                      </span>
-                                      <span className="rounded-full border border-white/30 px-2 py-0.5">View</span>
-                                    </div>
-                                  </div>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
+                <div className="rounded-[24px] border border-dashed border-blue-200 bg-blue-50/30 p-6 text-center text-sm text-slate-500">
+                  No hours recorded for this range yet.
                 </div>
               )}
             </div>
+            <div className="flex flex-col gap-4 rounded-[28px] border border-white/80 bg-gradient-to-br from-[#f6f8ff] via-white/90 to-white px-6 py-5 shadow-[0_16px_40px_rgba(0,51,155,0.08)] sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-[#00339B]">
+                <span className="font-semibold">Need deeper insights?</span>{' '}
+                <span className="text-slate-500">Open the full analytics workspace to review trends, exports, and reports.</span>
+              </p>
+              <Button
+                type="button"
+                onClick={handleGoToAnalytics}
+                className="w-full rounded-full bg-[#00339B] px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#00297a] sm:w-auto"
+              >
+                Go
+              </Button>
+            </div>
+          </CardContent>
+          </Card>
+        </section>
 
-            <Card className="rounded-2xl border border-gray-100 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-sm font-semibold">Recent Activity</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-                  {selectedLogsPreview.map((log) => (
-                    <div key={log.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
-                      <div className={`h-9 w-9 rounded-xl flex items-center justify-center text-white text-[10px] font-semibold ${getStatusColor(log.action)}`}>
-                        {log.action.slice(0, 3).toUpperCase()}
-                        </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">{log.action}</p>
-                        <p className="text-xs text-gray-500">{log.site_area || '—'}</p>
-                        <p className="text-xs text-gray-400 mt-1">{formatDateTime(log.timestamp)}</p>
+        <section className="grid gap-6 xl:grid-cols-2">
+          <Card className="rounded-[36px] border border-white/70 bg-white/85 shadow-[0_30px_80px_rgba(0,51,155,0.1)] backdrop-blur">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-xl font-semibold text-[#00339B]">Management</CardTitle>
+              <p className="text-sm text-slate-500">Search your roster, review submissions, and share feedback.</p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center gap-2 rounded-full border border-blue-100 bg-white/80 px-4 py-2 shadow-sm">
+                <Search className="h-4 w-4 text-[#00339B]" />
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search cleaners..."
+                  className="h-8 border-0 bg-transparent px-0 text-sm text-[#00339B] placeholder:text-slate-400 focus-visible:ring-0"
+                />
+              </div>
+              <div className="max-h-[32rem] space-y-3 overflow-y-auto pr-1">
+                {filteredCleaners.length ? (
+                  filteredCleaners.map((cleaner) => {
+                    const isSelected =
+                      isDetailModalOpen && selectedCleaner?.cleaner_id === cleaner.cleaner_id
+                    return (
+                      <button
+                        key={cleaner.cleaner_id || cleaner.id}
+                        onClick={() => handleCleanerSelect(cleaner)}
+                        className={`flex w-full items-center justify-between gap-4 rounded-[24px] px-4 py-3 text-left transition ${
+                          isSelected
+                            ? 'border border-blue-200 bg-blue-50 shadow-md'
+                            : 'border border-blue-100 bg-white/80 shadow-sm hover:border-blue-200 hover:bg-blue-50/70'
+                        }`}
+                      >
+                        <span className="font-semibold text-[#00339B]">{cleaner.cleaner_name}</span>
+                        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8aa5ff]">cleaner</span>
+                      </button>
+                    )
+                  })
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-6 text-center text-sm text-slate-500">
+                    No cleaners found. Adjust your search.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[36px] border border-white/70 bg-white/85 shadow-[0_30px_80px_rgba(0,51,155,0.1)] backdrop-blur">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-xl font-semibold text-[#00339B]">Calendar</CardTitle>
+              <p className="text-sm text-slate-500">Attendance timeline for your team.</p>
+            </CardHeader>
+            <CardContent>
+              <div className="max-h-[32rem] space-y-3 overflow-y-auto pr-1">
+                {isDailyAttendanceLoading ? (
+                  <div className="flex justify-center py-6">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#00339B] border-t-transparent" />
+                  </div>
+                ) : attendanceDisplayRows.length ? (
+                  attendanceDisplayRows.map(renderAttendanceCard)
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-6 text-center text-sm text-slate-500">
+                    No attendance records found for {selectedDateLabel}.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      </div>
+
+      <Dialog
+        open={isDetailModalOpen && Boolean(selectedCleaner)}
+        onOpenChange={(open) => {
+          setIsDetailModalOpen(open)
+          if (!open) {
+            setExpandedAttendanceId(null)
+            setSelectedCleaner(null)
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] w-full max-w-5xl overflow-y-auto overscroll-contain rounded-[32px] border border-blue-100 bg-white/90 p-6 shadow-[0_45px_120px_rgba(0,51,155,0.25)]">
+          {selectedCleaner ? (
+            <div className="space-y-6">
+              <DialogHeader className="space-y-4 text-left">
+                <div className="flex items-start justify-between gap-4">
+                  <DialogTitle className="text-2xl font-semibold text-[#00339B]">{selectedCleaner.cleaner_name}</DialogTitle>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#00339B]">
+                      cleaner
+                    </span>
+                    <DialogClose
+                      className="flex h-9 w-9 items-center justify-center rounded-full border border-blue-200 bg-white text-[#00339B] transition hover:bg-blue-50"
+                      aria-label="Close cleaner details"
+                    >
+                      <X className="h-4 w-4" />
+                    </DialogClose>
+                  </div>
+                </div>
+                {selectedCleaner.event_type && (
+                  <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-[#00339B]">
+                    <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 uppercase tracking-wide">
+                      {selectedCleaner.event_type.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                )}
+              </DialogHeader>
+
+              {isDetailLoading ? (
+                <div className="flex justify-center py-16">
+                  <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#00339B] border-t-transparent" />
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="grid gap-5 md:grid-cols-2">
+                    <div className="rounded-[28px] border border-blue-100 bg-white/80 p-5 shadow-sm">
+                      <h3 className="text-sm font-semibold text-[#00339B]">Time & Attendance</h3>
+                      <div className="mt-4 max-h-60 space-y-3 overflow-y-auto pr-1">
+                        {selectedAttendancePreview.length ? (
+                          selectedAttendancePreview.map(renderAttendanceCard)
+                        ) : (
+                          <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-4 text-xs text-slate-500">
+                            No attendance entries recorded.
+                          </div>
+                        )}
                       </div>
                     </div>
-                  ))}
-                  {selectedLogsPreview.length === 0 && <div className="text-xs text-gray-500">No recent actions recorded.</div>}
+                    <div className="rounded-[28px] border border-blue-100 bg-white/80 p-5 shadow-sm">
+                      <h3 className="text-sm font-semibold text-[#00339B]">Areas & Tasks</h3>
+                      <div className="mt-4 max-h-60 space-y-3 overflow-y-auto pr-1">
+                        {taskSummaries.length ? (
+                          taskSummaries.map((task) => (
+                            <div key={task.id} className="rounded-[20px] border border-blue-100 bg-blue-50/30 p-4">
+                              <p className="text-sm font-semibold text-[#00339B]">{task.area}</p>
+                              <p className="mt-1 text-xs text-slate-500">{formatDateTime(task.timestamp)}</p>
+                              <p className="mt-1 text-xs text-slate-600">Tasks completed: {task.completed}/{task.total}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-4 text-xs text-slate-500">
+                            No task submissions yet.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[32px] border border-blue-100 bg-white/80 p-6 shadow-sm">
+                    <h3 className="flex items-center gap-2 text-sm font-semibold text-[#00339B]">
+                      <ImageIcon className="h-4 w-4" /> Task photos
+                    </h3>
+                    {areaPhotoGroups.length === 0 ? (
+                      <div className="mt-4 rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-6 text-xs text-slate-500">
+                        No photos uploaded yet.
+                      </div>
+                    ) : (
+                      <div className="mt-5 space-y-4">
+                        {areaPhotoGroups.map((areaGroup) => {
+                          const isAreaExpanded = expandedGroups[areaGroup.key] ?? true
+                          return (
+                            <div key={areaGroup.key} className="rounded-[28px] border border-blue-100 bg-blue-50/20 p-5">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="space-y-2">
+                                  <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[#00339B]">
+                                    <MapPin className="h-3 w-3" />
+                                    <span>{areaGroup.area}</span>
+                                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#00339B] shadow-sm border border-[#00339B]/20">
+                                      {areaGroup.dateLabel}
+                                    </span>
+                                    {areaGroup.customer && (
+                                      <span className="rounded-full bg-[#fffbeb] px-2 py-0.5 text-[10px] font-semibold text-[#1f2937]">
+                                        {areaGroup.customer}
+                                      </span>
+                                    )}
+                                    <span className="rounded-full bg-[#e0e7ff] px-2 py-0.5 text-[10px] font-semibold text-[#1f2937]">
+                                      {areaGroup.tasks.reduce((sum, task) => sum + task.photos.length, 0)} photos
+                                    </span>
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => toggleGroup(areaGroup.key)}
+                                  className="rounded-full border border-blue-200 text-[#00339B] hover:bg-blue-100"
+                                  aria-label={isAreaExpanded ? 'Collapse area' : 'Expand area'}
+                                >
+                                  <ChevronDown className={`h-4 w-4 transition-transform ${isAreaExpanded ? 'rotate-180' : ''}`} />
+                                </Button>
+                              </div>
+
+                              <div
+                                className={`mt-4 overflow-hidden transition-all duration-300 ${
+                                  isAreaExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
+                                }`}
+                              >
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                  {areaGroup.tasks.map((taskGroup) => {
+                                    const taskKey = `${areaGroup.key}::${taskGroup.key}`
+                                    const thumbnail = taskGroup.photos[0]
+                                    if (!thumbnail) return null
+
+                                    return (
+                                      <button
+                                        key={taskKey}
+                                        onClick={() => openPhotoModal(taskGroup.photos, 0, taskGroup.taskName, taskGroup.startedAt)}
+                                        className="group relative aspect-square w-full overflow-hidden rounded-[26px] border border-white/70 bg-white/70 shadow-[0_16px_34px_rgba(15,35,95,0.06)] transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_50px_rgba(15,35,95,0.12)]"
+                                        aria-label={`View photo for ${taskGroup.taskName}`}
+                                      >
+                                        <img
+                                          src={thumbnail.photo_data}
+                                          alt={taskGroup.taskName}
+                                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                                        />
+
+                                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0f235f]/90 via-[#0f235f]/40 to-transparent p-4 text-white">
+                                          <h4 className="text-sm font-semibold leading-tight line-clamp-2">{taskGroup.taskName}</h4>
+                                          <div className="mt-2 flex items-center justify-between text-[11px] text-white/80">
+                                            <span className="flex items-center gap-1">
+                                              <Clock className="h-3 w-3" />
+                                              {thumbnail.photo_timestamp ? formatDateTime(thumbnail.photo_timestamp) : 'Time not recorded'}
+                                            </span>
+                                            <span className="rounded-full border border-white/30 px-2 py-0.5">View</span>
+                                          </div>
+                                        </div>
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-[28px] border border-blue-100 bg-white/80 p-5 shadow-sm">
+                    <h3 className="text-sm font-semibold text-[#00339B]">Recent activity</h3>
+                    <div className="mt-4 max-h-60 space-y-3 overflow-y-auto pr-1">
+                      {selectedLogsPreview.length ? (
+                        selectedLogsPreview.map((log) => (
+                          <div
+                            key={log.id}
+                            className="flex items-start gap-3 rounded-[22px] border border-blue-100 bg-blue-50/40 p-4"
+                          >
+                            <div
+                              className={`flex h-9 w-9 items-center justify-center rounded-xl text-[10px] font-semibold uppercase text-white ${getStatusColor(log.action)}`}
+                            >
+                              {log.action.slice(0, 3).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-[#00339B]">{log.action}</p>
+                              <p className="text-xs text-slate-500">{log.site_area || '—'}</p>
+                              <p className="mt-1 text-[11px] text-slate-400">{formatDateTime(log.timestamp)}</p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-4 text-xs text-slate-500">
+                          No recent actions recorded.
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-                    </CardContent>
-                  </Card>
-      )}
+              )}
+            </div>
+          ) : (
+            <div className="py-12 text-center text-sm text-slate-500">Select a cleaner from the management list to view details.</div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {currentPhoto &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-6">
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-6">
             <div className="relative w-full max-w-4xl rounded-[32px] border border-[#d9e3ff] bg-[#f6f8ff] shadow-[0_35px_80px_rgba(0,0,0,0.25)] p-6 sm:p-8">
               <button
+                type="button"
                 onClick={closePhotoModal}
                 className="absolute -right-3 -top-3 z-30 rounded-full border border-[#d9e3ff] bg-white p-2 shadow-sm hover:bg-gray-50"
                 aria-label="Close photo viewer"
@@ -1273,10 +1977,11 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                 <X className="h-5 w-5 text-gray-600" />
               </button>
 
-              <div className="relative rounded-[24px] border border-[#d9e3ff] bg-white overflow-hidden">
+              <div className="relative overflow-hidden rounded-[24px] border border-[#d9e3ff] bg-white">
                 <img src={currentPhoto.photo_data} alt="task" className="w-full max-h-[68vh] object-contain" />
 
                 <button
+                  type="button"
                   onClick={() => goToPhoto(-1)}
                   className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full border border-[#d9e3ff] bg-white p-3 shadow-sm transition hover:bg-gray-50"
                   aria-label="Previous photo"
@@ -1285,6 +1990,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => goToPhoto(1)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full border border-[#d9e3ff] bg-white p-3 shadow-sm transition hover:bg-gray-50"
                   aria-label="Next photo"
@@ -1292,11 +1998,11 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                   <ChevronRight className="h-5 w-5 text-gray-600" />
                 </button>
 
-                <div className="absolute top-5 left-5 rounded-full border border-[#d9e3ff] bg-white px-3 py-1 text-xs font-semibold text-gray-700 flex items-center gap-2 shadow-sm">
+                <div className="absolute top-5 left-5 flex items-center gap-2 rounded-full border border-[#d9e3ff] bg-white px-3 py-1 text-xs font-semibold text-gray-700 shadow-sm">
                   <ImageIcon className="h-4 w-4 text-[#00339B]" />
                   <span>{activePhotoIndex !== null ? `${activePhotoIndex + 1}/${photoList.length}` : ''}</span>
                 </div>
-                
+
                 <div className="absolute bottom-7 left-1/2 -translate-x-1/2">
                   <div className="flex flex-col items-center gap-3 rounded-full border border-[#d9e3ff] bg-white px-6 py-3 shadow-sm sm:flex-row sm:flex-nowrap sm:items-center sm:gap-6">
                     {photoTaskName && (
@@ -1314,7 +2020,11 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                         size="sm"
                         disabled={isSavingFeedback}
                         onClick={() => currentPhoto && handleFeedback(currentPhoto, 'up')}
-                        className={`rounded-full gap-2 px-5 font-semibold transition ${feedbackForPhoto === 'up' ? 'bg-[#00339B] hover:bg-[#00297a] text-white' : 'border border-[#00339B] bg-white text-[#00339B] hover:bg-[#00339B]/10'}`}
+                        className={`rounded-full gap-2 px-5 font-semibold transition ${
+                          feedbackForPhoto === 'up'
+                            ? 'bg-[#00339B] text-white hover:bg-[#00297a]'
+                            : 'border border-[#00339B] bg-white text-[#00339B] hover:bg-[#00339B]/10'
+                        }`}
                       >
                         <ThumbsUp className="h-4 w-4" />
                         Approve
@@ -1323,12 +2033,16 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                         size="sm"
                         disabled={isSavingFeedback}
                         onClick={() => currentPhoto && handleFeedback(currentPhoto, 'down')}
-                        className={`rounded-full gap-2 px-5 font-semibold transition ${feedbackForPhoto === 'down' ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'border border-rose-500 bg-white text-rose-600 hover:bg-rose-50'}`}
+                        className={`rounded-full gap-2 px-5 font-semibold transition ${
+                          feedbackForPhoto === 'down'
+                            ? 'bg-rose-600 text-white hover:bg-rose-700'
+                            : 'border border-rose-500 bg-white text-rose-600 hover:bg-rose-50'
+                        }`}
                       >
                         <ThumbsDown className="h-4 w-4" />
                         Revisit
                       </Button>
-                      </div>
+                    </div>
                   </div>
                   {isSavingFeedback && (
                     <div className="mt-2 text-center text-[11px] text-gray-500">Saving feedback...</div>
@@ -1339,6 +2053,6 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           </div>,
           document.body
         )}
-    </div>
+    </>
   )
 }

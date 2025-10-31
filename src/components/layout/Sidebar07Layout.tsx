@@ -1,18 +1,17 @@
 import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { 
-  Clock, 
-  MessageCircle, 
-  FileText, 
-  Settings, 
-  LogOut, 
+import type { LucideIcon } from 'lucide-react'
+import {
+  Clock,
+  LogOut,
   ChevronDown,
   Building2,
   User,
   BarChart3,
   Users,
   QrCode,
-  Camera
+  Camera,
+  Library
 } from 'lucide-react'
 import {
   Sidebar,
@@ -56,6 +55,17 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
   const location = useLocation()
   const isMobile = useIsMobile()
 
+  type MenuItem = {
+    icon: LucideIcon
+    label: string
+    path: string
+  }
+
+  type MenuSection = {
+    title: string
+    items: MenuItem[]
+  }
+
   const handleLogout = () => {
     localStorage.removeItem('userType')
     localStorage.removeItem('userId')
@@ -63,19 +73,19 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
     navigate('/login')
   }
 
-  const cleanerMenuItems = [
+  const cleanerMenuItems: MenuItem[] = [
     { icon: Clock, label: 'Clock In', path: '/clock-in' },
     { icon: Camera, label: 'Assistance', path: '/cleaner-assistance' },
   ]
 
-  const managerMenuItems = [
+  const managerMenuItems: MenuItem[] = [
     { icon: BarChart3, label: 'Dashboard', path: '/manager-dashboard' },
     { icon: Clock, label: 'Recent Activity', path: '/manager-activity' },
     { icon: BarChart3, label: 'Analytics', path: '/analytics' },
   ]
 
-  const adminMenuItems = [
-    { icon: QrCode, label: 'QR Library', path: '/qr-library' },
+  const adminMenuItems: MenuItem[] = [
+    { icon: Library, label: 'QR Library', path: '/qr-library' },
     { icon: QrCode, label: 'QR Generator', path: '/qr-generator' },
     { icon: Building2, label: 'Areas & Tasks', path: '/area-tasks' },
     { icon: Users, label: 'User Management', path: '/admin-dashboard' },
@@ -83,20 +93,52 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
     { icon: Clock, label: 'Calendar', path: '/admin-weekly-schedule' },
   ]
 
-  const getMenuItems = () => {
+  const getMenuSections = React.useCallback((): MenuSection[] => {
     switch (userType) {
       case 'cleaner':
-        return cleanerMenuItems
+        return [
+          {
+            title: 'Daily Tools',
+            items: cleanerMenuItems,
+          },
+        ]
       case 'manager':
-        return managerMenuItems
+        return [
+          {
+            title: 'Overview',
+            items: [managerMenuItems[0]],
+          },
+          {
+            title: 'Performance',
+            items: managerMenuItems.slice(1),
+          },
+        ]
       case 'admin':
-        return adminMenuItems
+        return [
+          {
+            title: 'QR Suite',
+            items: adminMenuItems.slice(0, 2),
+          },
+          {
+            title: 'Operations',
+            items: adminMenuItems.slice(2, 4),
+          },
+          {
+            title: 'Insights',
+            items: adminMenuItems.slice(4),
+          },
+        ]
       default:
-        return cleanerMenuItems
+        return [
+          {
+            title: 'Daily Tools',
+            items: cleanerMenuItems,
+          },
+        ]
     }
-  }
+  }, [userType])
 
-  const menuItems = getMenuItems()
+  const menuSections = React.useMemo(() => getMenuSections(), [getMenuSections])
 
   const isActive = (path: string) => location.pathname === path
 
@@ -117,50 +159,66 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
       <div className="min-h-screen bg-gray-50 flex w-full">
         <Sidebar variant="sidebar" className="bg-white border-0">
           {/* Company Header */}
-          <SidebarHeader className="bg-white border-0">
-            <div className="flex items-center justify-center px-4 py-4">
-              <img 
-                src="/suburban_services_logo-scaled.webp" 
-                alt="Suburban Services" 
-                className="h-16 w-16 object-contain sm:h-20 sm:w-20"
+          <SidebarHeader className="bg-white border-0 px-4 pt-6 pb-4">
+            <div className="flex flex-col items-center text-center">
+              <img
+                src="/suburban_services_logo-scaled.webp"
+                alt="Suburban Services"
+                className="h-28 w-28 object-contain sm:h-32 sm:w-32"
               />
             </div>
           </SidebarHeader>
 
-          <SidebarContent className="px-2">
+          <SidebarContent className="px-4 py-2 space-y-6">
             {/* Navigation Menu */}
-            <SidebarGroup>
-              <SidebarGroupContent>
-                <SidebarMenu className="space-y-3">
-                  {menuItems.map((item) => {
-                    const Icon = item.icon
-                    const active = isActive(item.path)
-                    return (
-                      <React.Fragment key={item.label}>
-                        <SidebarMenuItem>
+            {menuSections.map((section) => (
+              <SidebarGroup key={section.title} className="p-0">
+                <SidebarGroupLabel className="px-3 text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-gray-400">
+                  {section.title}
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu className="mt-3 space-y-2">
+                    {section.items.map((item) => {
+                      const Icon = item.icon
+                      const active = isActive(item.path)
+                      return (
+                        <SidebarMenuItem key={item.path} className="relative">
                           <SidebarMenuButton
                             asChild
-                            className={`rounded-full transition-all duration-200 h-11 text-sm ${
+                            className={`group rounded-2xl transition-all duration-200 h-11 text-sm pl-6 pr-3 ${
                               active
-                                ? 'bg-[#00339B] text-white shadow-lg'
-                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                ? 'bg-[#00339B]/5 text-[#00339B] font-semibold shadow-sm shadow-[#00339B]/10'
+                                : 'text-gray-600 hover:bg-gray-100 hover:text-[#00339B]'
                             }`}
                           >
                             <button
-                              onClick={() => navigate(item.path)}
-                              className="flex items-center gap-3 w-full px-4 py-2"
+                              type="button"
+                              onClick={() => {
+                                if (location.pathname !== item.path) {
+                                  navigate(item.path)
+                                }
+                              }}
+                              className="flex items-center gap-3 w-full py-2"
                             >
-                              <Icon className="h-5 w-5" />
-                              <span className="font-medium">{item.label}</span>
+                              <Icon
+                                className={`h-5 w-5 transition-colors duration-200 ${
+                                  active
+                                    ? 'text-[#00339B]'
+                                    : 'text-gray-400 group-hover:text-[#00339B]'
+                                }`}
+                              />
+                              <span className="font-medium tracking-tight">
+                                {item.label}
+                              </span>
                             </button>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
-                      </React.Fragment>
-                    )
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
+                      )
+                    })}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ))}
           </SidebarContent>
 
           {/* User Profile Footer */}
@@ -218,19 +276,10 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
           <SidebarRail />
         </Sidebar>
 
-        <SidebarInset className="flex-1">
-          {/* Top Header Bar */}
-          <header className={`flex shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 bg-white ${
-            isMobile ? 'h-14' : 'h-16'
-          }`}>
-            <div className="flex items-center gap-3 px-3 sm:px-4">
-              <SidebarTrigger className="-ml-1 text-gray-600 hover:text-gray-900" />
-            </div>
-          </header>
-
+        <SidebarInset className="flex-1 bg-gray-50">
           {/* Main Content with subtle page fade animation */}
-          <div className="flex flex-1 flex-col gap-4 px-4 pb-6 pt-2 sm:p-6 sm:pt-0">
-            <div className="w-full max-w-7xl mx-auto py-4 sm:py-6">
+          <div className="flex flex-1 flex-col px-4 pb-6 pt-4 sm:p-6 sm:pt-6">
+            <div className="w-full max-w-7xl mx-auto py-2 sm:py-4">
               <div className="page-fade-enter page-fade-enter-active">
                 {children}
               </div>

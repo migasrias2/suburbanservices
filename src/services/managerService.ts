@@ -1,3 +1,4 @@
+import { normalizeCleanerName, normalizeCleanerNumericId } from '../lib/identity'
 import { supabase, type Cleaner } from './supabase'
 
 const CLEANER_SUMMARY_FIELDS = 'id, first_name, last_name, created_at, email, mobile_number, is_active' as const
@@ -131,6 +132,10 @@ const resolveActivityDisplayLabel = (
   return null
 }
 
+const isUuid = (value: string): boolean => {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim())
+}
+
 export async function fetchManagerRecentActivity(
   managerId: string,
   limit = 100,
@@ -143,45 +148,104 @@ export async function fetchManagerRecentActivity(
     console.warn('Falling back to global cleaner activity feed', error)
   }
 
-  let logsQuery = supabase
+  const scopedCleanerIds = cleanerIds.filter((id) => typeof id === 'string' && id.trim().length > 0)
+  const restrictToManagedCleaners = scopedCleanerIds.length > 0
+
+  type CleanerIdentifier = {
+    raw: string
+    normalized: string
+    numeric: number | null
+  }
+
+  const normalizedCleanerIdentifiers: CleanerIdentifier[] = scopedCleanerIds.map((value) => ({
+    raw: value.trim(),
+    normalized: normalizeCleanerName(value).toLowerCase(),
+    numeric: normalizeCleanerNumericId(value),
+  }))
+
+  const cleanerIdSet = new Set(normalizedCleanerIdentifiers.map((identifier) => identifier.raw))
+  const numericCleanerIdSet = new Set(
+    normalizedCleanerIdentifiers.map((identifier) => identifier.numeric).filter((value): value is number => value !== null),
+  )
+  const rosterNameSet = new Set<string>(normalizedCleanerIdentifiers.map((identifier) => identifier.normalized))
+
+  const logsResponse = await supabase
     .from('cleaner_logs')
     .select('id, cleaner_id, action, comments, timestamp, site_id, area_id, qr_code_id, customer_name, site_area')
+    .order('timestamp', { ascending: false })
+    .limit(restrictToManagedCleaners ? limit * 3 : limit)
 
-  if (cleanerIds.length) {
-    logsQuery = logsQuery.in('cleaner_id', cleanerIds)
+  if (logsResponse.error) {
+    console.error('Failed to load cleaner logs for manager activity', logsResponse.error)
+    throw logsResponse.error
   }
 
-  const [{ data: logRows, error: logError }] = await Promise.all([
-    logsQuery.order('timestamp', { ascending: false }).limit(limit),
-  ])
+  const rawLogRows = logsResponse.data ?? []
 
-  if (logError) {
-    console.error('Failed to load cleaner logs for manager activity', logError)
-    throw logError
-  }
-
-  let photosQuery = supabase
+  const photosResponse = await supabase
     .from('uk_cleaner_task_photos')
-    .select('id, cleaner_id, cleaner_name, area_type, qr_code_id, task_id, photo_data, photo_timestamp, created_at, customer_name, site_area, area_name')
+    .select(
+      'id, cleaner_id, cleaner_name, area_type, qr_code_id, task_id, photo_data, photo_timestamp, created_at, customer_name, site_area, area_name',
+    )
+    .order('photo_timestamp', { ascending: false, nullsFirst: true })
+    .limit(restrictToManagedCleaners ? limit * 2 : limit)
 
-  if (cleanerIds.length) {
-    photosQuery = photosQuery.in('cleaner_id', cleanerIds)
+  if (photosResponse.error) {
+    console.warn('Failed to load task photos for manager activity', photosResponse.error)
   }
 
-  const { data: photoRows, error: photoError } = await photosQuery
-    .order('photo_timestamp', { ascending: false, nullsFirst: true })
-    .limit(limit)
+  const rawPhotoRows = photosResponse.data ?? []
 
-  if (photoError) {
-    console.warn('Failed to load task photos for manager activity', photoError)
+  type ScopedCleanerRow = {
+    cleaner_id?: string | null
+    cleaner_name?: string | null
+  }
+
+  const matchesCleanerScope = (row: ScopedCleanerRow): boolean => {
+    if (!restrictToManagedCleaners) {
+      return true
+    }
+
+    const candidateId = row.cleaner_id ? String(row.cleaner_id).trim() : null
+    if (candidateId) {
+      if (cleanerIdSet.has(candidateId)) {
+        return true
+      }
+      const numericCandidate = normalizeCleanerNumericId(candidateId)
+      if (numericCandidate !== null && numericCleanerIdSet.has(numericCandidate)) {
+        return true
+      }
+    }
+
+    if (row.cleaner_name) {
+      const normalizedName = normalizeCleanerName(row.cleaner_name).toLowerCase()
+      if (rosterNameSet.has(normalizedName)) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  let logRows = restrictToManagedCleaners
+    ? rawLogRows.filter((row) => matchesCleanerScope({ cleaner_id: row.cleaner_id, cleaner_name: null }))
+    : rawLogRows
+
+  let photoRows = restrictToManagedCleaners
+    ? rawPhotoRows.filter((row) => matchesCleanerScope({ cleaner_id: row.cleaner_id, cleaner_name: row.cleaner_name ?? null }))
+    : rawPhotoRows
+
+  if (restrictToManagedCleaners && !logRows.length && !photoRows.length) {
+    console.warn('No scoped activity matched cleaners even after normalization; keeping filtered results to avoid leakage')
   }
 
   const cleanerIdsForNames = Array.from(
-    new Set([
-      ...(cleanerIds ?? []),
-      ...((logRows ?? []).map((row) => row.cleaner_id).filter(Boolean) as string[]),
-      ...((photoRows ?? []).map((row) => row.cleaner_id).filter(Boolean) as string[]),
-    ])
+    new Set(
+      logRows
+        .map((row) => row.cleaner_id)
+        .concat(photoRows.map((row) => row.cleaner_id))
+        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
+    ),
   )
 
   const qrCodeIds = Array.from(
@@ -212,6 +276,11 @@ export async function fetchManagerRecentActivity(
           `${cleaner.first_name ?? ''} ${cleaner.last_name ?? ''}`.trim() || 'Cleaner',
         ])
       )
+
+      cleanerRecords.forEach((cleaner) => {
+        const normalizedName = normalizeCleanerName(`${cleaner.first_name ?? ''} ${cleaner.last_name ?? ''}`).toLowerCase()
+        rosterNameSet.add(normalizedName)
+      })
     } catch (error) {
       console.warn('Unable to fetch cleaner names for manager activity', error)
     }
@@ -345,5 +414,30 @@ export async function fetchManagerRecentActivity(
   })
 
   return sorted.slice(0, limit)
+}
+
+
+export async function assignCleanerToManager(managerId: string, cleanerId: string): Promise<void> {
+  if (!managerId || !cleanerId) return
+  const { error } = await supabase
+    .from('manager_cleaners')
+    .upsert({ manager_id: managerId, cleaner_id: cleanerId }, { onConflict: 'manager_id,cleaner_id' })
+  if (error) {
+    console.error('Failed to assign cleaner to manager', error)
+    throw error
+  }
+}
+
+export async function removeCleanerFromManager(managerId: string, cleanerId: string): Promise<void> {
+  if (!managerId || !cleanerId) return
+  const { error } = await supabase
+    .from('manager_cleaners')
+    .delete()
+    .eq('manager_id', managerId)
+    .eq('cleaner_id', cleanerId)
+  if (error) {
+    console.error('Failed to remove cleaner from manager', error)
+    throw error
+  }
 }
 

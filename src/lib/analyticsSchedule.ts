@@ -72,11 +72,15 @@ const buildSchedule = () => {
     })
   }
 
-  addEntry('Mosleen', 'PSM Marine', 'M/W/F', '18:00', '21:00')
-  addEntry('Gill', "Adam's", 'Everyday', '10:30', '19:30')
-  addEntry('Sienna', 'RDP', 'F', '15:00', '19:00')
-  addEntry('Harry Newton', 'General', 'Daily', '09:00', '17:00')
-  addEntry('Jackie Palmer', 'General', 'Daily', '18:00', '22:00')
+  addEntry('Danica', 'General', 'Mon Tue Wed Thu Fri', '09:00', '13:00')
+  addEntry('Mosleen', 'Avtrade', 'Mon Tue Thu Fri', '08:30', '16:00')
+  addEntry('Mosleen', 'Avtrade', 'Wed', '08:30', '15:30')
+  addEntry('Mosleen', 'PSM Marine', 'Mon Wed Fri', '18:00', '21:00')
+  addEntry('Harry Newton', 'General', 'Mon Tue Wed Thu Fri', '08:30', '17:00')
+  addEntry('Jackie Palmer', 'General', 'Mon Tue Wed Thu Fri', '18:00', '20:00')
+  addEntry('Edyta', 'General', 'Mon Tue Wed Thu Fri', '18:00', '20:00')
+  addEntry('Gill', "Adam's", 'Daily', '10:30', '19:30')
+  addEntry('Sienna', 'RDP', 'Fri', '15:00', '19:00')
 
   return entries
 }
@@ -91,27 +95,63 @@ const parseTimeToMinutes = (time: string): number => {
   return hours * 60 + minutes
 }
 
-export const getScheduleForCleaner = (cleanerName: string): ScheduleEntry | null => {
+export const getSchedulesForCleaner = (cleanerName: string): ScheduleEntry[] => {
   const normalized = normalizeCleanerName(cleanerName)
-  return (
-    CLEANER_SCHEDULES.find((entry) => entry.normalizedCleaner.toLowerCase() === normalized.toLowerCase()) || null
+  const normalizedLower = normalized.toLowerCase()
+
+  const directMatches = CLEANER_SCHEDULES.filter(
+    (entry) => entry.normalizedCleaner.toLowerCase() === normalizedLower,
   )
+
+  if (directMatches.length) {
+    return directMatches
+  }
+
+  const firstToken = normalizedLower.split(' ')[0] ?? ''
+  if (!firstToken) {
+    return []
+  }
+
+  return CLEANER_SCHEDULES.filter((entry) => entry.normalizedCleaner.toLowerCase().startsWith(firstToken))
+}
+
+export const getScheduleForCleaner = (cleanerName: string): ScheduleEntry | null => {
+  const schedules = getSchedulesForCleaner(cleanerName)
+  return schedules.length ? schedules[0] : null
 }
 
 export const isClockInOnTime = (clockInIso: string | null, cleanerName: string): boolean | null => {
   if (!clockInIso) return null
-  const schedule = getScheduleForCleaner(cleanerName)
-  if (!schedule) return null
-
   const clockDate = new Date(clockInIso)
+  if (Number.isNaN(clockDate.getTime())) return null
+
+  const schedules = getSchedulesForCleaner(cleanerName)
+  if (!schedules.length) return null
+
   const day = clockDate.getDay()
-  if (!schedule.days.includes(day)) {
+  const dayMatches = schedules.filter((entry) => entry.days.includes(day))
+  if (!dayMatches.length) {
     return null
   }
 
   const minutes = clockDate.getHours() * 60 + clockDate.getMinutes()
-  const scheduledStart = parseTimeToMinutes(schedule.startTime)
+  const closest = dayMatches.reduce<{ schedule: ScheduleEntry | null; diff: number }>(
+    (acc, entry) => {
+      const start = parseTimeToMinutes(entry.startTime)
+      const diff = Math.abs(minutes - start)
+      if (!acc.schedule || diff < acc.diff) {
+        return { schedule: entry, diff }
+      }
+      return acc
+    },
+    { schedule: null, diff: Number.POSITIVE_INFINITY },
+  ).schedule
 
+  if (!closest) {
+    return null
+  }
+
+  const scheduledStart = parseTimeToMinutes(closest.startTime)
   return minutes <= scheduledStart + 5
 }
 
@@ -121,6 +161,9 @@ export const buildScheduleLabel = (entry: ScheduleEntry): string => {
     .join(', ')
   return `${entry.cleaner} • ${daysLabel} • ${entry.startTime} - ${entry.endTime}`
 }
+
+
+
 
 
 
