@@ -3,12 +3,12 @@ import { createPortal } from 'react-dom'
 import { format } from 'date-fns'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Image as ImageIcon, ArrowRight, Clock, MapPin, Search, ChevronDown, ChevronLeft, ChevronRight, ThumbsUp, ThumbsDown, X, CalendarDays } from 'lucide-react'
+import { Image as ImageIcon, ArrowRight, Clock, MapPin, Search, ChevronDown, ChevronLeft, ChevronRight, ThumbsUp, ThumbsDown, X, CalendarDays, Trash2, Loader2 } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
-import { fetchAllCleaners, fetchCleanersByIds, fetchManagerCleanerIds } from '../../services/managerService'
+import { fetchAllCleaners, fetchCleanersByIds, fetchManagerCleanerIds, deleteCleaner } from '../../services/managerService'
 import { AREA_TASKS } from '../../services/qrService'
 import { normalizeCleanerName } from '../../lib/identity'
 import { defaultAnalyticsRange, toIsoRange } from '../../lib/utils'
@@ -152,11 +152,30 @@ const formatDateTime = (iso: string | null) =>
 const formatDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '—'
 const formatTimeOnly = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—')
-const calculateHoursBetween = (start?: string | null, end?: string | null) => {
-  if (!start || !end) return 0
+const calculateHoursBetween = (start?: string | null, end?: string | null, fallbackEnd?: Date | null) => {
+  if (!start) return 0
   const startDate = new Date(start)
-  const endDate = new Date(end)
-  const diff = endDate.getTime() - startDate.getTime()
+  const startTime = startDate.getTime()
+  if (!Number.isFinite(startTime)) return 0
+
+  let endDate: Date | null = null
+  if (end) {
+    const parsedEnd = new Date(end)
+    if (Number.isFinite(parsedEnd.getTime())) {
+      endDate = parsedEnd
+    }
+  }
+
+  if (!endDate && fallbackEnd) {
+    const fallbackTime = fallbackEnd.getTime()
+    if (Number.isFinite(fallbackTime) && fallbackTime > startTime) {
+      endDate = new Date(fallbackTime)
+    }
+  }
+
+  if (!endDate) return 0
+
+  const diff = endDate.getTime() - startTime
   if (!Number.isFinite(diff) || diff <= 0) return 0
   return diff / (1000 * 60 * 60)
 }
@@ -314,6 +333,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const [isAutoDate, setIsAutoDate] = useState(true)
   const [now, setNow] = useState<Date>(() => new Date())
   const [todayRefreshKey, setTodayRefreshKey] = useState(0)
+  const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null)
 
   const isSameDay = (left: Date, right: Date) =>
     left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth() && left.getDate() === right.getDate()
@@ -1283,7 +1303,29 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     const completedEntries = deduped.filter((row) => row.clock_in && row.clock_out)
     const otherEntries = deduped.filter((row) => !row.clock_in && row.clock_out)
 
-    return [...activeEntries, ...completedEntries, ...otherEntries]
+    const activeEntriesByCleaner = new Map<string, AttendanceRow>()
+
+    activeEntries.forEach((row) => {
+      const cleanerKey = normalizeCleanerName(row.cleaner_name || '')
+      const siteKey = (row.site_name || row.customer_name || '').trim().toLowerCase()
+      const combinedKey = `${cleanerKey}::${siteKey}`
+      const existing = activeEntriesByCleaner.get(combinedKey)
+      if (!existing) {
+        activeEntriesByCleaner.set(combinedKey, row)
+        return
+      }
+
+      const existingStart = existing.clock_in ? new Date(existing.clock_in).getTime() : Number.POSITIVE_INFINITY
+      const candidateStart = row.clock_in ? new Date(row.clock_in).getTime() : Number.POSITIVE_INFINITY
+
+      if (candidateStart < existingStart) {
+        activeEntriesByCleaner.set(combinedKey, row)
+      }
+    })
+
+    const dedupedActiveEntries = Array.from(activeEntriesByCleaner.values()).sort((a, b) => getSortTime(b) - getSortTime(a))
+
+    return [...dedupedActiveEntries, ...completedEntries, ...otherEntries]
   }, [dailyAttendance, selectedDate])
 
   const cleanersOnlineApprox = useMemo(() => {
@@ -1301,7 +1343,11 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
   const hoursWorkedApprox = useMemo(() => {
     if (!isSelectedDateToday) return 0
-    const totalHours = todaysAttendance.reduce((sum, row) => sum + calculateHoursBetween(row.clock_in, row.clock_out), 0)
+    const nowInstant = new Date()
+    const totalHours = todaysAttendance.reduce(
+      (sum, row) => sum + calculateHoursBetween(row.clock_in, row.clock_out, nowInstant),
+      0,
+    )
     return Number(totalHours.toFixed(1))
   }, [isSelectedDateToday, todaysAttendance])
 
@@ -1378,6 +1424,58 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const handleCleanerSelect = (cleaner: CleanerListItem) => {
     setSelectedCleaner(cleaner)
     setIsDetailModalOpen(true)
+  }
+
+  const handleCleanerDelete = async (
+    event: React.MouseEvent<HTMLButtonElement>,
+    cleaner: CleanerListItem,
+  ) => {
+    event.stopPropagation()
+    event.preventDefault()
+
+    if (!cleaner.cleaner_id) {
+      console.warn('Cannot delete cleaner without a cleaner_id', cleaner)
+      return
+    }
+
+    const confirmed = window.confirm(`Delete ${cleaner.cleaner_name}? This action cannot be undone.`)
+    if (!confirmed) {
+      return
+    }
+
+    const cleanerId = cleaner.cleaner_id
+    setDeleteLoadingId(cleanerId)
+
+    try {
+      await deleteCleaner(cleanerId)
+
+      const previouslySelectedId = selectedCleaner?.cleaner_id ?? null
+      let nextSelectedCleaner: CleanerListItem | null = null
+
+      setCleaners((prev) => {
+        const updated = prev.filter((item) => item.cleaner_id !== cleanerId)
+        if (previouslySelectedId === cleanerId) {
+          nextSelectedCleaner = updated[0] ?? null
+        }
+        return updated
+      })
+
+      setSelectedCleaner((prev) => {
+        if (prev?.cleaner_id === cleanerId) {
+          return nextSelectedCleaner
+        }
+        return prev
+      })
+
+      if (previouslySelectedId === cleanerId) {
+        setIsDetailModalOpen(false)
+      }
+    } catch (error) {
+      console.error('Failed to delete cleaner', error)
+      window.alert('Unable to delete cleaner right now. Please try again.')
+    } finally {
+      setDeleteLoadingId(null)
+    }
   }
 
   const metricCards = useMemo(() => {
@@ -1715,18 +1813,43 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                     const isSelected =
                       isDetailModalOpen && selectedCleaner?.cleaner_id === cleaner.cleaner_id
                     return (
-                      <button
+                      <div
                         key={cleaner.cleaner_id || cleaner.id}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => handleCleanerSelect(cleaner)}
-                        className={`flex w-full items-center justify-between gap-4 rounded-[24px] px-4 py-3 text-left transition ${
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault()
+                            handleCleanerSelect(cleaner)
+                          }
+                        }}
+                        className={`flex w-full cursor-pointer items-center justify-between gap-4 rounded-[24px] px-4 py-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00339B] ${
                           isSelected
                             ? 'border border-blue-200 bg-blue-50 shadow-md'
                             : 'border border-blue-100 bg-white/80 shadow-sm hover:border-blue-200 hover:bg-blue-50/70'
                         }`}
                       >
                         <span className="font-semibold text-[#00339B]">{cleaner.cleaner_name}</span>
-                        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8aa5ff]">cleaner</span>
-                      </button>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8aa5ff]">cleaner</span>
+                          {cleaner.cleaner_id && (
+                            <button
+                              type="button"
+                              onClick={(event) => handleCleanerDelete(event, cleaner)}
+                              className="flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-white/80 text-[#00339B] transition hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+                              aria-label={`Delete ${cleaner.cleaner_name}`}
+                              disabled={deleteLoadingId === cleaner.cleaner_id}
+                            >
+                              {deleteLoadingId === cleaner.cleaner_id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     )
                   })
                 ) : (

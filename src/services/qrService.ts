@@ -1,7 +1,7 @@
 import QRCode from 'qrcode'
 import { supabase } from './supabase'
 import { v4 as uuidv4 } from 'uuid'
-import { getStoredCleanerName, normalizeCleanerNumericId } from '../lib/identity'
+import { getStoredCleanerName, normalizeCleanerName, normalizeCleanerNumericId } from '../lib/identity'
 
 export type AreaType = 
   | 'BATHROOMS_ABLUTIONS'
@@ -61,6 +61,18 @@ export interface ManualQRCodeResult {
   dataUrl: string
   storageUrl: string
   storagePath: string
+}
+
+type TimeAttendanceRecord = {
+  id: number
+  cleaner_id: number | null
+  cleaner_uuid: string | null
+  cleaner_name: string | null
+  customer_name: string | null
+  site_name: string | null
+  clock_in: string | null
+  clock_out: string | null
+  notes: string | null
 }
 
 export const AREA_TASKS: Record<AreaType, TaskDefinition[]> = {
@@ -665,18 +677,22 @@ export class QRService {
     qrData: QRCodeData
   ): Promise<{success: boolean, message?: string}> {
     try {
-      const cleanerName = getStoredCleanerName()
+      const rawCleanerName = getStoredCleanerName()
+      const cleanerName = normalizeCleanerName(rawCleanerName)
       const currentTime = new Date().toISOString()
       const siteLabelRaw = this.deriveSiteLabel(qrData, siteId)
       const siteLabel = this.prettifySiteLabel(siteLabelRaw) || siteLabelRaw || 'Site'
       const customerLabel = this.deriveCustomerLabel(qrData, siteLabel)
+      const trimmedCleanerId = cleanerId ? cleanerId.toString().trim() : null
+      const numericCleanerId = trimmedCleanerId ? normalizeCleanerNumericId(trimmedCleanerId) : null
 
       if (eventType === 'clock_in') {
         // For clock-in, create a new time_attendance record
           const { error: attendanceError } = await supabase
           .from('time_attendance')
           .insert({
-            cleaner_id: normalizeCleanerNumericId(cleanerId),
+            cleaner_id: numericCleanerId,
+            cleaner_uuid: trimmedCleanerId,
             cleaner_name: cleanerName,
             customer_name: customerLabel,
             site_name: siteLabel,
@@ -692,28 +708,31 @@ export class QRService {
         }
       } else {
         // For clock-out, update the most recent open time_attendance record
-        const { data: openRecord, error: findError } = await supabase
-          .from('time_attendance')
-          .select('*')
-          .eq('cleaner_name', cleanerName)
-          .is('clock_out', null)
-          .order('id', { ascending: false })
-          .limit(1)
-          .single()
+        const openRecord = await this.findOpenAttendanceRecord(cleanerId, cleanerName)
 
-        if (findError || !openRecord) {
-          console.error('Error finding open attendance record:', findError)
+        if (!openRecord) {
+          console.error('No active attendance record found for clock-out')
           return { success: false, message: 'No active clock-in found. Please clock in first.' }
+        }
+
+        const updatePayload: Record<string, any> = {
+          clock_out: currentTime,
+          notes: openRecord.notes ? `${openRecord.notes} | Clock-out via QR` : 'Clock-out via QR',
+          customer_name: customerLabel || openRecord.customer_name,
+          site_name: siteLabel || openRecord.site_name,
+        }
+
+        if ((openRecord.cleaner_uuid === null || openRecord.cleaner_uuid === undefined) && trimmedCleanerId) {
+          updatePayload.cleaner_uuid = trimmedCleanerId
+        }
+
+        if ((openRecord.cleaner_id === null || openRecord.cleaner_id === undefined) && numericCleanerId !== null) {
+          updatePayload.cleaner_id = numericCleanerId
         }
 
         const { error: updateError } = await supabase
           .from('time_attendance')
-          .update({
-            clock_out: currentTime,
-            notes: openRecord.notes ? `${openRecord.notes} | Clock-out via QR` : 'Clock-out via QR',
-            customer_name: customerLabel || openRecord.customer_name,
-            site_name: siteLabel || openRecord.site_name
-          })
+          .update(updatePayload)
           .eq('id', openRecord.id)
 
         if (updateError) {
@@ -744,6 +763,60 @@ export class QRService {
     }
   }
 
+  private static async findOpenAttendanceRecord(
+    cleanerId: string | null | undefined,
+    cleanerName: string,
+  ): Promise<TimeAttendanceRecord | null> {
+    try {
+      if (!supabase || !import.meta.env.VITE_SUPABASE_URL) {
+        console.error('Supabase not configured properly')
+        return null
+      }
+
+      const trimmedCleanerId = cleanerId ? cleanerId.toString().trim() : null
+      const numericCleanerId = trimmedCleanerId ? normalizeCleanerNumericId(trimmedCleanerId) : null
+      const normalizedCleanerName = normalizeCleanerName(cleanerName)
+
+      const identifiers: Array<{ column: string; value: string | number }> = []
+
+      if (numericCleanerId !== null) {
+        identifiers.push({ column: 'cleaner_id', value: numericCleanerId })
+      }
+
+      if (trimmedCleanerId) {
+        identifiers.push({ column: 'cleaner_uuid', value: trimmedCleanerId })
+      }
+
+      if (normalizedCleanerName) {
+        identifiers.push({ column: 'cleaner_name', value: normalizedCleanerName })
+      }
+
+      for (const identifier of identifiers) {
+        const { data, error } = await supabase
+          .from('time_attendance')
+          .select('id, cleaner_id, cleaner_uuid, cleaner_name, customer_name, site_name, clock_in, clock_out, notes')
+          .eq(identifier.column, identifier.value)
+          .is('clock_out', null)
+          .order('id', { ascending: false })
+          .limit(1)
+
+        if (error) {
+          console.error('Error finding open attendance record by', identifier.column, error)
+          continue
+        }
+
+        if (data && data.length > 0) {
+          return data[0] as TimeAttendanceRecord
+        }
+      }
+
+      return null
+    } catch (error) {
+      console.error('Error in findOpenAttendanceRecord:', error)
+      return null
+    }
+  }
+
   /**
    * Check if cleaner is already clocked in
    */
@@ -758,30 +831,15 @@ export class QRService {
       const cleanerName = getStoredCleanerName()
       console.log('Checking if clocked in for:', cleanerName)
 
-      // Check by cleaner_name instead of cleaner_id to handle UUID vs integer mismatch
-      const { data, error } = await supabase
-        .from('time_attendance')
-        .select('*')
-        .eq('cleaner_name', cleanerName)
-        .is('clock_out', null)
-        .order('id', { ascending: false })
-        .limit(1)
+      const openRecord = await this.findOpenAttendanceRecord(cleanerId, cleanerName)
 
-      console.log('Database query result:', { data, error })
-
-      if (error) {
-        console.error('Error checking clock status:', error)
-        // If database error, allow operation to continue
-        return false
+      const isOpen = Boolean(openRecord)
+      console.log('Has open clock-in sessions?', isOpen)
+      if (isOpen && openRecord) {
+        console.log('Latest open session:', openRecord)
       }
 
-      const result = data && data.length > 0
-      console.log('Has open clock-in sessions?', result)
-      if (result && data[0]) {
-        console.log('Latest open session:', data[0])
-      }
-
-      return result
+      return isOpen
     } catch (error) {
       console.error('Error in isAlreadyClockedIn:', error)
       // If any error, allow operation to continue

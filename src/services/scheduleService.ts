@@ -1,11 +1,15 @@
 import { supabase } from './supabase'
 import { normalizeCleanerName } from '@/lib/identity'
-import { getMockVisitsForWeek, type MockVisit } from '@/lib/mockSchedules'
+import { endOfWeek, startOfWeek } from 'date-fns'
 
-export type WeeklyVisit = MockVisit & {
-  clockIn?: string | null
-  clockOut?: string | null
-  attendanceId?: number
+export type WeeklyVisit = {
+  id: string
+  attendanceId: number
+  cleanerName: string
+  siteName: string
+  customerName?: string | null
+  clockIn: string
+  clockOut: string | null
 }
 
 type AttendanceRow = {
@@ -17,74 +21,49 @@ type AttendanceRow = {
   clock_out: string | null
 }
 
-const startOfWeek = (date: Date): Date => {
-  const copy = new Date(date)
-  const day = copy.getDay()
-  const diff = copy.getDate() - day + 1
-  copy.setDate(diff)
-  copy.setHours(0, 0, 0, 0)
-  return copy
-}
+const getWeekBounds = (date: Date) => {
+  const start = startOfWeek(new Date(date), { weekStartsOn: 1 })
+  start.setHours(0, 0, 0, 0)
 
-const endOfWeek = (date: Date): Date => {
-  const start = startOfWeek(date)
-  const end = new Date(start)
-  end.setDate(start.getDate() + 6)
+  const end = endOfWeek(new Date(date), { weekStartsOn: 1 })
   end.setHours(23, 59, 59, 999)
-  return end
+
+  return { start, end }
 }
 
-export const mapAttendanceToVisits = (
-  visits: MockVisit[],
-  attendance: AttendanceRow[],
-): WeeklyVisit[] => {
-  return visits.map((visit) => {
-    const matchingAttendance = attendance.find((entry) => {
-      const normalizedCleaner = normalizeCleanerName(entry.cleaner_name || '')
-      const sameCleaner = normalizedCleaner.toLowerCase() === visit.cleanerName.toLowerCase()
-      const sameSite = (entry.site_name || entry.customer_name || '').toLowerCase().includes(visit.siteName.toLowerCase())
-      if (!sameCleaner || !sameSite) {
-        return false
-      }
-      if (!entry.clock_in) {
-        return false
-      }
-      const clockDate = new Date(entry.clock_in)
-      return clockDate.getDay() === visit.dayOfWeek
-    })
-
-    if (matchingAttendance) {
-      return {
-        ...visit,
-        clockIn: matchingAttendance.clock_in,
-        clockOut: matchingAttendance.clock_out,
-        attendanceId: matchingAttendance.id,
-      }
-    }
-
-    return visit
-  })
-}
-
-export async function fetchWeeklyVisits(): Promise<WeeklyVisit[]> {
-  const visits = getMockVisitsForWeek()
-  const today = new Date()
-  const rangeStart = startOfWeek(today)
-  const rangeEnd = endOfWeek(today)
+export async function fetchWeeklyVisits(targetDate: Date = new Date()): Promise<WeeklyVisit[]> {
+  const { start, end } = getWeekBounds(targetDate)
 
   const { data, error } = await supabase
     .from('time_attendance')
     .select('id, cleaner_name, site_name, customer_name, clock_in, clock_out')
-    .gte('clock_in', rangeStart.toISOString())
-    .lte('clock_in', rangeEnd.toISOString())
+    .gte('clock_in', start.toISOString())
+    .lte('clock_in', end.toISOString())
+    .order('clock_in', { ascending: true })
 
   if (error) {
-    console.warn('Failed to load attendance for weekly visits. Using mock data only.', error)
-    return visits
+    console.error('Failed to load attendance for weekly visits', error)
+    return []
   }
 
   const attendanceRows = (data ?? []) as AttendanceRow[]
-  return mapAttendanceToVisits(visits, attendanceRows)
+
+  return attendanceRows
+    .filter((row) => Boolean(row.clock_in))
+    .map((row) => {
+      const normalizedCleaner = normalizeCleanerName(row.cleaner_name || 'Unknown Cleaner')
+      const siteName = row.site_name?.trim() || row.customer_name?.trim() || 'Unassigned Site'
+
+      return {
+        id: String(row.id),
+        attendanceId: row.id,
+        cleanerName: normalizedCleaner,
+        siteName,
+        customerName: row.customer_name,
+        clockIn: row.clock_in as string,
+        clockOut: row.clock_out,
+      }
+    })
 }
 
 

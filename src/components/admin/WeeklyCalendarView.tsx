@@ -1,34 +1,47 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { format, addDays, differenceInMinutes, setHours, setMinutes, startOfWeek } from 'date-fns'
+import { addDays, differenceInCalendarDays, differenceInMinutes, format, startOfDay } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import type { WeeklyVisit } from '@/services/scheduleService'
 
-const DAY_START_HOUR = 6
-const DAY_END_HOUR = 22
-const MINUTES_PER_STEP = 15
 const HOUR_HEIGHT = 64
 const MIN_EVENT_HEIGHT = 72
+const MINUTES_PER_STEP = 15
 const PIXELS_PER_MINUTE = HOUR_HEIGHT / 60
+const DEFAULT_DAY_START_HOUR = 6
+const DEFAULT_DAY_END_HOUR = 22
+const DAY_COUNT = 7
 
-const DAY_LABELS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-const HOURS = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR + 1 }).map((_, index) => DAY_START_HOUR + index)
+const COLOR_PALETTE = ['#8B5CF6', '#0F60FF', '#6366F1', '#2563EB', '#EA580C', '#F97316', '#10B981', '#0EA5E9', '#14B8A6']
+const cleanerColorCache = new Map<string, string>()
 
-const mapDayToColumn = (dayOfWeek: number): number => (dayOfWeek + 6) % 7
+const getColorForCleaner = (cleanerName: string) => {
+  const key = cleanerName.toLowerCase().trim() || 'unknown'
+  if (cleanerColorCache.has(key)) {
+    return cleanerColorCache.get(key) as string
+  }
 
-const toDateFromTime = (dayIndex: number, time: string) => {
-  const base = startOfWeek(new Date(), { weekStartsOn: 1 })
-  const [hours, minutes] = time.split(':').map((value) => Number.parseInt(value, 10))
-  const dayOffset = mapDayToColumn(dayIndex)
-  return setMinutes(setHours(addDays(base, dayOffset), hours), minutes)
+  let hash = 0
+  for (let i = 0; i < key.length; i += 1) {
+    hash = (hash << 5) - hash + key.charCodeAt(i)
+    hash |= 0
+  }
+
+  const index = Math.abs(hash) % COLOR_PALETTE.length
+  const color = COLOR_PALETTE[index]
+  cleanerColorCache.set(key, color)
+  return color
 }
 
 type WeeklyCalendarProps = {
   visits: WeeklyVisit[]
+  weekStart: Date
+  headerAction?: React.ReactNode
+  isLoading?: boolean
 }
 
 type CalendarCellVisit = WeeklyVisit & {
@@ -36,59 +49,77 @@ type CalendarCellVisit = WeeklyVisit & {
   end: Date
   durationMinutes: number
   isCompleted: boolean
+  dayIndex: number
+  color: string
 }
 
-const enhanceVisits = (visits: WeeklyVisit[]): CalendarCellVisit[] => {
-  return visits.map((visit) => {
-    const start = toDateFromTime(visit.dayOfWeek, visit.startTime)
-    const end = toDateFromTime(visit.dayOfWeek, visit.endTime)
-    const durationMinutes = Math.max(MINUTES_PER_STEP, differenceInMinutes(end, start))
-    const isCompleted = Boolean(visit.clockIn && visit.clockOut)
-    return {
-      ...visit,
-      start,
-      end,
-      durationMinutes,
-      isCompleted,
-    }
-  })
+const isValidDate = (value: Date) => !Number.isNaN(value.getTime())
+
+const enhanceVisits = (visits: WeeklyVisit[], weekStart: Date, now: Date): CalendarCellVisit[] => {
+  return visits
+    .map((visit) => {
+      const start = new Date(visit.clockIn)
+      if (!isValidDate(start)) {
+        return null
+      }
+
+      const rawEnd = visit.clockOut ? new Date(visit.clockOut) : now
+      const end = !isValidDate(rawEnd) || rawEnd < start ? start : rawEnd
+
+      const durationMinutes = Math.max(MINUTES_PER_STEP, differenceInMinutes(end, start) || MINUTES_PER_STEP)
+      const dayIndex = differenceInCalendarDays(startOfDay(start), weekStart)
+
+      if (dayIndex < 0 || dayIndex >= DAY_COUNT) {
+        return null
+      }
+
+      return {
+        ...visit,
+        start,
+        end,
+        durationMinutes,
+        isCompleted: Boolean(visit.clockOut),
+        dayIndex,
+        color: getColorForCleaner(visit.cleanerName),
+      }
+    })
+    .filter((value): value is CalendarCellVisit => Boolean(value))
 }
 
-const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
+const formatDuration = (minutes: number) => {
+  const rounded = Math.max(MINUTES_PER_STEP, Math.round(minutes))
+  const hours = Math.floor(rounded / 60)
+  const remaining = rounded % 60
 
-const hexToRgba = (hex?: string, alpha = 0.65) => {
-  if (!hex) return `rgba(0, 51, 155, ${alpha})`
-  let sanitized = hex.trim().replace('#', '')
-  if (sanitized.length === 3) {
-    sanitized = sanitized
-      .split('')
-      .map((char) => char + char)
-      .join('')
+  if (hours <= 0) {
+    return `${rounded} min`
   }
-  const parsed = Number.parseInt(sanitized, 16)
-  if (Number.isNaN(parsed)) {
-    return `rgba(0, 51, 155, ${alpha})`
+
+  if (remaining === 0) {
+    return `${hours} hr${hours > 1 ? 's' : ''}`
   }
-  const r = (parsed >> 16) & 255
-  const g = (parsed >> 8) & 255
-  const b = parsed & 255
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+
+  return `${hours} hr${hours > 1 ? 's' : ''} ${remaining} min`
 }
 
-const createGradient = (color?: string) => {
-  const primary = color || '#00339B'
-  const secondary = hexToRgba(color, 0.75)
-  return `linear-gradient(135deg, ${primary} 0%, ${secondary} 100%)`
-}
-
-export const WeeklyCalendarView: React.FC<WeeklyCalendarProps> = ({ visits }) => {
-  const [events, setEvents] = useState<CalendarCellVisit[]>(() => enhanceVisits(visits))
+export const WeeklyCalendarView: React.FC<WeeklyCalendarProps> = ({ visits, weekStart, headerAction, isLoading }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [activeInteraction, setActiveInteraction] = useState<{ id: string; mode: 'move' | 'resize' } | null>(null)
+  const [now, setNow] = useState<Date>(() => new Date())
+
+  const isLoadingData = Boolean(isLoading)
 
   useEffect(() => {
-    setEvents(enhanceVisits(visits))
-  }, [visits])
+    const intervalId = window.setInterval(() => setNow(new Date()), 30_000)
+    return () => window.clearInterval(intervalId)
+  }, [])
+
+  const normalizedWeekStart = useMemo(() => {
+    const copy = new Date(weekStart)
+    copy.setHours(0, 0, 0, 0)
+    return copy
+  }, [weekStart])
+
+  const events = useMemo(() => enhanceVisits(visits, normalizedWeekStart, now), [visits, normalizedWeekStart, now])
 
   const selectedVisit = useMemo(
     () => (selectedId ? events.find((event) => event.id === selectedId) ?? null : null),
@@ -96,113 +127,89 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarProps> = ({ visits }) =>
   )
 
   useEffect(() => {
-    if (selectedVisit) {
-      // ensure dialog reflects updated event when times change
-      setSelectedId(selectedVisit.id)
-    }
-  }, [selectedVisit?.start?.getTime(), selectedVisit?.end?.getTime()])
-
-  const visitsByDay = useMemo(() => {
-    const entries: Record<number, CalendarCellVisit[]> = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] }
-    events.forEach((visit) => {
-      const column = mapDayToColumn(visit.dayOfWeek)
-      if (!entries[column]) {
-        entries[column] = []
+    if (!selectedVisit && selectedId) {
+      const stillExists = events.some((event) => event.id === selectedId)
+      if (!stillExists) {
+        setSelectedId(null)
       }
-      entries[column].push(visit)
+    }
+  }, [events, selectedId, selectedVisit])
+
+  const dayDates = useMemo(
+    () => Array.from({ length: DAY_COUNT }, (_, index) => addDays(normalizedWeekStart, index)),
+    [normalizedWeekStart],
+  )
+
+  const weekRangeLabel = useMemo(() => {
+    if (!dayDates.length) {
+      return ''
+    }
+    const startLabel = format(dayDates[0], 'MMM d')
+    const endLabel = format(dayDates[DAY_COUNT - 1], 'MMM d, yyyy')
+    return `${startLabel} – ${endLabel}`
+  }, [dayDates])
+
+  const { dayStartHour, dayEndHour } = useMemo(() => {
+    if (!events.length) {
+      return { dayStartHour: DEFAULT_DAY_START_HOUR, dayEndHour: DEFAULT_DAY_END_HOUR }
+    }
+
+    let minHour = DEFAULT_DAY_START_HOUR
+    let maxHour = DEFAULT_DAY_END_HOUR
+
+    events.forEach((event) => {
+      const startHourValue = event.start.getHours() + event.start.getMinutes() / 60
+      const endHourValue = event.end.getHours() + event.end.getMinutes() / 60
+      minHour = Math.min(minHour, Math.floor(startHourValue))
+      maxHour = Math.max(maxHour, Math.ceil(endHourValue))
     })
-    Object.values(entries).forEach((dayEvents) => {
-      dayEvents.sort((a, b) => a.start.getTime() - b.start.getTime())
-    })
-    return entries
+
+    minHour = Math.max(0, minHour)
+    maxHour = Math.min(24, Math.max(minHour + 1, maxHour))
+
+    return { dayStartHour: minHour, dayEndHour: maxHour }
   }, [events])
 
-  const beginInteraction = (
-    visitId: string,
-    mode: 'move' | 'resize',
-    pointerEvent: React.PointerEvent<HTMLElement>,
-  ) => {
-    pointerEvent.preventDefault()
-    pointerEvent.stopPropagation()
+  const hours = useMemo(
+    () => Array.from({ length: dayEndHour - dayStartHour + 1 }, (_, index) => dayStartHour + index),
+    [dayEndHour, dayStartHour],
+  )
 
-    const initialEvent = events.find((event) => event.id === visitId)
-    if (!initialEvent) return
+  const calendarStartMinutes = dayStartHour * 60
+  const calendarEndMinutes = dayEndHour * 60
 
-    setActiveInteraction({ id: visitId, mode })
+  const visitsByDay = useMemo(() => {
+    const buckets: Record<number, CalendarCellVisit[]> = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] }
+    events.forEach((event) => {
+      if (event.dayIndex >= 0 && event.dayIndex < DAY_COUNT) {
+        buckets[event.dayIndex].push(event)
+      }
+    })
 
-    const startMinutes = initialEvent.start.getHours() * 60 + initialEvent.start.getMinutes()
-    const endMinutes = initialEvent.end.getHours() * 60 + initialEvent.end.getMinutes()
-    const duration = initialEvent.durationMinutes
-    const pointerStartY = pointerEvent.clientY
+    Object.values(buckets).forEach((bucket) => {
+      bucket.sort((a, b) => a.start.getTime() - b.start.getTime())
+    })
 
-    const handleMove = (moveEvent: PointerEvent) => {
-      const deltaY = moveEvent.clientY - pointerStartY
-      const deltaMinutes = Math.round(deltaY / PIXELS_PER_MINUTE / MINUTES_PER_STEP) * MINUTES_PER_STEP
-
-      setEvents((prev) =>
-        prev.map((event) => {
-          if (event.id !== visitId) return event
-
-          if (mode === 'move') {
-            const minStart = DAY_START_HOUR * 60
-            const maxStart = DAY_END_HOUR * 60 - duration
-            const nextStartMinutes = clamp(startMinutes + deltaMinutes, minStart, maxStart)
-            const nextEndMinutes = nextStartMinutes + duration
-
-            const nextStart = setMinutes(setHours(new Date(event.start), Math.floor(nextStartMinutes / 60)), nextStartMinutes % 60)
-            const nextEnd = setMinutes(setHours(new Date(event.end), Math.floor(nextEndMinutes / 60)), nextEndMinutes % 60)
-
-            return {
-              ...event,
-              start: nextStart,
-              end: nextEnd,
-              startTime: format(nextStart, 'HH:mm'),
-              endTime: format(nextEnd, 'HH:mm'),
-            }
-          }
-
-          const minEnd = Math.max(startMinutes + MINUTES_PER_STEP, DAY_START_HOUR * 60 + MINUTES_PER_STEP)
-          const maxEnd = DAY_END_HOUR * 60
-          const nextEndMinutes = clamp(endMinutes + deltaMinutes, minEnd, maxEnd)
-
-          const nextEnd = setMinutes(setHours(new Date(event.end), Math.floor(nextEndMinutes / 60)), nextEndMinutes % 60)
-          const nextDuration = Math.max(MINUTES_PER_STEP, nextEndMinutes - startMinutes)
-
-          return {
-            ...event,
-            end: nextEnd,
-            endTime: format(nextEnd, 'HH:mm'),
-            durationMinutes: nextDuration,
-          }
-        }),
-      )
-    }
-
-    const endInteraction = () => {
-      setActiveInteraction(null)
-      document.removeEventListener('pointermove', handleMove)
-      document.removeEventListener('pointerup', endInteraction)
-      document.removeEventListener('pointercancel', endInteraction)
-    }
-
-    document.addEventListener('pointermove', handleMove)
-    document.addEventListener('pointerup', endInteraction)
-    document.addEventListener('pointercancel', endInteraction)
-  }
+    return buckets
+  }, [events])
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold text-[#00339B]">Weekly Schedule</h1>
-        <p className="text-sm text-gray-500">Drag visits to fine-tune timing or pull the handle to stretch their duration.</p>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 className="text-3xl font-semibold text-[#00339B]">Weekly Schedule</h2>
+          <p className="text-sm text-gray-500">Cleaner attendance for {weekRangeLabel}</p>
+        </div>
+        {headerAction ? <div className="flex items-center gap-3">{headerAction}</div> : null}
       </div>
 
-      <Card className="rounded-3xl border-blue-100 bg-white shadow-lg shadow-blue-100/60">
+      <Card className="relative overflow-hidden rounded-3xl border-blue-100 bg-white shadow-lg shadow-blue-100/60">
         <div className="grid grid-cols-8 border-b border-blue-50 text-sm font-medium text-[#00339B]">
           <div className="border-r border-blue-50 px-4 py-3">Time</div>
-          {DAY_LABELS.map((label) => (
-            <div key={label} className="border-r border-blue-50 px-4 py-3 text-center">
-              {label}
+          {dayDates.map((date) => (
+            <div key={date.toISOString()} className="border-r border-blue-50 px-4 py-3 text-center">
+              <div className="text-sm font-semibold">{format(date, 'EEEE')}</div>
+              <div className="text-xs font-medium text-gray-400">{format(date, 'MMM d')}</div>
             </div>
           ))}
         </div>
@@ -210,67 +217,70 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarProps> = ({ visits }) =>
         <div className="relative">
           <div className="grid grid-cols-8 divide-x divide-blue-50 text-sm">
             <div className="relative">
-              {HOURS.map((hour) => (
-                <div key={hour} className="border-b border-blue-50 px-4" style={{ height: HOUR_HEIGHT }}>
-                  <span className="text-xs text-gray-500">{format(setHours(new Date(), hour), 'h a')}</span>
-                </div>
-              ))}
+              {hours.map((hour) => {
+                const timeLabel = new Date()
+                timeLabel.setHours(hour, 0, 0, 0)
+                return (
+                  <div key={hour} className="border-b border-blue-50 px-4" style={{ height: HOUR_HEIGHT }}>
+                    <span className="text-xs text-gray-500">{format(timeLabel, 'h a')}</span>
+                  </div>
+                )
+              })}
             </div>
 
-            {DAY_LABELS.map((_, dayIndex) => (
-              <div key={dayIndex} className="relative h-full">
-                {HOURS.map((hour) => (
+            {dayDates.map((date, dayIndex) => (
+              <div key={date.toISOString()} className="relative h-full">
+                {hours.map((hour) => (
                   <div key={`${dayIndex}-${hour}`} className="border-b border-blue-50" style={{ height: HOUR_HEIGHT }} />
                 ))}
 
                 <div className="absolute inset-0 pb-4">
                   {visitsByDay[dayIndex]?.map((visit) => {
-                    const minutesFromStart = visit.start.getHours() * 60 + visit.start.getMinutes() - DAY_START_HOUR * 60
-                    const topOffset = Math.max(0, minutesFromStart * PIXELS_PER_MINUTE)
-                    const height = Math.max(MIN_EVENT_HEIGHT, visit.durationMinutes * PIXELS_PER_MINUTE)
-                    const isActive = activeInteraction?.id === visit.id
+                    const startMinutes = visit.start.getHours() * 60 + visit.start.getMinutes()
+                    const endMinutes = startMinutes + visit.durationMinutes
+
+                    const visibleStart = Math.max(calendarStartMinutes, startMinutes)
+                    const visibleEnd = Math.min(calendarEndMinutes, endMinutes)
+
+                    if (visibleEnd <= visibleStart) {
+                      return null
+                    }
+
+                    const topOffset = (visibleStart - calendarStartMinutes) * PIXELS_PER_MINUTE
+                    const heightMinutes = Math.max(MINUTES_PER_STEP, visibleEnd - visibleStart)
+                    const height = Math.max(MIN_EVENT_HEIGHT, heightMinutes * PIXELS_PER_MINUTE)
 
                     return (
                       <button
                         key={visit.id}
-                        onPointerDown={(event) => beginInteraction(visit.id, 'move', event)}
+                        type="button"
                         onClick={() => setSelectedId(visit.id)}
                         className={cn(
-                          'group absolute left-3 right-3 flex flex-col gap-2 rounded-3xl border border-white/30 px-4 py-3 text-left shadow-xl transition duration-150 focus:outline-none focus:ring-2 focus:ring-white/60 focus:ring-offset-2 focus:ring-offset-blue-200',
-                          'backdrop-blur-sm text-white hover:-translate-y-1 hover:shadow-2xl',
-                          isActive ? 'cursor-grabbing ring-2 ring-white/70' : 'cursor-grab'
+                          'absolute left-3 right-3 flex flex-col gap-2 rounded-3xl border border-white/30 px-4 py-3 text-left shadow-xl transition duration-150 focus:outline-none focus:ring-2 focus:ring-white/60 focus:ring-offset-2 focus:ring-offset-blue-200',
+                          'backdrop-blur-sm text-white hover:-translate-y-1 hover:shadow-2xl'
                         )}
                         style={{
                           top: `${topOffset}px`,
                           height: `${height}px`,
-                          backgroundImage: createGradient(visit.color),
+                          background: `linear-gradient(135deg, ${visit.color} 0%, rgba(255,255,255,0.25) 100%)`,
                         }}
                       >
                         <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-white/80">
                           <span>{format(visit.start, 'h:mm a')}</span>
-                          <span>{format(visit.end, 'h:mm a')}</span>
+                          <span>{visit.isCompleted ? format(visit.end, 'h:mm a') : 'Now'}</span>
                         </div>
                         <div className="space-y-1">
-                          <p className="text-sm font-semibold leading-tight text-white drop-shadow-md">
-                            {visit.siteName}
-                          </p>
+                          <p className="text-sm font-semibold leading-tight text-white drop-shadow-md">{visit.siteName}</p>
                           <p className="text-xs text-white/80">{visit.cleanerName}</p>
                         </div>
                         <Badge
                           className={cn(
                             'w-fit rounded-full px-3 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] transition',
-                            visit.isCompleted
-                              ? 'bg-white/95 text-emerald-600'
-                              : 'bg-white/80 text-amber-600 group-hover:bg-white'
+                            visit.isCompleted ? 'bg-white/95 text-emerald-600' : 'bg-white/80 text-amber-600 hover:bg-white'
                           )}
                         >
-                          {visit.isCompleted ? 'Completed' : 'Pending'}
+                          {visit.isCompleted ? 'Clocked out' : 'In progress'}
                         </Badge>
-
-                        <div
-                          className="absolute bottom-2 left-1/2 h-2 w-12 -translate-x-1/2 rounded-full bg-white/60 opacity-0 transition group-hover:opacity-100"
-                          onPointerDown={(event) => beginInteraction(visit.id, 'resize', event)}
-                        />
                       </button>
                     )
                   })}
@@ -279,10 +289,17 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarProps> = ({ visits }) =>
             ))}
           </div>
         </div>
+
+        {isLoadingData ? (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/70 backdrop-blur-sm">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+            <p className="mt-3 text-sm font-medium text-[#00339B]">Loading attendance...</p>
+          </div>
+        ) : null}
       </Card>
 
       <Dialog
-        open={Boolean(selectedVisit)}
+        open={Boolean(selectedVisit) && !isLoadingData}
         onOpenChange={(isOpen) => {
           if (!isOpen) {
             setSelectedId(null)
@@ -293,31 +310,30 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarProps> = ({ visits }) =>
           {selectedVisit && (
             <>
               <DialogHeader>
-                <DialogTitle className="text-2xl font-semibold text-[#00339B]">
-                  {selectedVisit.siteName}
-                </DialogTitle>
+                <DialogTitle className="text-2xl font-semibold text-[#00339B]">{selectedVisit.siteName}</DialogTitle>
                 <DialogDescription>
-                  {format(selectedVisit.start, 'EEEE · h:mm a')} – {format(selectedVisit.end, 'h:mm a')}
+                  {format(selectedVisit.start, 'EEEE • MMM d, yyyy')} · {format(selectedVisit.start, 'h:mm a')} –{' '}
+                  {selectedVisit.isCompleted ? format(selectedVisit.end, 'h:mm a') : 'Now'}
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4">
                 <div className="grid gap-3 rounded-2xl bg-blue-50/70 p-4">
-                  <div className="text-sm text-blue-800">
+                  <div className="text-sm text-blue-900">
                     <span className="font-semibold">Cleaner:</span> {selectedVisit.cleanerName}
                   </div>
-                  <div className="text-sm text-blue-800">
+                  <div className="text-sm text-blue-900">
+                    <span className="font-semibold">Duration:</span> {formatDuration(selectedVisit.durationMinutes)}
+                  </div>
+                  <div className="text-sm text-blue-900">
                     <span className="font-semibold">Status:</span>{' '}
                     <Badge
-                      variant={selectedVisit.isCompleted ? 'default' : 'secondary'}
                       className={cn(
                         'rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide',
-                        selectedVisit.isCompleted
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-amber-500/20 text-amber-700'
+                        selectedVisit.isCompleted ? 'bg-emerald-600 text-white' : 'bg-amber-500/20 text-amber-700'
                       )}
                     >
-                      {selectedVisit.isCompleted ? 'Completed' : 'Awaiting clock-out'}
+                      {selectedVisit.isCompleted ? 'Clocked out' : 'Still clocked in'}
                     </Badge>
                   </div>
                 </div>
@@ -327,12 +343,12 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarProps> = ({ visits }) =>
                     <p>
                       {selectedVisit.clockIn
                         ? `Clock-in recorded at ${format(new Date(selectedVisit.clockIn), 'PPpp')}`
-                        : 'No clock-in recorded yet.'}
+                        : 'Clock-in time missing.'}
                     </p>
                     <p>
                       {selectedVisit.clockOut
                         ? `Clock-out recorded at ${format(new Date(selectedVisit.clockOut), 'PPpp')}`
-                        : 'Awaiting clock-out to mark completion.'}
+                        : 'Cleaner has not clocked out yet. Their card will continue to extend until they clock out.'}
                     </p>
                   </div>
                 </ScrollArea>

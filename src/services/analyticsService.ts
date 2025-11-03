@@ -123,17 +123,51 @@ const toDateKey = (iso?: string | null) => {
   return d.toISOString().slice(0, 10)
 }
 
-const minutesBetween = (start?: string | null, end?: string | null): number | null => {
-  if (!start || !end) return null
-  const startDate = new Date(start)
-  const endDate = new Date(end)
+type HoursBetweenOptions = {
+  fallbackEnd?: string | Date | null
+  clampEnd?: string | Date | null
+}
+
+const toValidDate = (value?: string | Date | null): Date | null => {
+  if (!value) return null
+  if (value instanceof Date) {
+    const time = value.getTime()
+    return Number.isNaN(time) ? null : value
+  }
+  const date = new Date(value)
+  const time = date.getTime()
+  return Number.isNaN(time) ? null : date
+}
+
+const minutesBetween = (start?: string | null, end?: string | null, options?: HoursBetweenOptions): number | null => {
+  const startDate = toValidDate(start)
+  if (!startDate) return null
+
+  let endDate = toValidDate(end)
+  if (!endDate && options?.fallbackEnd) {
+    endDate = toValidDate(options.fallbackEnd)
+  }
+
+  if (!endDate) return null
+
+  const clampEndDate = toValidDate(options?.clampEnd ?? null)
+  if (clampEndDate) {
+    const clampTime = clampEndDate.getTime()
+    if (clampTime <= startDate.getTime()) {
+      return null
+    }
+    if (endDate.getTime() > clampTime) {
+      endDate = new Date(clampTime)
+    }
+  }
+
   const diff = endDate.getTime() - startDate.getTime()
   if (!Number.isFinite(diff) || diff <= 0) return null
   return diff / (1000 * 60)
 }
 
-const hoursBetween = (start?: string | null, end?: string | null): number | null => {
-  const minutes = minutesBetween(start, end)
+const hoursBetween = (start?: string | null, end?: string | null, options?: HoursBetweenOptions): number | null => {
+  const minutes = minutesBetween(start, end, options)
   return minutes === null ? null : minutes / 60
 }
 
@@ -319,8 +353,17 @@ export async function fetchDashboardSnapshot({ managerId, role, dayIso }: Dashbo
 
   const photosTaken = photoRows.length
 
+  const parsedDayEnd = new Date(end)
+  const hasValidDayEnd = !Number.isNaN(parsedDayEnd.getTime())
+  const fallbackNowForOpenShifts = isCurrentDay
+    ? new Date(hasValidDayEnd ? Math.min(Date.now(), parsedDayEnd.getTime()) : Date.now())
+    : null
+
   const hoursWorked = attendanceRows.reduce((total, row) => {
-    const hours = hoursBetween(row.clock_in, row.clock_out)
+    const hours = hoursBetween(row.clock_in, row.clock_out, {
+      fallbackEnd: !row.clock_out ? fallbackNowForOpenShifts : undefined,
+      clampEnd: hasValidDayEnd ? parsedDayEnd : undefined,
+    })
     return hours ? total + hours : total
   }, 0)
 
@@ -484,6 +527,7 @@ export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAna
 
   const onTimeByCleaner = new Map<string, { onTime: number; total: number }>()
   const hoursByDate = new Map<string, number>()
+  const now = new Date()
 
   attendance.forEach((row) => {
     const dateKey = toDateKey(row.clock_in ?? row.clock_out)
@@ -505,7 +549,14 @@ export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAna
       ? rosterNames.get(cleanerIdFromRow) ?? normalizeCleanerName(row.cleaner_name)
       : normalizeCleanerName(row.cleaner_name)
 
-    const hours = hoursBetween(row.clock_in, row.clock_out)
+    const referenceIso = row.clock_in ?? row.clock_out
+    const referenceDate = referenceIso ? new Date(referenceIso) : null
+    const isRowCurrentDay = referenceDate ? isSameCalendarDay(referenceDate, now) : false
+
+    const hours = hoursBetween(row.clock_in, row.clock_out, {
+      fallbackEnd: !row.clock_out && isRowCurrentDay ? now : undefined,
+      clampEnd: range.end,
+    })
     if (hours) {
       totalHoursWorked += hours
       const dateTotal = hoursByDate.get(dateKey) ?? 0

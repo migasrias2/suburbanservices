@@ -60,6 +60,32 @@ export async function fetchAllCleaners(): Promise<CleanerSummary[]> {
   return (data ?? []) as CleanerSummary[]
 }
 
+export async function deleteCleaner(cleanerId: string): Promise<void> {
+  const trimmedId = typeof cleanerId === 'string' ? cleanerId.trim() : ''
+
+  if (!trimmedId) {
+    throw new Error('Cleaner ID is required to delete a cleaner record')
+  }
+
+  const { error: mappingError } = await supabase
+    .from('manager_cleaners')
+    .delete()
+    .eq('cleaner_id', trimmedId)
+
+  if (mappingError) {
+    console.warn('Failed to remove manager_cleaners mapping before deleting cleaner', mappingError)
+  }
+
+  const { error } = await supabase
+    .from('cleaners')
+    .delete()
+    .eq('id', trimmedId)
+
+  if (error) {
+    throw error
+  }
+}
+
 export async function resolveManagerCleanerRoster(managerId?: string | null): Promise<CleanerSummary[]> {
   const scopedManagerId = managerId ?? ''
 
