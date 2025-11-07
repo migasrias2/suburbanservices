@@ -11,7 +11,9 @@ import {
   Users,
   QrCode,
   Camera,
-  Library
+  Library,
+  Activity,
+  CalendarDays
 } from 'lucide-react'
 import {
   Sidebar,
@@ -42,7 +44,7 @@ import { useIsMobile } from '@/hooks/use-mobile'
 
 interface Sidebar07LayoutProps {
   children: React.ReactNode
-  userType: 'cleaner' | 'manager' | 'admin'
+  userType: 'cleaner' | 'manager' | 'ops_manager' | 'admin'
   userName: string
 }
 
@@ -70,6 +72,10 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
     localStorage.removeItem('userType')
     localStorage.removeItem('userId')
     localStorage.removeItem('userName')
+    localStorage.removeItem('currentClockInData')
+    localStorage.removeItem('currentClockInPhase')
+    localStorage.removeItem('currentSiteName')
+    localStorage.removeItem('recentClockOutAt')
     navigate('/login')
   }
 
@@ -81,6 +87,13 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
   const managerMenuItems: MenuItem[] = [
     { icon: BarChart3, label: 'Dashboard', path: '/manager-dashboard' },
     { icon: Clock, label: 'Recent Activity', path: '/manager-activity' },
+    { icon: BarChart3, label: 'Analytics', path: '/analytics' },
+  ]
+
+  const opsManagerMenuItems: MenuItem[] = [
+    { icon: BarChart3, label: 'Dashboard', path: '/ops-dashboard' },
+    { icon: Clock, label: 'Clock In', path: '/clock-in' },
+    { icon: CalendarDays, label: 'Calendar', path: '/ops-calendar' },
     { icon: BarChart3, label: 'Analytics', path: '/analytics' },
   ]
 
@@ -111,6 +124,21 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
           {
             title: 'Performance',
             items: managerMenuItems.slice(1),
+          },
+        ]
+      case 'ops_manager':
+        return [
+          {
+            title: 'Overview',
+            items: [opsManagerMenuItems[0]],
+          },
+          {
+            title: 'Site Visits',
+            items: opsManagerMenuItems.slice(1, 3),
+          },
+          {
+            title: 'Insights',
+            items: opsManagerMenuItems.slice(3),
           },
         ]
       case 'admin':
@@ -151,8 +179,30 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
       if (location.pathname === '/admin-weekly-schedule') return 'Weekly Calendar'
       return 'Admin'
     }
+    if (userType === 'ops_manager') {
+      if (location.pathname === '/clock-in') return 'Ops Manager Clock In'
+      if (location.pathname === '/manager-activity') return 'Site Activity'
+      if (location.pathname === '/analytics') return 'Analytics'
+      return 'Ops Manager Dashboard'
+    }
     return userType === 'cleaner' ? 'Cleaner Dashboard' : 'Manager Dashboard'
   }
+
+  const formatUserTypeLabel = React.useCallback(() => {
+    switch (userType) {
+      case 'ops_manager':
+        return 'Ops Manager'
+      case 'admin':
+        return 'Admin'
+      case 'manager':
+        return 'Manager'
+      case 'cleaner':
+      default:
+        return 'Cleaner'
+    }
+  }, [userType])
+
+  const userTypeLabel = formatUserTypeLabel()
 
   return (
     <SidebarProvider defaultOpen={!isMobile}>
@@ -240,8 +290,8 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
                         <span className="truncate font-semibold text-gray-900">
                           {userName}
                         </span>
-                        <span className="truncate text-xs text-gray-500 capitalize">
-                          {userType}
+                        <span className="truncate text-xs text-gray-500">
+                          {userTypeLabel}
                         </span>
                       </div>
                       <ChevronDown className="ml-auto h-4 w-4 text-gray-400" />

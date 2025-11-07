@@ -11,7 +11,7 @@ import {
 } from '../lib/analyticsSchedule'
 import { normalizeCleanerName, normalizeCleanerNumericId } from '../lib/identity'
 
-export type AnalyticsRole = 'manager' | 'admin'
+export type AnalyticsRole = 'manager' | 'ops_manager' | 'admin'
 
 export type AnalyticsRange = {
   start: string
@@ -219,11 +219,11 @@ const isSameCalendarDay = (left: Date, right: Date): boolean =>
   left.getDate() === right.getDate()
 
 const buildCleanerScope = async (managerId: string | undefined | null, role: AnalyticsRole) => {
-  const isAdmin = role === 'admin'
+  const isGlobalRole = role === 'admin' || role === 'ops_manager'
   let roster: CleanerSummary[]
   let scopedCleanerIds: string[] = []
 
-  if (isAdmin) {
+  if (isGlobalRole) {
     roster = await fetchAllCleaners()
   } else {
     scopedCleanerIds = await fetchManagerCleanerIds(managerId ?? '')
@@ -236,7 +236,7 @@ const buildCleanerScope = async (managerId: string | undefined | null, role: Ana
 
   roster = ensureUniqueCleanerSummaries(roster)
 
-  const restrictToManaged = role !== 'admin' && scopedCleanerIds.length > 0
+  const restrictToManaged = !isGlobalRole && scopedCleanerIds.length > 0
   const cleanerIdSet = new Set(scopedCleanerIds.filter(Boolean))
   const numericCleanerIdSet = new Set(
     scopedCleanerIds
@@ -379,13 +379,13 @@ export async function fetchDashboardSnapshot({ managerId, role, dayIso }: Dashbo
 }
 
 export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAnalyticsParams): Promise<AnalyticsSummary> {
-  const isAdmin = role === 'admin'
+  const isGlobalRole = role === 'admin' || role === 'ops_manager'
 
   let roster: CleanerSummary[]
   let cleanerIds: string[] = []
   let managerScopedCleanerIds: string[] = []
 
-  if (isAdmin) {
+  if (isGlobalRole) {
     roster = await fetchAllCleaners()
     cleanerIds = roster.map((cleaner) => cleaner.id)
   } else {
@@ -401,7 +401,7 @@ export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAna
 
   roster = ensureUniqueCleanerSummaries(roster)
 
-  const restrictToManagedCleaners = !isAdmin && managerScopedCleanerIds.length > 0
+  const restrictToManagedCleaners = !isGlobalRole && managerScopedCleanerIds.length > 0
   const filterCleanerIds = restrictToManagedCleaners ? managerScopedCleanerIds : []
   const cleanerIdSet = new Set(filterCleanerIds.filter(Boolean))
   const numericCleanerIds = filterCleanerIds
@@ -421,7 +421,7 @@ export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAna
     .gte('timestamp', range.start)
     .lte('timestamp', range.end)
 
-  if (!isAdmin && cleanerIds.length) {
+  if (!isGlobalRole && cleanerIds.length) {
     selectionsQuery = selectionsQuery.in('cleaner_id', cleanerIds)
   }
 
@@ -431,7 +431,7 @@ export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAna
     .gte('photo_timestamp', range.start)
     .lte('photo_timestamp', range.end)
 
-  if (!isAdmin && cleanerIds.length) {
+  if (!isGlobalRole && cleanerIds.length) {
     photosQuery = photosQuery.in('cleaner_id', cleanerIds)
   }
 

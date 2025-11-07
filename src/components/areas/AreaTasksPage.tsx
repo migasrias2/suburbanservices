@@ -77,7 +77,9 @@ export const AreaTasksPage = () => {
   const [newCustomerName, setNewCustomerName] = useState("");
   const [addAreaOpen, setAddAreaOpen] = useState<null | { customerId: string; customerName: string }>(null);
   const [newAreaName, setNewAreaName] = useState("");
-  const [extraAreasByCustomer, setExtraAreasByCustomer] = useState<Record<string, string[]>>({});
+  const [extraAreasByCustomer, setExtraAreasByCustomer] = useState<Record<string, string[]>>({
+    Metalex: ['Unit 11 Ablution'],
+  });
   const [addTaskOpen, setAddTaskOpen] = useState<null | { customer: string; area: string }>(null);
   const [newTaskDescription, setNewTaskDescription] = useState("");
 
@@ -250,6 +252,34 @@ export const AreaTasksPage = () => {
         backfillMutation.mutate(customer)
       }
     })
+  }, [tasksQuery.data, backfillMutation])
+
+  const metalexBackfillTriggered = useRef(false)
+  useEffect(() => {
+    if (metalexBackfillTriggered.current) return
+    const rows = tasksQuery.data ?? []
+    if (!rows.length) return
+    const targetCustomer = 'Metalex'
+    const targetArea = 'Unit 11 – Disabled Ablution'
+    const matches = rows.filter((task) => {
+      const customerLabel = (task.customer_name ?? '').trim()
+      const areaLabel = (task.area ?? '').trim()
+      return customerLabel.toLowerCase() === targetCustomer.toLowerCase() && areaLabel.toLowerCase() === targetArea.toLowerCase()
+    })
+    if (!matches.length) {
+      metalexBackfillTriggered.current = true
+      backfillMutation.mutate(targetCustomer)
+      return
+    }
+    const placeholderFiltered = matches.filter((task) => {
+      const areaLabel = (task.area ?? '').trim().toLowerCase()
+      const description = (task.task_description ?? '').trim().toLowerCase()
+      return description !== areaLabel
+    })
+    if (placeholderFiltered.length < 6) {
+      metalexBackfillTriggered.current = true
+      backfillMutation.mutate(targetCustomer)
+    }
   }, [tasksQuery.data, backfillMutation])
 
   // Run Avtrade backfill once immediately for admin, then persist a flag to avoid repeats

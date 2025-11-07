@@ -6,16 +6,16 @@ export interface CreateUserData {
   first_name: string
   last_name: string
   password: string
-  user_type: 'cleaner' | 'manager' | 'admin'
+  user_type: 'cleaner' | 'manager' | 'ops_manager'
   email?: string
-  username?: string // For admin registration
+  username?: string
 }
 
 export interface LoginData {
   mobile_number?: string
   username?: string
   password: string
-  user_type: 'cleaner' | 'manager' | 'admin'
+  user_type: 'cleaner' | 'manager' | 'admin' | 'ops_manager'
 }
 
 export const authService = {
@@ -34,7 +34,7 @@ export const authService = {
   async registerUser(userData: CreateUserData) {
     try {
       // Disallow admin self-registration at the application level
-      if (userData.user_type === 'admin') {
+      if ((userData as any).user_type === 'admin') {
         return {
           success: false,
           error: 'Admin account creation is disabled. Please contact a system administrator.'
@@ -63,10 +63,16 @@ export const authService = {
             .single()
           existingUser = existingManager
           break
-        case 'admin':
-          // This path should not be reached due to the early return above,
-          // but we keep it for explicitness and safety.
-          existingUser = null
+        case 'ops_manager':
+          if (!userData.username) {
+            throw new Error('Username is required for operations managers')
+          }
+          const { data: existingOps } = await supabase
+            .from('managers')
+            .select('username')
+            .eq('username', userData.username)
+            .single()
+          existingUser = existingOps
           break
       }
 
@@ -93,6 +99,7 @@ export const authService = {
           break
 
         case 'manager':
+        case 'ops_manager':
           result = await supabase
             .from('managers')
             .insert({
@@ -101,16 +108,14 @@ export const authService = {
               last_name: userData.last_name,
               password_hash: hashedPassword,
               email: userData.email || null,
-              employee_id: `MGR_${Date.now()}`,
-              is_active: true
+              employee_id: `${userData.user_type === 'ops_manager' ? 'OPS' : 'MGR'}_${Date.now()}`,
+              is_active: true,
+              role: userData.user_type === 'ops_manager' ? 'ops_manager' : 'manager',
+              username: userData.user_type === 'ops_manager' ? userData.username : null
             })
             .select()
             .single()
           break
-
-        case 'admin':
-          // Guardrail: should not reach here because admin registration is disabled
-          throw new Error('Admin account creation is disabled')
 
         default:
           throw new Error('Invalid user type')
@@ -171,6 +176,7 @@ export const authService = {
       // Default flow for cleaner/manager using client-side verification
       let tableName
       let identifierField
+      let expectedRole: string | null = null
 
       switch (loginData.user_type) {
         case 'cleaner':
@@ -181,16 +187,21 @@ export const authService = {
           tableName = 'managers'
           identifierField = 'mobile_number'
           break
+        case 'ops_manager':
+          tableName = 'managers'
+          identifierField = 'username'
+          expectedRole = 'ops_manager'
+          break
         default:
           throw new Error('Invalid user type')
       }
 
-      const identifier = loginData.mobile_number
+      const identifier = loginData.user_type === 'ops_manager' ? loginData.username : loginData.mobile_number
       if (!identifier) {
-        throw new Error('Mobile number is required')
+        throw new Error(loginData.user_type === 'ops_manager' ? 'Username is required' : 'Mobile number is required')
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from(tableName)
         .select('*')
         .eq(identifierField, identifier)
@@ -198,6 +209,13 @@ export const authService = {
 
       if (error || !data) {
         throw new Error('Invalid credentials')
+      }
+
+      if (expectedRole) {
+        const recordRole = data.role || data.manager_type || data.user_type || data.type || 'manager'
+        if (recordRole && recordRole !== expectedRole) {
+          throw new Error('Account is not authorized for this role')
+        }
       }
 
       if (!data.is_active) {
@@ -214,22 +232,47 @@ export const authService = {
         throw new Error('Invalid credentials')
       }
 
-      const userData = loginData.user_type === 'cleaner'
-        ? {
-            id: data.id,
-            name: `${data.first_name} ${data.last_name}`,
-            mobile_number: data.mobile_number,
-            email: data.email,
-            user_type: 'cleaner' as const
-          }
-        : {
-            id: data.id,
-            name: `${data.first_name} ${data.last_name}`,
-            mobile_number: data.mobile_number,
-            email: data.email,
-            employee_id: data.employee_id,
-            user_type: 'manager' as const
-          }
+      const userData = (() => {
+        switch (loginData.user_type) {
+          case 'cleaner':
+            return {
+              id: data.id,
+              name: `${data.first_name} ${data.last_name}`,
+              mobile_number: data.mobile_number,
+              email: data.email,
+              user_type: 'cleaner' as const
+            }
+          case 'manager':
+            return {
+              id: data.id,
+              name: `${data.first_name} ${data.last_name}`,
+              mobile_number: data.mobile_number,
+              email: data.email,
+              employee_id: data.employee_id,
+              username: data.username,
+              user_type: 'manager' as const
+            }
+          case 'ops_manager':
+            return {
+              id: data.id,
+              name: `${data.first_name} ${data.last_name}`,
+              mobile_number: data.mobile_number,
+              email: data.email,
+              employee_id: data.employee_id,
+               username: data.username,
+              user_type: 'ops_manager' as const
+            }
+          default:
+            return {
+              id: data.id,
+              name: `${data.first_name} ${data.last_name}`,
+              mobile_number: data.mobile_number,
+              email: data.email,
+              employee_id: data.employee_id,
+              user_type: 'manager' as const
+            }
+        }
+      })()
 
       return {
         success: true,

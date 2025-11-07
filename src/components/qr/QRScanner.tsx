@@ -172,44 +172,67 @@ export const QRScanner: React.FC<QRScannerProps> = ({
             // Check if this QR code should show task selector
             // Only AREA QR codes show tasks, CLOCK_IN just processes the clock in
             const shouldGoToTasks = qrData.type === 'AREA'
-            if (shouldGoToTasks && !previewMode) {
-              // Delegate to parent to render tasks UI; avoid duplicate headers/buttons
-              stopScanning()
-              onScanSuccess?.(qrData)
-              setLastScan({ data: qrData, timestamp: new Date(), success: true })
-            } else {
-              if (previewMode) {
-                stopScanning()
-                setLastScan({ data: qrData, timestamp: new Date(), success: true })
-                onScanSuccess?.(qrData)
-              } else {
-                // For CLOCK_IN flows, move forward immediately once recognized
-                if (qrData.type === 'CLOCK_IN' && (!allowedTypes || allowedTypes.includes('CLOCK_IN'))) {
-                  onScanSuccess?.(qrData)
-                }
 
-                // Process in the background for CLOCK_IN/CLOCK_OUT/FEEDBACK
+            if (shouldGoToTasks) {
+              if (!previewMode) {
                 const result = await QRService.processQRScan(qrData, cleanerId, cleanerName, location)
-                
-                setLastScan({
+                const scanRecord = {
                   data: qrData,
                   timestamp: new Date(),
-                  success: result.success
-                })
+                  success: result.success,
+                }
+                setLastScan(scanRecord)
 
-                if (result.success) {
-                  onScanSuccess?.(qrData)
-                } else {
+                if (!result.success) {
                   const errorMessage = result.message || 'Failed to process QR code scan'
                   setError(errorMessage)
                   onScanError?.(errorMessage)
+                  setTimeout(() => {
+                    setError(null)
+                  }, 2000)
+                  return
                 }
-
-                // Brief pause before allowing next scan
-                setTimeout(() => {
-                  setError(null)
-                }, 2000)
+              } else {
+                setLastScan({ data: qrData, timestamp: new Date(), success: true })
               }
+
+              // Delegate to parent to render tasks UI; avoid duplicate headers/buttons
+              stopScanning()
+              onScanSuccess?.(qrData)
+              return
+            }
+
+            if (previewMode) {
+              stopScanning()
+              setLastScan({ data: qrData, timestamp: new Date(), success: true })
+              onScanSuccess?.(qrData)
+            } else {
+              // For CLOCK_IN flows, move forward immediately once recognized
+              if (qrData.type === 'CLOCK_IN' && (!allowedTypes || allowedTypes.includes('CLOCK_IN'))) {
+                onScanSuccess?.(qrData)
+              }
+
+              // Process in the background for CLOCK_IN/CLOCK_OUT/FEEDBACK
+              const result = await QRService.processQRScan(qrData, cleanerId, cleanerName, location)
+              
+              setLastScan({
+                data: qrData,
+                timestamp: new Date(),
+                success: result.success
+              })
+
+              if (result.success) {
+                onScanSuccess?.(qrData)
+              } else {
+                const errorMessage = result.message || 'Failed to process QR code scan'
+                setError(errorMessage)
+                onScanError?.(errorMessage)
+              }
+
+              // Brief pause before allowing next scan
+              setTimeout(() => {
+                setError(null)
+              }, 2000)
             }
 
           } catch (err) {
@@ -400,7 +423,11 @@ export const QRScanner: React.FC<QRScannerProps> = ({
           </Button>
         )}
 
-        {/* Error Display removed per request */}
+        {error && (
+          <Alert variant="destructive" className="rounded-2xl">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         {/* Success Display */}
         <style>{`

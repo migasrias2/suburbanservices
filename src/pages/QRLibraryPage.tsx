@@ -43,7 +43,7 @@ interface QRCodeItem {
 
 export default function QRLibraryPage() {
   const navigate = useNavigate()
-  const [userType, setUserType] = useState<string>('')
+  const [userType, setUserType] = useState<'cleaner' | 'manager' | 'ops_manager' | 'admin' | ''>('')
   const [userId, setUserId] = useState<string>('')
   const [userName, setUserName] = useState<string>('')
   const [qrCodes, setQrCodes] = useState<QRCodeItem[]>([])
@@ -67,7 +67,7 @@ export default function QRLibraryPage() {
       return
     }
 
-    setUserType(type)
+    setUserType(type as 'admin')
     setUserId(id)
     setUserName(name)
     loadQRCodes()
@@ -347,7 +347,7 @@ export default function QRLibraryPage() {
   }
 
   return (
-    <Sidebar07Layout userType={userType as 'cleaner' | 'manager' | 'admin'} userName={userName}>
+    <Sidebar07Layout userType={(userType || 'admin') as 'cleaner' | 'manager' | 'ops_manager' | 'admin'} userName={userName}>
       <div className="space-y-8 max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">

@@ -8,7 +8,7 @@ import { getStoredCleanerName } from '@/lib/identity'
 
 export default function ChatPage() {
   const userName = getStoredCleanerName() || 'Cleaner'
-  const userType = (localStorage.getItem('userType') as 'cleaner' | 'manager' | 'admin') || 'cleaner'
+  const userType = (localStorage.getItem('userType') as 'cleaner' | 'manager' | 'ops_manager' | 'admin') || 'cleaner'
   const [messages, setMessages] = useState<{ me: boolean; text: string }[]>([
     { me: false, text: 'Hi, please clock in at Bex-Sunward Park.' },
   ])

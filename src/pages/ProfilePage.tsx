@@ -10,7 +10,7 @@ export default function ProfilePage() {
   const navigate = useNavigate()
   const [cleaner, setCleaner] = useState<UKCleaner | null>(null)
   const [loading, setLoading] = useState(true)
-  const [userType, setUserType] = useState<string>('')
+  const [userType, setUserType] = useState<'cleaner' | 'manager' | 'ops_manager' | 'admin' | ''>('')
   const [userId, setUserId] = useState<string>('')
   const [userName, setUserName] = useState<string>('')
 
@@ -25,7 +25,7 @@ export default function ProfilePage() {
       return
     }
 
-    setUserType(type)
+    setUserType(type as 'cleaner' | 'manager' | 'ops_manager' | 'admin')
     setUserId(id)
     setUserName(name)
   }, [navigate])
@@ -64,7 +64,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <Sidebar07Layout userType={userType as 'cleaner' | 'manager' | 'admin'} userName={userName}>
+    <Sidebar07Layout userType={(userType || 'cleaner') as 'cleaner' | 'manager' | 'ops_manager' | 'admin'} userName={userName}>
       <div className="space-y-8 max-w-2xl mx-auto">
         {/* Header */}
         <div className="text-center space-y-3">
@@ -78,7 +78,21 @@ export default function ProfilePage() {
           <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
             {userName}
           </h1>
-          <p className="text-gray-600 text-lg capitalize">{userType} Profile</p>
+          <p className="text-gray-600 text-lg">
+            {(() => {
+              switch (userType) {
+                case 'ops_manager':
+                  return 'Ops Manager Profile'
+                case 'manager':
+                  return 'Manager Profile'
+                case 'admin':
+                  return 'Admin Profile'
+                case 'cleaner':
+                default:
+                  return 'Cleaner Profile'
+              }
+            })()}
+          </p>
         </div>
 
         {/* Profile Information */}

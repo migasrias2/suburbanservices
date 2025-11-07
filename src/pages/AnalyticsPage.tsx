@@ -8,19 +8,20 @@ const AnalyticsPage: React.FC = () => {
   const navigate = useNavigate()
   const [userId, setUserId] = useState<string>('')
   const [userName, setUserName] = useState<string>('')
-  const [role, setRole] = useState<'manager' | 'admin'>('manager')
+  const [role, setRole] = useState<'manager' | 'ops_manager' | 'admin'>('manager')
 
   useEffect(() => {
     const storedRole = localStorage.getItem('userType')
     const storedId = localStorage.getItem('userId')
     const storedName = getStoredCleanerName()
 
-    if ((storedRole !== 'manager' && storedRole !== 'admin') || !storedId || !storedName) {
+    const allowedRoles: Array<'manager' | 'ops_manager' | 'admin'> = ['manager', 'ops_manager', 'admin']
+    if (!storedRole || !allowedRoles.includes(storedRole as typeof allowedRoles[number]) || !storedId || !storedName) {
       navigate('/login')
       return
     }
 
-    setRole(storedRole)
+    setRole(storedRole as 'manager' | 'ops_manager' | 'admin')
     setUserId(storedId)
     setUserName(storedName)
   }, [navigate])

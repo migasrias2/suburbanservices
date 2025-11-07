@@ -8,7 +8,7 @@ export default function ManagerDashboardPage() {
   const navigate = useNavigate()
   const [managerId, setManagerId] = useState<string>('')
   const [managerName, setManagerName] = useState<string>('')
-  const [userType, setUserType] = useState<'manager' | 'admin'>('manager')
+  const [userType, setUserType] = useState<'manager' | 'ops_manager' | 'admin'>('manager')
 
   useEffect(() => {
     // Check if user is logged in as manager or admin
@@ -16,14 +16,14 @@ export default function ManagerDashboardPage() {
     const userId = localStorage.getItem('userId')
     const userName = getStoredCleanerName()
 
-    if ((storedUserType !== 'manager' && storedUserType !== 'admin') || !userId || !userName) {
+    if ((storedUserType !== 'manager' && storedUserType !== 'admin' && storedUserType !== 'ops_manager') || !userId || !userName) {
       navigate('/login')
       return
     }
 
     setManagerId(userId)
     setManagerName(userName)
-    setUserType(storedUserType as 'manager' | 'admin')
+    setUserType(storedUserType as 'manager' | 'ops_manager' | 'admin')
   }, [navigate])
 
   if (!managerId || !managerName) {

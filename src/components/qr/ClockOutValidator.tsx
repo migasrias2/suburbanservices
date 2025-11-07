@@ -78,8 +78,9 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
               return
             }
 
+            const normalizedType = QRService.normalizeQrType(qrData.type)
             // Validate that this is a clock out QR code
-            if (qrData.type !== 'CLOCK_OUT') {
+            if (normalizedType !== 'CLOCK_OUT') {
               setValidationResult({
                 valid: false,
                 message: 'This is not a valid clock out QR code'
@@ -93,7 +94,7 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
             setValidationResult({
               valid: true,
               message: 'Valid clock out QR code detected',
-              qrData
+              qrData: normalizedType ? { ...qrData, type: normalizedType } : qrData
             })
 
             // Stop scanning after successful validation

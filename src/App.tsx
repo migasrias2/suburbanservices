@@ -20,6 +20,7 @@ import { Navigate } from "react-router-dom";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import AdminWeeklySchedulePage from "./pages/AdminWeeklySchedulePage";
 import BathroomAssistReportPage from "./pages/BathroomAssistReportPage";
+import OpsCalendarPage from "./pages/OpsCalendarPage";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,8 @@ const App = () => (
           <Route path="/qr-generator" element={<QRGeneratorPage />} />
           <Route path="/area-tasks" element={<AreaTasksPage />} />
           <Route path="/manager-dashboard" element={<ManagerDashboardPage />} />
+          <Route path="/ops-dashboard" element={<ManagerDashboardPage />} />
+          <Route path="/ops-calendar" element={<OpsCalendarPage />} />
           <Route path="/manager-activity" element={<ManagerActivityPage />} />
           <Route path="/admin-dashboard" element={<ManagerDashboardPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />

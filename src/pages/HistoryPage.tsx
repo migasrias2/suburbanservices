@@ -11,7 +11,7 @@ export default function HistoryPage() {
   const navigate = useNavigate()
   const [recentScans, setRecentScans] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [userType, setUserType] = useState<string>('')
+  const [userType, setUserType] = useState<'cleaner' | 'manager' | 'ops_manager' | 'admin' | ''>('')
   const [userId, setUserId] = useState<string>('')
   const [userName, setUserName] = useState<string>('')
 
@@ -26,7 +26,7 @@ export default function HistoryPage() {
       return
     }
 
-    setUserType(type)
+    setUserType(type as 'cleaner' | 'manager' | 'ops_manager' | 'admin')
     setUserId(id)
     setUserName(name)
   }, [navigate])
@@ -66,7 +66,7 @@ export default function HistoryPage() {
   }
 
   return (
-    <Sidebar07Layout userType={userType as 'cleaner' | 'manager' | 'admin'} userName={userName}>
+    <Sidebar07Layout userType={(userType || 'cleaner') as 'cleaner' | 'manager' | 'ops_manager' | 'admin'} userName={userName}>
       <div className="space-y-8 max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center space-y-3">

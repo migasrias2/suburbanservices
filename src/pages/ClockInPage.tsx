@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Sidebar07Layout } from '@/components/layout/Sidebar07Layout'
 import { QRScanner } from '@/components/qr/QRScanner'
 import { WorkflowManager } from '@/components/qr/WorkflowManager'
+import { OpsWorkflowManager } from '@/components/qr/OpsWorkflowManager'
 import { Button } from '@/components/ui/button'
 import { Clock, QrCode } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -12,7 +13,7 @@ type Phase = 'clock_in' | 'workflow' | 'completed'
 
 export default function ClockInPage() {
   const userName = getStoredCleanerName() || 'Cleaner'
-  const userType = (localStorage.getItem('userType') as 'cleaner' | 'manager' | 'admin') || 'cleaner'
+  const userType = (localStorage.getItem('userType') as 'cleaner' | 'manager' | 'ops_manager' | 'admin') || 'cleaner'
   const cleanerId = localStorage.getItem('userId') || ''
   const navigate = useNavigate()
 
@@ -30,6 +31,9 @@ export default function ClockInPage() {
   const [clockInData, setClockInData] = useState<{
     time: string
     siteName?: string
+    customerName?: string
+    qrCodeId?: string
+    siteId?: string
   } | null>(() => {
     const saved = localStorage.getItem('currentClockInData')
     return saved ? JSON.parse(saved) : null
@@ -77,14 +81,15 @@ export default function ClockInPage() {
           // Hydrate display data if missing
           if (!clockInData) {
             const record = data[0]
-            setClockInData({
+            const hydrated = {
               time: record.clock_in || new Date().toISOString(),
-              siteName: record.site_name || record.customer_name || 'Work Site'
-            })
-            localStorage.setItem('currentClockInData', JSON.stringify({
-              time: record.clock_in || new Date().toISOString(),
-              siteName: record.site_name || record.customer_name || 'Work Site'
-            }))
+              siteName: record.site_name || record.customer_name || 'Work Site',
+              customerName: record.customer_name || undefined,
+              qrCodeId: undefined as string | undefined,
+              siteId: undefined as string | undefined,
+            }
+            setClockInData(hydrated)
+            localStorage.setItem('currentClockInData', JSON.stringify(hydrated))
           }
         }
       } catch (err) {
@@ -112,9 +117,18 @@ export default function ClockInPage() {
 
   const handleClockInSuccess = (qrData: any) => {
     // Store clock-in information
+    const derivedSiteName =
+      qrData?.metadata?.siteName ||
+      qrData?.customerName ||
+      qrData?.metadata?.areaName ||
+      'Work Site'
+
     const clockInInfo = {
       time: new Date().toISOString(),
-      siteName: qrData?.metadata?.siteName || qrData?.customerName || 'Work Site'
+      siteName: derivedSiteName,
+      customerName: qrData?.customerName || undefined,
+      qrCodeId: qrData?.id || undefined,
+      siteId: qrData?.siteId || undefined,
     }
     setClockInData(clockInInfo)
     setCurrentPhase('workflow')
@@ -216,13 +230,25 @@ export default function ClockInPage() {
 
         {/* Workflow Phase */}
         {currentPhase === 'workflow' && clockInData && (
-          <WorkflowManager
-            cleanerId={cleanerId}
-            cleanerName={userName}
-            clockInTime={clockInData.time}
-            siteName={clockInData.siteName}
-            onClockOut={handleClockOut}
-          />
+          userType === 'ops_manager' ? (
+            <OpsWorkflowManager
+              cleanerId={cleanerId}
+              cleanerName={userName}
+              clockInTime={clockInData.time}
+              siteName={clockInData.siteName}
+              customerName={clockInData.customerName}
+              qrCodeId={clockInData.qrCodeId}
+              onClockOut={handleClockOut}
+            />
+          ) : (
+            <WorkflowManager
+              cleanerId={cleanerId}
+              cleanerName={userName}
+              clockInTime={clockInData.time}
+              siteName={clockInData.siteName}
+              onClockOut={handleClockOut}
+            />
+          )
         )}
 
         {/* Completion Phase */}

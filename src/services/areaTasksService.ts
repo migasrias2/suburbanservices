@@ -185,7 +185,8 @@ export async function backfillDefaultTasksForCustomer(customerName: string): Pro
     }
 
     const existingNames = new Set((existing ?? []).map((t) => (t.task_description || '').trim().toLowerCase()))
-    const defaults = QRService.getTasksForArea(areaType)
+    const overrideDefaults = QRService.getPresetTasks(normalizedCustomer, areaLabel, qrData.id)
+    const defaults = overrideDefaults.length ? overrideDefaults : QRService.getTasksForArea(areaType)
     const newRows = defaults
       .filter((t) => !existingNames.has(t.name.trim().toLowerCase()))
       .map((task, index) => ({

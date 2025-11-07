@@ -73,7 +73,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ managerI
         <div>
           <h1 className="text-3xl font-semibold text-[#00339B]">Analytics</h1>
           <p className="text-sm text-gray-500">
-            {role === 'admin'
+            {role === 'admin' || role === 'ops_manager'
               ? 'Monitoring performance across all cleaners'
               : 'Focused insights for your cleaner team'}
           </p>

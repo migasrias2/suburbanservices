@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react'
-import { CheckCircle2, Camera, Folder, ArrowLeft, Trash2, RotateCcw, Check, X, Flag } from 'lucide-react'
-import { QRCodeData, AreaType, QRService, TaskSelection } from '../../services/qrService'
+import { CheckCircle2, Camera, Folder, ArrowLeft, Trash2, RotateCcw, Check, X, Flag, Loader2 } from 'lucide-react'
+import { QRCodeData, AreaType, QRService, TaskSelection, TaskDefinition } from '../../services/qrService'
 import { Button } from '../ui/button'
 import { Alert, AlertDescription } from '../ui/alert'
 import { saveDraft as saveLocalDraft, clearDraft } from '../../lib/offlineStore'
@@ -60,31 +60,75 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
 
   // Detect area type from QR data
   const areaType = QRService.detectAreaType(qrData)
-  const tasks = QRService.getTasksForArea(areaType)
+  const [tasks, setTasks] = useState<TaskDefinition[]>([])
+  const [tasksLoading, setTasksLoading] = useState<boolean>(true)
+  const [tasksError, setTasksError] = useState<string | null>(null)
 
-  // Initialize task completions on mount
   React.useEffect(() => {
-    const initialCompletions = tasks.map(task => ({
-      taskId: task.id,
-      completed: false,
-      photos: []
-    }))
-    setTaskCompletions(initialCompletions)
-    setConfirmedPhotos({})
-    setCurrentIndex(0)
-  }, [qrData.id, areaType, tasks])
+    let cancelled = false
+    const loadTasks = async () => {
+      setTasksLoading(true)
+      setTasksError(null)
+      try {
+        const remoteTasks = await QRService.fetchTasksForQrArea(qrData)
+        const resolved = remoteTasks.length > 0 ? remoteTasks : QRService.getTasksForArea(areaType)
+        if (!cancelled) {
+          setTasks(resolved)
+        }
+      } catch (err) {
+        console.error('Failed to load tasks for area:', err)
+        if (!cancelled) {
+          setTasks(QRService.getTasksForArea(areaType))
+          setTasksError('Could not load custom tasks for this area. Showing default checklist instead.')
+        }
+      } finally {
+        if (!cancelled) {
+          setTasksLoading(false)
+        }
+      }
+    }
 
-  // Hydrate from initial draft (including photos)
+    loadTasks()
+
+    return () => {
+      cancelled = true
+    }
+  }, [qrData.id, qrData.customerName, qrData.metadata?.areaName, areaType])
+
   React.useEffect(() => {
-    if (!initialState) return
-    if (initialState.qrCodeId && initialState.qrCodeId !== qrData.id) return
-    if (tasks.length === 0) return
-    const map = new Map(initialState.taskCompletions.map(tc => [tc.taskId, tc]))
-    const merged = tasks.map(t => map.get(t.id) || { taskId: t.id, completed: false, photos: [] })
-    setTaskCompletions(merged)
-    setConfirmedPhotos(initialState.confirmedPhotos || {})
-    setCurrentIndex(Math.min(Math.max(initialState.currentTaskIndex || 0, 0), Math.max(merged.length - 1, 0)))
-  }, [initialState, tasks.length])
+    if (tasksLoading) return
+
+    if (tasks.length === 0) {
+      setTaskCompletions([])
+      setConfirmedPhotos({})
+      setCurrentIndex(0)
+      return
+    }
+
+    const hasInitialState = Boolean(initialState && (!initialState.qrCodeId || initialState.qrCodeId === qrData.id))
+    const initialMap = hasInitialState
+      ? new Map((initialState?.taskCompletions || []).map(tc => [tc.taskId, tc]))
+      : null
+
+    const nextCompletions = tasks.map(task => {
+      if (initialMap?.has(task.id)) {
+        return initialMap.get(task.id) as TaskCompletion
+      }
+      return { taskId: task.id, completed: false, photos: [] }
+    })
+
+    setTaskCompletions(nextCompletions)
+
+    if (initialMap) {
+      setConfirmedPhotos(initialState?.confirmedPhotos || {})
+      const maxIndex = Math.max(nextCompletions.length - 1, 0)
+      const nextIndex = Math.min(Math.max(initialState?.currentTaskIndex || 0, 0), maxIndex)
+      setCurrentIndex(nextIndex)
+    } else {
+      setConfirmedPhotos({})
+      setCurrentIndex(0)
+    }
+  }, [tasks, tasksLoading, initialState, qrData.id])
 
   const getAreaDisplayName = (area: AreaType): string => {
     switch (area) {
@@ -268,8 +312,8 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
     setConfirmedPhotos(prev => ({ ...prev, [currentTask.id]: true }))
   }
 
-  const currentTask = tasks[currentIndex]
-  const currentCompletion = taskCompletions.find(tc => tc.taskId === currentTask?.id)
+  const currentTask = tasks[currentIndex] || tasks[0]
+  const currentCompletion = taskCompletions.find(tc => currentTask && tc.taskId === currentTask.id)
   const currentHasPhoto = (currentCompletion?.photos?.length || 0) > 0
   const completedTasksCount = taskCompletions.filter(tc => (tc.photos?.length || 0) > 0).length
   const confirmedCount = tasks.filter(t => confirmedPhotos[t.id]).length
@@ -281,6 +325,8 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
 
   // Persist draft (local + remote-light) whenever key state changes
   React.useEffect(() => {
+    if (tasksLoading || !tasks.length) return
+
     const draft = {
       cleanerId,
       qrCodeId: qrData.id,
@@ -303,7 +349,20 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
       }
     }
     QRService.saveRemoteDraft(light)
-  }, [taskCompletions, confirmedPhotos, currentIndex])
+  }, [taskCompletions, confirmedPhotos, currentIndex, tasksLoading, tasks.length])
+
+  if (tasksLoading) {
+    return (
+      <div className="w-full max-w-md mx-auto space-y-4 text-center">
+        <div className="flex justify-center">
+          <div className="flex items-center gap-3 rounded-3xl border border-blue-100 bg-blue-50 px-6 py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-[#00339B]" />
+            <span className="text-sm font-medium text-[#00339B]">Loading tasks...</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (tasks.length === 0) {
     return (
@@ -445,9 +504,9 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
         </div>
       </div>
 
-      {error && (
+      {(error || tasksError) && (
         <Alert variant="destructive" className="rounded-xl">
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{error || tasksError}</AlertDescription>
         </Alert>
       )}
 

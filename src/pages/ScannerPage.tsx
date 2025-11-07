@@ -9,7 +9,7 @@ import { getStoredCleanerName } from '../lib/identity'
 
 export default function ScannerPage() {
   const navigate = useNavigate()
-  const [userType, setUserType] = useState<string>('')
+  const [userType, setUserType] = useState<'cleaner' | 'manager' | 'ops_manager' | 'admin' | ''>('')
   const [userId, setUserId] = useState<string>('')
   const [userName, setUserName] = useState<string>('')
 
@@ -24,7 +24,7 @@ export default function ScannerPage() {
       return
     }
 
-    setUserType(type)
+    setUserType(type as 'cleaner' | 'manager' | 'ops_manager' | 'admin')
     setUserId(id)
     setUserName(name)
   }, [navigate])
@@ -48,7 +48,7 @@ export default function ScannerPage() {
   }
 
   return (
-    <Sidebar07Layout userType={userType as 'cleaner' | 'manager' | 'admin'} userName={userName}>
+    <Sidebar07Layout userType={(userType || 'cleaner') as 'cleaner' | 'manager' | 'ops_manager' | 'admin'} userName={userName}>
       <div className="space-y-8 max-w-2xl mx-auto">
           {/* Header */}
           <div className="text-center space-y-3">

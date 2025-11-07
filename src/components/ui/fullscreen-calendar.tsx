@@ -30,6 +30,7 @@ export interface CalendarEvent {
   name: string
   time: string
   datetime: string
+  metadata?: Record<string, unknown>
 }
 
 export interface CalendarLogEntry {
@@ -54,6 +55,8 @@ export interface FullScreenCalendarProps {
   onMonthChange?: (range: { start: Date; end: Date }) => void
   headerActionSlot?: React.ReactNode
   emptyState?: React.ReactNode
+  onDaySelect?: (day: Date) => void
+  renderDetails?: (day: Date, data: CalendarData | null) => React.ReactNode
 }
 
 const colStartClasses = ['', 'col-start-2', 'col-start-3', 'col-start-4', 'col-start-5', 'col-start-6', 'col-start-7']
@@ -67,7 +70,15 @@ const truncateText = (value: string, maxLength: number) => {
   return `${value.slice(0, maxLength - 1)}…`
 }
 
-export function FullScreenCalendar({ data, isLoading, onMonthChange, headerActionSlot, emptyState }: FullScreenCalendarProps) {
+export function FullScreenCalendar({
+  data,
+  isLoading,
+  onMonthChange,
+  headerActionSlot,
+  emptyState,
+  onDaySelect,
+  renderDetails,
+}: FullScreenCalendarProps) {
   const today = startOfToday()
   const [selectedDay, setSelectedDay] = React.useState<Date>(today)
   const [currentMonth, setCurrentMonth] = React.useState<string>(format(today, 'MMM-yyyy'))
@@ -121,6 +132,7 @@ export function FullScreenCalendar({ data, isLoading, onMonthChange, headerActio
 
   const handleSelectDay = (day: Date) => {
     setSelectedDay(day)
+    onDaySelect?.(day)
   }
 
   const previousMonth = () => {
@@ -416,61 +428,65 @@ export function FullScreenCalendar({ data, isLoading, onMonthChange, headerActio
       </div>
 
       <div className="rounded-3xl border border-blue-100 bg-white p-6 shadow-lg shadow-blue-100/60">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-8">
-          <div className="flex-1 space-y-3">
-            <div>
-              <h3 className="text-lg font-semibold text-[#00339B]">{format(selectedDay, 'PPP')}</h3>
-              <p className="text-xs font-medium uppercase tracking-wide text-[#00339B]/60">Summary of cleaner attendance and logs</p>
-            </div>
-
-            {selectedDayData?.events?.length ? (
-              <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4 shadow-sm shadow-blue-100/50">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-[#00339B]/80">Shifts</h4>
-                <div className="mt-2 space-y-2">
-                  {selectedDayData.events.map((event) => (
-                    <div key={event.id} className="rounded-xl border border-blue-100 bg-white/90 p-3 shadow-sm shadow-blue-100/40">
-                      <p className="text-sm font-semibold text-[#00339B]">{event.name}</p>
-                      <p className="text-xs text-[#00339B]/70">{event.time}</p>
-                    </div>
-                  ))}
-                </div>
+        {renderDetails ? (
+          renderDetails(selectedDay, selectedDayData)
+        ) : (
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-8">
+            <div className="flex-1 space-y-3">
+              <div>
+                <h3 className="text-lg font-semibold text-[#00339B]">{format(selectedDay, 'PPP')}</h3>
+                <p className="text-xs font-medium uppercase tracking-wide text-[#00339B]/60">Summary of cleaner attendance and logs</p>
               </div>
-            ) : null}
 
-            {selectedDayData?.logs?.length ? (
-              <div className="rounded-2xl border border-blue-100 bg-white/90 p-4 shadow-sm shadow-blue-100/50">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-[#00339B]/80">Cleaner Logs</h4>
-                <div className="mt-2 space-y-2">
-                  {selectedDayData.logs.map((log) => (
-                    <div key={log.id} className="rounded-xl border border-blue-100 bg-blue-50/40 p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-[#00339B]">
-                        <span>{log.action ?? 'Log entry'}</span>
-                        <span className="text-[#00339B]/70">{format(new Date(log.timestamp), 'p')}</span>
+              {selectedDayData?.events?.length ? (
+                <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4 shadow-sm shadow-blue-100/50">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[#00339B]/80">Shifts</h4>
+                  <div className="mt-2 space-y-2">
+                    {selectedDayData.events.map((event) => (
+                      <div key={event.id} className="rounded-xl border border-blue-100 bg-white/90 p-3 shadow-sm shadow-blue-100/40">
+                        <p className="text-sm font-semibold text-[#00339B]">{event.name}</p>
+                        <p className="text-xs text-[#00339B]/70">{event.time}</p>
                       </div>
-                      {log.cleanerName ? (
-                        <p className="mt-1 text-xs text-[#00339B]/70">{log.cleanerName}</p>
-                      ) : null}
-                      {log.siteArea || log.customerName ? (
-                        <p className="mt-0.5 text-xs text-[#00339B]/70">
-                          {log.siteArea ?? log.customerName}
-                        </p>
-                      ) : null}
-                      {log.comments ? (
-                        <p className="mt-1 text-xs italic text-[#00339B]/70">{log.comments}</p>
-                      ) : null}
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {!selectedDayData?.events?.length && !selectedDayData?.logs?.length ? (
-              <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/40 p-6 text-center text-sm font-medium text-[#00339B]/70">
-                {emptyState ?? 'No attendance or cleaner logs for this day.'}
-              </div>
-            ) : null}
+              {selectedDayData?.logs?.length ? (
+                <div className="rounded-2xl border border-blue-100 bg-white/90 p-4 shadow-sm shadow-blue-100/50">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[#00339B]/80">Cleaner Logs</h4>
+                  <div className="mt-2 space-y-2">
+                    {selectedDayData.logs.map((log) => (
+                      <div key={log.id} className="rounded-xl border border-blue-100 bg-blue-50/40 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-[#00339B]">
+                          <span>{log.action ?? 'Log entry'}</span>
+                          <span className="text-[#00339B]/70">{format(new Date(log.timestamp), 'p')}</span>
+                        </div>
+                        {log.cleanerName ? (
+                          <p className="mt-1 text-xs text-[#00339B]/70">{log.cleanerName}</p>
+                        ) : null}
+                        {log.siteArea || log.customerName ? (
+                          <p className="mt-0.5 text-xs text-[#00339B]/70">
+                            {log.siteArea ?? log.customerName}
+                          </p>
+                        ) : null}
+                        {log.comments ? (
+                          <p className="mt-1 text-xs italic text-[#00339B]/70">{log.comments}</p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {!selectedDayData?.events?.length && !selectedDayData?.logs?.length ? (
+                <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/40 p-6 text-center text-sm font-medium text-[#00339B]/70">
+                  {emptyState ?? 'No attendance or cleaner logs for this day.'}
+                </div>
+              ) : null}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

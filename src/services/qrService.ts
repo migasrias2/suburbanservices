@@ -10,6 +10,7 @@ export type AreaType =
   | 'WAREHOUSE_INDUSTRIAL'
   | 'KITCHEN_CANTEEN'
   | 'RECEPTION_COMMON'
+  | 'OPS_SITE_INSPECTION'
 
 export interface TaskDefinition {
   id: string
@@ -37,6 +38,21 @@ export interface TaskSelection {
   selectedTasks: string[]
   timestamp: string
   completedTasks?: string[]
+}
+
+export interface OpsInspectionPhoto {
+  slot: number
+  photo: string
+  timestamp: string
+}
+
+export interface OpsInspectionPayload {
+  cleanerId: string
+  photos: OpsInspectionPhoto[]
+  siteName?: string
+  customerName?: string
+  clockInTime?: string
+  qrCodeId?: string
 }
 
 export interface ManualQRCodePayload {
@@ -68,11 +84,13 @@ type TimeAttendanceRecord = {
   cleaner_id: number | null
   cleaner_uuid: string | null
   cleaner_name: string | null
+  cleaner_mobile?: string | null
   customer_name: string | null
   site_name: string | null
   clock_in: string | null
   clock_out: string | null
   notes: string | null
+  clock_in_qr?: string | null
 }
 
 export const AREA_TASKS: Record<AreaType, TaskDefinition[]> = {
@@ -120,15 +138,536 @@ export const AREA_TASKS: Record<AreaType, TaskDefinition[]> = {
     { id: 'reception_wipe_counters', name: 'Wipe counters and reception desks', category: 'RECEPTION_COMMON' },
     { id: 'reception_arrange_chairs', name: 'Clean and arrange waiting area chairs', category: 'RECEPTION_COMMON' },
     { id: 'reception_remove_waste', name: 'Remove waste and recycling', category: 'RECEPTION_COMMON' }
+  ],
+  OPS_SITE_INSPECTION: [
+    { id: 'ops_photo_1', name: 'Inspection Photo 1', category: 'OPS_SITE_INSPECTION' },
+    { id: 'ops_photo_2', name: 'Inspection Photo 2', category: 'OPS_SITE_INSPECTION' },
+    { id: 'ops_photo_3', name: 'Inspection Photo 3', category: 'OPS_SITE_INSPECTION' }
   ]
 }
 
+type AreaTaskOverride = {
+  tasks: Array<{ name: string; category?: AreaType; description?: string }>
+}
+
+const METALEX_ABLUTION_TASKS: AreaTaskOverride['tasks'] = [
+  { name: 'Clean toilets', category: 'BATHROOMS_ABLUTIONS' },
+  { name: 'Clean sinks', category: 'BATHROOMS_ABLUTIONS' },
+  { name: 'Wipe mirrors', category: 'BATHROOMS_ABLUTIONS' },
+  { name: 'Empty waste bins', category: 'BATHROOMS_ABLUTIONS' },
+  { name: 'Replenish: hand paper towels, toilet rolls, soap', category: 'BATHROOMS_ABLUTIONS' },
+  { name: 'Mop floors', category: 'BATHROOMS_ABLUTIONS' },
+]
+
+const METALEX_HALL_TASKS: AreaTaskOverride['tasks'] = [
+  { name: 'Vacuum, mop or sweep as appropriate', category: 'GENERAL_AREAS' },
+  { name: 'Wipe skirting boards', category: 'GENERAL_AREAS' },
+  { name: 'Wipe glass panels and internal doors', category: 'GENERAL_AREAS' },
+]
+
+const METALEX_OPEN_OFFICE_TASKS: AreaTaskOverride['tasks'] = [
+  { name: 'Wipe desks and workstations', category: 'ADMIN_OFFICE' },
+  { name: 'Reset meeting rooms (tables, chairs, presentation surfaces)', category: 'ADMIN_OFFICE' },
+  { name: 'Vacuum floors', category: 'ADMIN_OFFICE' },
+  { name: 'Empty waste bins', category: 'ADMIN_OFFICE' },
+  { name: 'Dust computers and monitors', category: 'ADMIN_OFFICE' },
+  { name: 'Wipe phones and headsets', category: 'ADMIN_OFFICE' },
+  { name: 'Clean light switches and touch points', category: 'ADMIN_OFFICE' },
+]
+
+const METALEX_STAIRS_TASKS: AreaTaskOverride['tasks'] = [
+  { name: 'Vacuum, mop, or sweep floors (as appropriate)', category: 'GENERAL_AREAS' },
+  { name: 'Wipe handrails and banisters', category: 'GENERAL_AREAS' },
+]
+
+const METALEX_UNIT11_RECEPTION_TASKS: AreaTaskOverride['tasks'] = [
+  { name: 'Clean glass doors and partitions', category: 'RECEPTION_COMMON' },
+  { name: 'Clean and arrange waiting area chairs', category: 'RECEPTION_COMMON' },
+  { name: 'Wipe windowsills', category: 'RECEPTION_COMMON' },
+  { name: 'Vacuum, mop, or sweep floors (as appropriate)', category: 'RECEPTION_COMMON' },
+  { name: 'Wipe skirting boards', category: 'RECEPTION_COMMON' },
+  { name: 'Wipe glass panels and internal doors', category: 'RECEPTION_COMMON' },
+  { name: 'Mop floors', category: 'RECEPTION_COMMON' },
+]
+
+const METALEX_UNIT11_REST_AREA_TASKS: AreaTaskOverride['tasks'] = [
+  { name: 'Vacuum or mop floors as appropriate', category: 'GENERAL_AREAS' },
+  { name: 'Empty waste bins', category: 'GENERAL_AREAS' },
+  { name: 'Clean light switches and touch points', category: 'GENERAL_AREAS' },
+  { name: 'Wipe down kitchenette', category: 'GENERAL_AREAS' },
+]
+
+const CUSTOMER_AREA_TASK_OVERRIDES: Record<string, AreaTaskOverride> = {
+  'metalex::hall': {
+    tasks: METALEX_HALL_TASKS,
+  },
+  'metalex::metalex_hall': {
+    tasks: METALEX_HALL_TASKS,
+  },
+  'metalex::ladies_ablution': {
+    tasks: METALEX_ABLUTION_TASKS,
+  },
+  'metalex::ladies': {
+    tasks: METALEX_ABLUTION_TASKS,
+  },
+  'metalex::metalex_ladies_ablution': {
+    tasks: METALEX_ABLUTION_TASKS,
+  },
+  'metalex::men_s_ablution': {
+    tasks: METALEX_ABLUTION_TASKS,
+  },
+  'metalex::mens_ablution': {
+    tasks: METALEX_ABLUTION_TASKS,
+  },
+  'metalex::metalex_mens_ablution': {
+    tasks: METALEX_ABLUTION_TASKS,
+  },
+  'metalex::open_office': {
+    tasks: METALEX_OPEN_OFFICE_TASKS,
+  },
+  'metalex::metalex_open_office': {
+    tasks: METALEX_OPEN_OFFICE_TASKS,
+  },
+  'metalex::stairs': {
+    tasks: METALEX_STAIRS_TASKS,
+  },
+  'metalex::metalex_stairs': {
+    tasks: METALEX_STAIRS_TASKS,
+  },
+  'metalex::unit_11_ablution': {
+    tasks: METALEX_ABLUTION_TASKS,
+  },
+  'metalex::metalex_unit_11_ablution': {
+    tasks: METALEX_ABLUTION_TASKS,
+  },
+  'metalex::unit_11_disabled_ablution': {
+    tasks: METALEX_ABLUTION_TASKS,
+  },
+  'metalex::metalex_unit_11_disabled_ablution': {
+    tasks: METALEX_ABLUTION_TASKS,
+  },
+  'metalex::unit_11_reception': {
+    tasks: METALEX_UNIT11_RECEPTION_TASKS,
+  },
+  'metalex::unit_11_reception_mop_floors_wipe_ledge': {
+    tasks: METALEX_UNIT11_RECEPTION_TASKS,
+  },
+  'metalex::metalex_unit_11_reception_mop_floors_wipe_ledge': {
+    tasks: METALEX_UNIT11_RECEPTION_TASKS,
+  },
+  'metalex::unit_11_rest_area': {
+    tasks: METALEX_UNIT11_REST_AREA_TASKS,
+  },
+  'metalex::unit_11_rest_area_mop_tidy_wipe_ledge': {
+    tasks: METALEX_UNIT11_REST_AREA_TASKS,
+  },
+  'metalex::metalex_unit_11_rest_area_mop_tidy_wipe_ledge': {
+    tasks: METALEX_UNIT11_REST_AREA_TASKS,
+  },
+  'metalex::metalex_unit_11_rest_area': {
+    tasks: METALEX_UNIT11_REST_AREA_TASKS,
+  },
+}
+
+type AreaTaskRow = {
+  id?: string | number | null
+  task_description?: string | null
+  task_type?: string | null
+  qr_code?: string | null
+  sort_order?: number | null
+  customer_name?: string | null
+  area?: string | null
+  active?: boolean | null
+}
+
 export class QRService {
+  private static isSupabaseConfigured() {
+    try {
+      const url = import.meta.env?.VITE_SUPABASE_URL
+      const key = import.meta.env?.VITE_SUPABASE_ANON_KEY
+      return Boolean(supabase && typeof url === 'string' && url.trim() && typeof key === 'string' && key.trim())
+    } catch {
+      return false
+    }
+  }
+
+  private static hasLocalActiveClockIn(cleanerId?: string | null) {
+    if (typeof window === 'undefined') return false
+    try {
+      const phase = localStorage.getItem('currentClockInPhase')
+      if (phase !== 'workflow') return false
+
+      const storedDataRaw = localStorage.getItem('currentClockInData')
+      if (!storedDataRaw) return false
+
+      const storedCleanerId = localStorage.getItem('userId')
+      if (cleanerId && storedCleanerId && storedCleanerId.trim() && cleanerId.trim()) {
+        if (storedCleanerId.trim().toLowerCase() !== cleanerId.trim().toLowerCase()) {
+          return false
+        }
+      }
+
+      return true
+    } catch (error) {
+      console.warn('Local clock-in state check failed:', error)
+      return false
+    }
+  }
+
+  private static normalizeAreaTypeValue(value?: string | null): AreaType | null {
+    if (!value) return null
+    const raw = value.toString().trim()
+    if (!raw) return null
+
+    const upper = raw.toUpperCase()
+    if ((AREA_TASKS as Record<string, TaskDefinition[]>)[upper]) {
+      return upper as AreaType
+    }
+
+    const canonical = upper.replace(/[^A-Z0-9]+/g, '_')
+    if ((AREA_TASKS as Record<string, TaskDefinition[]>)[canonical]) {
+      return canonical as AreaType
+    }
+
+    return null
+  }
+
+  static async fetchTasksForQrArea(qrData: QRCodeData): Promise<TaskDefinition[]> {
+    const fallbackAreaType = this.detectAreaType(qrData)
+    const normalizedCustomer = (qrData.customerName || qrData.metadata?.siteName || '').trim()
+    const normalizedArea = (qrData.metadata?.areaName || '').trim()
+    const normalizedAreaSegment = normalizedArea ? this.sanitizeSegment(normalizedArea) : ''
+    const overrideKey = this.buildOverrideKey(normalizedCustomer, normalizedArea)
+    const overrideTasks = this.getOverrideTasks(
+      normalizedCustomer,
+      normalizedArea,
+      fallbackAreaType,
+      overrideKey,
+      qrData.areaId,
+    )
+
+    if (overrideTasks.length) {
+      return overrideTasks
+    }
+
+    try {
+      if (!supabase || !import.meta.env.VITE_SUPABASE_URL) {
+        return []
+      }
+
+      const rowsById = new Map<string, { task: TaskDefinition; sort: number | null }>()
+
+      const coerceTaskDefinition = (row: AreaTaskRow) => {
+        const description = (row.task_description || '').trim()
+        if (!description || row.active === false) return
+
+        const sanitizedDescription = this.sanitizeSegment(description)
+        const rawTypeValue = (row.task_type || '').toString().trim().toUpperCase()
+        const isPlaceholderType = rawTypeValue === 'AREA'
+        const matchesAreaLabel = normalizedAreaSegment && sanitizedDescription === normalizedAreaSegment
+        if (isPlaceholderType && matchesAreaLabel) {
+          return
+        }
+
+        const rawId = row.id !== undefined && row.id !== null ? String(row.id) : null
+        const defId = rawId || `${qrData.id || 'area'}-${this.sanitizeSegment(description)}-${rowsById.size + 1}`
+
+        if (rowsById.has(defId)) return
+
+        const taskAreaType = this.normalizeAreaTypeValue(row.task_type) ?? fallbackAreaType
+        const definition: TaskDefinition = {
+          id: defId,
+          name: description,
+          category: taskAreaType,
+          description,
+        }
+
+        rowsById.set(defId, {
+          task: definition,
+          sort: typeof row.sort_order === 'number' ? row.sort_order : null,
+        })
+      }
+
+      if (qrData.id) {
+        const { data } = await supabase
+          .from('area_tasks')
+          .select('id, task_description, task_type, qr_code, sort_order, active')
+          .eq('active', true)
+          .eq('qr_code', qrData.id)
+          .order('sort_order', { ascending: true, nullsFirst: false })
+
+        data?.forEach((row: AreaTaskRow) => coerceTaskDefinition(row))
+      }
+
+      if (!rowsById.size && normalizedCustomer && normalizedArea) {
+        const { data } = await supabase
+          .from('area_tasks')
+          .select('id, task_description, task_type, qr_code, sort_order, active, customer_name, area')
+          .eq('active', true)
+          .eq('customer_name', normalizedCustomer)
+          .eq('area', normalizedArea)
+          .order('sort_order', { ascending: true, nullsFirst: false })
+
+        data?.forEach((row: AreaTaskRow) => coerceTaskDefinition(row))
+      }
+
+      if (!rowsById.size && normalizedArea) {
+        const { data } = await supabase
+          .from('area_tasks')
+          .select('id, task_description, task_type, qr_code, sort_order, active, customer_name, area')
+          .eq('active', true)
+          .ilike('area', `%${normalizedArea}%`)
+          .order('sort_order', { ascending: true, nullsFirst: false })
+
+        data
+          ?.filter((row: AreaTaskRow) => {
+            if (!normalizedCustomer) return true
+            const label = (row.customer_name || '').trim()
+            return label.toLowerCase() === normalizedCustomer.toLowerCase()
+          })
+          .forEach((row: AreaTaskRow) => coerceTaskDefinition(row))
+      }
+
+      if (!rowsById.size) {
+        return []
+      }
+
+      return Array.from(rowsById.values())
+        .sort((a, b) => {
+          const aSort = a.sort ?? Number.MAX_SAFE_INTEGER
+          const bSort = b.sort ?? Number.MAX_SAFE_INTEGER
+          if (aSort !== bSort) return aSort - bSort
+          return a.task.name.localeCompare(b.task.name)
+        })
+        .map(({ task }) => task)
+    } catch (error) {
+      console.error('Failed to fetch tasks for QR area:', error)
+      return overrideTasks
+    }
+  }
+
+  private static buildOverrideKey(customerName?: string | null, areaName?: string | null) {
+    const customerSegment = this.sanitizeSegment(customerName || '')
+    const areaSegment = this.sanitizeSegment(areaName || '')
+    if (!customerSegment || !areaSegment) {
+      return ''
+    }
+    return `${customerSegment}::${areaSegment}`
+  }
+
+  private static getOverrideTasks(
+    customerName: string,
+    areaName: string,
+    fallbackAreaType: AreaType,
+    precomputedKey?: string,
+    areaId?: string | null,
+  ): TaskDefinition[] {
+    const customerSegment = this.sanitizeSegment(customerName || '')
+    if (!customerSegment) {
+      return []
+    }
+
+    const candidateKeys: string[] = []
+    if (precomputedKey) {
+      candidateKeys.push(precomputedKey)
+    }
+
+    const candidateSegments = new Set<string>()
+    const collectSegment = (value?: string | null) => {
+      if (!value) return
+      const segment = this.sanitizeSegment(value)
+      if (segment) {
+        candidateSegments.add(segment)
+      }
+    }
+
+    collectSegment(areaName)
+    collectSegment(areaId)
+
+    if (areaName) {
+      const noParens = areaName.replace(/\(.*?\)/g, ' ')
+      collectSegment(noParens)
+
+      const replacedDashes = areaName.replace(/[–—−]/g, ' ')
+      collectSegment(replacedDashes)
+    }
+
+    if (areaId) {
+      const withoutPrefix = areaId.replace(/^metalex[_-]*/i, '')
+      collectSegment(withoutPrefix)
+    }
+
+    for (const segment of candidateSegments) {
+      candidateKeys.push(`${customerSegment}::${segment}`)
+    }
+
+    const overrideAreaLabel = areaName || areaId || ''
+
+    for (const key of candidateKeys) {
+      if (!key) continue
+      const override = CUSTOMER_AREA_TASK_OVERRIDES[key]
+      if (override) {
+        return this.formatOverrideTasks(customerName, overrideAreaLabel, fallbackAreaType, override.tasks)
+      }
+    }
+
+    if (customerSegment === 'metalex') {
+      const heuristicTasks = this.resolveMetalexHeuristic(areaName, areaId)
+      if (heuristicTasks.length) {
+        return this.formatOverrideTasks(customerName, overrideAreaLabel, fallbackAreaType, heuristicTasks)
+      }
+    }
+
+    return []
+  }
+
+  private static formatOverrideTasks(
+    customerName: string,
+    areaLabel: string,
+    fallbackAreaType: AreaType,
+    tasks: AreaTaskOverride['tasks'],
+  ): TaskDefinition[] {
+    if (!tasks.length) {
+      return []
+    }
+
+    const customerSegment = this.sanitizeSegment(customerName || 'customer')
+    const areaSegment = this.sanitizeSegment(areaLabel || 'area')
+
+    return tasks.map((task, index) => ({
+      id: `${customerSegment}_${areaSegment}_${this.sanitizeSegment(task.name)}_${index}`,
+      name: task.name,
+      category: task.category ?? fallbackAreaType,
+      description: task.description ?? task.name,
+    }))
+  }
+
+  private static resolveMetalexHeuristic(
+    areaName?: string | null,
+    areaId?: string | null,
+  ): AreaTaskOverride['tasks'] {
+    const searchSource = `${areaName || ''} ${areaId || ''}`.toLowerCase()
+    const condensed = searchSource.replace(/[^a-z0-9]+/g, ' ')
+    if (!condensed.trim()) {
+      return []
+    }
+
+    const contains = (pattern: RegExp) => pattern.test(condensed)
+
+    if (contains(/ablution/)) {
+      return METALEX_ABLUTION_TASKS
+    }
+
+    if (contains(/unit\s*11/) && contains(/reception/)) {
+      return METALEX_UNIT11_RECEPTION_TASKS
+    }
+
+    if (contains(/rest\s*area/) && contains(/unit\s*11/)) {
+      return METALEX_UNIT11_REST_AREA_TASKS
+    }
+
+    if (contains(/open\s*office/)) {
+      return METALEX_OPEN_OFFICE_TASKS
+    }
+
+    if (contains(/stairs?/)) {
+      return METALEX_STAIRS_TASKS
+    }
+
+    if (contains(/hall/)) {
+      return METALEX_HALL_TASKS
+    }
+
+    return []
+  }
+
+  static getPresetTasks(
+    customerName: string,
+    areaName: string,
+    areaId?: string | null,
+  ): TaskDefinition[] {
+    const dummyQr: QRCodeData = {
+      id: areaId || '',
+      type: 'AREA',
+      customerName,
+      metadata: { areaName },
+    }
+    const fallbackAreaType = this.detectAreaType(dummyQr)
+    const overrideKey = this.buildOverrideKey(customerName, areaName)
+    return this.getOverrideTasks(customerName, areaName, fallbackAreaType, overrideKey, areaId)
+  }
+
   private static normalizeLabel(value?: string | null) {
     if (!value) return ''
     const trimmed = value.toString().trim()
     if (!trimmed || /unknown site/i.test(trimmed)) return ''
     return trimmed
+  }
+
+  static normalizeQrType(type?: string | null): QRCodeData['type'] | null {
+    if (!type) return null
+    const normalized = type.toString().trim()
+    if (!normalized) return null
+
+    const canonical = normalized
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '')
+
+    switch (canonical) {
+      case 'clock_in':
+      case 'clockin':
+        return 'CLOCK_IN'
+      case 'clock_out':
+      case 'clockout':
+        return 'CLOCK_OUT'
+      case 'area':
+        return 'AREA'
+      case 'task':
+        return 'TASK'
+      case 'feedback':
+        return 'FEEDBACK'
+      default:
+        return null
+    }
+  }
+
+  private static resolveClockInReference(qrData: QRCodeData): string | null {
+    const metadata = qrData.metadata || {}
+    const candidateKeys = [
+      'clockInQrId',
+      'clock_in_qr_id',
+      'clockInQr',
+      'clock_in_qr',
+      'clockInId',
+      'clock_in_id',
+      'linkedClockInQrId',
+      'linked_clock_in_qr_id',
+      'pairedClockInId',
+      'paired_clock_in_id',
+      'pairedClockInQr',
+      'paired_clock_in_qr',
+      'clockInCode',
+      'clock_in_code',
+    ]
+
+    for (const key of candidateKeys) {
+      const value = (metadata as Record<string, any>)[key]
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim()
+      }
+    }
+
+    const nestedClockIn = (metadata as Record<string, any>).clockIn
+    if (nestedClockIn && typeof nestedClockIn === 'object') {
+      const nestedValue = nestedClockIn.id || nestedClockIn.qrId || nestedClockIn.qr_id
+      if (typeof nestedValue === 'string' && nestedValue.trim()) {
+        return nestedValue.trim()
+      }
+    }
+
+    return null
   }
 
   private static deriveSiteLabel(qrData: QRCodeData, siteId?: string) {
@@ -229,7 +768,8 @@ export class QRService {
   }
 
   private static describeAreaTask(type: QRCodeData['type'], areaName: string) {
-    switch (type) {
+    const normalizedType = this.normalizeQrType(type) ?? 'AREA'
+    switch (normalizedType) {
       case 'CLOCK_IN':
         return `Clock in checkpoint – ${areaName}`
       case 'CLOCK_OUT':
@@ -328,6 +868,7 @@ export class QRService {
       throw new Error('Customer selection is required')
     }
 
+    const normalizedType = this.normalizeQrType(payload.type) ?? 'AREA'
     const now = new Date().toISOString()
     const metadata = {
       ...payload.metadata,
@@ -342,10 +883,10 @@ export class QRService {
 
     const qrData: QRCodeData = {
       id: uuidv4(),
-      type: payload.type,
+      type: normalizedType,
       siteId: payload.siteId?.trim() || undefined,
       areaId: payload.areaId?.trim() || undefined,
-      taskId: payload.type === 'TASK' ? payload.metadata?.taskId || uuidv4() : undefined,
+      taskId: normalizedType === 'TASK' ? payload.metadata?.taskId || uuidv4() : undefined,
       customerName: trimmedCustomer,
       metadata,
     }
@@ -536,8 +1077,26 @@ export class QRService {
 
       // If it's JSON, parse directly; otherwise, convert plain text to a structured QR
       const data = trimmed.startsWith('{') ? JSON.parse(trimmed) : this.fromPlainText(trimmed)
-      if (data.id && data.type) {
-        return data as QRCodeData
+
+      if (typeof data === 'object' && data) {
+        const record = data as Record<string, any>
+
+        if (!record.id && typeof record.metadata?.qrCodeId === 'string') {
+          record.id = record.metadata.qrCodeId
+        }
+
+        const normalizedType =
+          this.normalizeQrType(record.type) ||
+          this.normalizeQrType(record.metadata?.action) ||
+          this.normalizeQrType(record.metadata?.qrType)
+
+        if (normalizedType) {
+          record.type = normalizedType
+        }
+
+        if (record.id && record.type) {
+          return record as QRCodeData
+        }
       }
       return null
     } catch (error) {
@@ -560,15 +1119,18 @@ export class QRService {
       let siteArea = ''
       const siteLabelRaw = this.deriveSiteLabel(qrData, qrData.siteId)
       const siteLabel = this.prettifySiteLabel(siteLabelRaw) || siteLabelRaw || 'Site'
+      const normalizedType = this.normalizeQrType(qrData.type) ?? 'AREA'
+      const clockInReference = this.resolveClockInReference(qrData)
+      const localClockedIn = this.hasLocalActiveClockIn(cleanerId)
       // Database should be configured now
 
-      switch (qrData.type) {
+      switch (normalizedType) {
         case 'CLOCK_IN':
           action = 'Clock In'
           siteArea = this.prettifySiteLabel(qrData.metadata?.areaName) || siteLabel
           
           // Check if already clocked in
-          const alreadyClockedIn = await this.isAlreadyClockedIn(cleanerId)
+          const alreadyClockedIn = await this.isAlreadyClockedIn(cleanerId, { clockInQr: qrData.id })
           if (alreadyClockedIn) {
             return { 
               success: false, 
@@ -576,7 +1138,7 @@ export class QRService {
             }
           }
           
-          const clockInResult = await this.logClockEvent(cleanerId, qrData.siteId!, 'clock_in', qrData.id, qrData)
+          const clockInResult = await this.logClockEvent(cleanerId, qrData.siteId ?? '', 'clock_in', qrData.id, qrData)
           if (!clockInResult.success) {
             return { success: false, message: clockInResult.message }
           }
@@ -590,17 +1152,26 @@ export class QRService {
           const cleanerName = getStoredCleanerName()
           console.log('Clock-out validation for:', cleanerName)
           
-          const alreadyClockedOut = await this.isAlreadyClockedOut(cleanerId)
+          const alreadyClockedOut = await this.isAlreadyClockedOut(cleanerId, {
+            clockInQr: clockInReference ?? null,
+          })
           console.log('Already clocked out?', alreadyClockedOut)
           
-          if (alreadyClockedOut) {
+          if (alreadyClockedOut && !localClockedIn) {
             return { 
               success: false, 
               message: `You are already clocked out, ${cleanerName}. Please scan a Clock In QR code to start working.` 
             }
           }
           
-          const clockOutResult = await this.logClockEvent(cleanerId, qrData.siteId!, 'clock_out', qrData.id, qrData)
+          const clockOutResult = await this.logClockEvent(
+            cleanerId,
+            qrData.siteId ?? '',
+            'clock_out',
+            qrData.id,
+            qrData,
+            clockInReference ?? null,
+          )
           if (!clockOutResult.success) {
             return { success: false, message: clockOutResult.message }
           }
@@ -612,7 +1183,7 @@ export class QRService {
           
           // Check if clocked in before allowing area scan
           const isClockedIn = await this.isAlreadyClockedIn(cleanerId)
-          if (!isClockedIn) {
+          if (!isClockedIn && !localClockedIn) {
             return { 
               success: false, 
               message: 'Please clock in first before scanning area QR codes.' 
@@ -674,9 +1245,14 @@ export class QRService {
     siteId: string, 
     eventType: 'clock_in' | 'clock_out',
     qrCodeId: string,
-    qrData: QRCodeData
+    qrData: QRCodeData,
+    clockInReference?: string | null,
   ): Promise<{success: boolean, message?: string}> {
     try {
+      if (!this.isSupabaseConfigured()) {
+        console.warn('Supabase not configured; skipping remote log for', eventType)
+        return { success: true }
+      }
       const rawCleanerName = getStoredCleanerName()
       const cleanerName = normalizeCleanerName(rawCleanerName)
       const currentTime = new Date().toISOString()
@@ -708,7 +1284,9 @@ export class QRService {
         }
       } else {
         // For clock-out, update the most recent open time_attendance record
-        const openRecord = await this.findOpenAttendanceRecord(cleanerId, cleanerName)
+        const openRecord = await this.findOpenAttendanceRecord(cleanerId, cleanerName, {
+          clockInQr: clockInReference || this.resolveClockInReference(qrData) || null,
+        })
 
         if (!openRecord) {
           console.error('No active attendance record found for clock-out')
@@ -766,8 +1344,12 @@ export class QRService {
   private static async findOpenAttendanceRecord(
     cleanerId: string | null | undefined,
     cleanerName: string,
+    options?: { clockInQr?: string | null; allowFuzzy?: boolean },
   ): Promise<TimeAttendanceRecord | null> {
     try {
+      if (!this.isSupabaseConfigured()) {
+        return null
+      }
       if (!supabase || !import.meta.env.VITE_SUPABASE_URL) {
         console.error('Supabase not configured properly')
         return null
@@ -776,37 +1358,143 @@ export class QRService {
       const trimmedCleanerId = cleanerId ? cleanerId.toString().trim() : null
       const numericCleanerId = trimmedCleanerId ? normalizeCleanerNumericId(trimmedCleanerId) : null
       const normalizedCleanerName = normalizeCleanerName(cleanerName)
+      const normalizedCleanerNameLower = normalizedCleanerName.toLowerCase()
+      const clockInQr = options?.clockInQr ? options.clockInQr.toString().trim() : null
 
-      const identifiers: Array<{ column: string; value: string | number }> = []
-
-      if (numericCleanerId !== null) {
-        identifiers.push({ column: 'cleaner_id', value: numericCleanerId })
+      let cleanerMobile: string | null = null
+      try {
+        cleanerMobile = typeof window !== 'undefined' ? localStorage.getItem('userMobile') : null
+      } catch {
+        cleanerMobile = null
       }
 
-      if (trimmedCleanerId) {
-        identifiers.push({ column: 'cleaner_uuid', value: trimmedCleanerId })
+      const selectColumns =
+        'id, cleaner_id, cleaner_uuid, cleaner_name, cleaner_mobile, customer_name, site_name, clock_in, clock_out, notes, clock_in_qr'
+
+      const matchesRecord = (candidate?: Partial<TimeAttendanceRecord> | null) => {
+        if (!candidate) return false
+
+        if (clockInQr && candidate.clock_in_qr && candidate.clock_in_qr === clockInQr) {
+          return true
+        }
+
+        if (trimmedCleanerId && candidate.cleaner_uuid) {
+          if (candidate.cleaner_uuid.trim().toLowerCase() === trimmedCleanerId.toLowerCase()) {
+            return true
+          }
+        }
+
+        if (
+          numericCleanerId !== null &&
+          candidate.cleaner_id !== null &&
+          candidate.cleaner_id !== undefined &&
+          Number(candidate.cleaner_id) === numericCleanerId
+        ) {
+          return true
+        }
+
+        if (cleanerMobile && candidate.cleaner_mobile) {
+          if (candidate.cleaner_mobile.trim() === cleanerMobile.trim()) {
+            return true
+          }
+        }
+
+        if (normalizedCleanerName && candidate.cleaner_name) {
+          const candidateName = normalizeCleanerName(candidate.cleaner_name).toLowerCase()
+          if (candidateName === normalizedCleanerNameLower) {
+            return true
+          }
+        }
+
+        return false
+      }
+
+      const queryFactories: Array<() => Promise<{ data: TimeAttendanceRecord[] | null; error: any }>> = []
+
+      if (numericCleanerId !== null) {
+        queryFactories.push(() =>
+          supabase
+            .from('time_attendance')
+            .select(selectColumns)
+            .eq('cleaner_id', numericCleanerId)
+            .is('clock_out', null)
+            .order('id', { ascending: false })
+            .limit(3),
+        )
+      }
+
+      if (trimmedCleanerId && isUuid(trimmedCleanerId)) {
+        queryFactories.push(() =>
+          supabase
+            .from('time_attendance')
+            .select(selectColumns)
+            .eq('cleaner_uuid', trimmedCleanerId)
+            .is('clock_out', null)
+            .order('id', { ascending: false })
+            .limit(3),
+        )
       }
 
       if (normalizedCleanerName) {
-        identifiers.push({ column: 'cleaner_name', value: normalizedCleanerName })
+        queryFactories.push(() =>
+          supabase
+            .from('time_attendance')
+            .select(selectColumns)
+            .eq('cleaner_name', normalizedCleanerName)
+            .is('clock_out', null)
+            .order('id', { ascending: false })
+            .limit(3),
+        )
       }
 
-      for (const identifier of identifiers) {
-        const { data, error } = await supabase
-          .from('time_attendance')
-          .select('id, cleaner_id, cleaner_uuid, cleaner_name, customer_name, site_name, clock_in, clock_out, notes')
-          .eq(identifier.column, identifier.value)
-          .is('clock_out', null)
-          .order('id', { ascending: false })
-          .limit(1)
+      if (cleanerMobile) {
+        queryFactories.push(() =>
+          supabase
+            .from('time_attendance')
+            .select(selectColumns)
+            .eq('cleaner_mobile', cleanerMobile)
+            .is('clock_out', null)
+            .order('id', { ascending: false })
+            .limit(3),
+        )
+      }
 
+      const allowFuzzy = options?.allowFuzzy ?? true
+      if (allowFuzzy && normalizedCleanerName && normalizedCleanerName !== 'Unknown Cleaner') {
+        queryFactories.push(() =>
+          supabase
+            .from('time_attendance')
+            .select(selectColumns)
+            .ilike('cleaner_name', `%${normalizedCleanerName}%`)
+            .is('clock_out', null)
+            .order('id', { ascending: false })
+            .limit(5),
+        )
+      }
+
+      if (clockInQr) {
+        queryFactories.push(() =>
+          supabase
+            .from('time_attendance')
+            .select(selectColumns)
+            .eq('clock_in_qr', clockInQr)
+            .is('clock_out', null)
+            .order('id', { ascending: false })
+            .limit(5),
+        )
+      }
+
+      for (const buildQuery of queryFactories) {
+        const { data, error } = await buildQuery()
         if (error) {
-          console.error('Error finding open attendance record by', identifier.column, error)
+          console.error('Error finding open attendance record candidate:', error)
           continue
         }
 
-        if (data && data.length > 0) {
-          return data[0] as TimeAttendanceRecord
+        const rows = data ?? []
+        const match = rows.find((row) => matchesRecord(row))
+        if (match) {
+          return match as TimeAttendanceRecord
         }
       }
 
@@ -820,18 +1508,27 @@ export class QRService {
   /**
    * Check if cleaner is already clocked in
    */
-  private static async isAlreadyClockedIn(cleanerId: string): Promise<boolean> {
+  private static async isAlreadyClockedIn(
+    cleanerId: string,
+    options?: { clockInQr?: string | null },
+  ): Promise<boolean> {
     try {
+      const localActive = this.hasLocalActiveClockIn(cleanerId)
+      if (!this.isSupabaseConfigured()) {
+        return localActive
+      }
       // Check if Supabase is configured
       if (!supabase || !import.meta.env.VITE_SUPABASE_URL) {
         console.error('Supabase not configured properly')
-        return false
+        return localActive
       }
 
       const cleanerName = getStoredCleanerName()
       console.log('Checking if clocked in for:', cleanerName)
 
-      const openRecord = await this.findOpenAttendanceRecord(cleanerId, cleanerName)
+      const openRecord = await this.findOpenAttendanceRecord(cleanerId, cleanerName, {
+        clockInQr: options?.clockInQr ?? null,
+      })
 
       const isOpen = Boolean(openRecord)
       console.log('Has open clock-in sessions?', isOpen)
@@ -839,33 +1536,49 @@ export class QRService {
         console.log('Latest open session:', openRecord)
       }
 
+      if (!isOpen && localActive) {
+        console.warn('Supabase did not return an active clock-in, but local state indicates an active session. Trusting local state.')
+        return true
+      }
+
       return isOpen
     } catch (error) {
       console.error('Error in isAlreadyClockedIn:', error)
       // If any error, allow operation to continue
-      return false
+      return this.hasLocalActiveClockIn(cleanerId)
     }
   }
 
   /**
    * Check if cleaner is already clocked out
    */
-  private static async isAlreadyClockedOut(cleanerId: string): Promise<boolean> {
+  private static async isAlreadyClockedOut(
+    cleanerId: string,
+    options?: { clockInQr?: string | null },
+  ): Promise<boolean> {
     try {
+      const localActive = this.hasLocalActiveClockIn(cleanerId)
+      if (!this.isSupabaseConfigured()) {
+        return !localActive
+      }
       // Check if Supabase is configured
       if (!supabase || !import.meta.env.VITE_SUPABASE_URL) {
         console.error('Supabase not configured properly')
-        return false
+        return !localActive
       }
 
       const cleanerName = getStoredCleanerName()
       console.log('Checking clock-out status for:', cleanerName)
 
       // If there's no active clock-in, consider them clocked out
-      const isActive = await this.isAlreadyClockedIn(cleanerId)
+      const isActive = await this.isAlreadyClockedIn(cleanerId, options)
       console.log('Is currently clocked in?', isActive)
       
       const result = !isActive
+      if (result && localActive) {
+        console.warn('Supabase indicated no active clock-in, but local state shows active session. Treating as still clocked in.')
+        return false
+      }
       console.log('Should prevent clock-out?', result)
       
       return result
@@ -1015,6 +1728,80 @@ export class QRService {
       return true
     } catch (error) {
       console.error('Error saving task selection:', error)
+      return false
+    }
+  }
+
+  static async saveOpsInspection(payload: OpsInspectionPayload): Promise<boolean> {
+    try {
+      if (!payload.cleanerId) {
+        throw new Error('Cleaner ID is required to save an inspection.')
+      }
+
+      const photos = Array.isArray(payload.photos) ? [...payload.photos] : []
+      if (!photos.length) {
+        throw new Error('At least one photo is required to submit an inspection.')
+      }
+
+      const sortedPhotos = photos
+        .filter((photo) => photo && typeof photo.photo === 'string' && photo.photo.trim().length > 0)
+        .sort((a, b) => a.slot - b.slot)
+
+      if (!sortedPhotos.length) {
+        throw new Error('Inspection photos are not valid.')
+      }
+
+      const cleanerName = getStoredCleanerName()
+      const qrCodeId = (payload.qrCodeId || '').trim() || `ops_inspection_${uuidv4()}`
+      const submissionTimestamp = new Date().toISOString()
+      const taskIds = sortedPhotos.map((photo) => `ops_photo_${photo.slot}`)
+
+      // Persist summary selection for analytics (best-effort)
+      const { error: selectionError } = await supabase
+        .from('uk_cleaner_task_selections')
+        .insert({
+          cleaner_id: payload.cleanerId,
+          cleaner_name: cleanerName,
+          qr_code_id: qrCodeId,
+          area_type: 'OPS_SITE_INSPECTION',
+          selected_tasks: JSON.stringify(taskIds),
+          completed_tasks: JSON.stringify(taskIds),
+          timestamp: submissionTimestamp,
+        })
+
+      if (selectionError) {
+        console.warn('Ops inspection selection insert failed (continuing with photos):', selectionError)
+      }
+
+      const siteLabel = payload.siteName?.trim() || 'Site Inspection'
+      const customerLabel = payload.customerName?.trim() || payload.siteName?.trim() || null
+      const startedAt = payload.clockInTime || submissionTimestamp
+
+      const photoRows = sortedPhotos.map((photo) => ({
+        cleaner_id: payload.cleanerId,
+        cleaner_name: cleanerName,
+        qr_code_id: qrCodeId,
+        task_id: `ops_photo_${photo.slot}`,
+        area_type: 'OPS_SITE_INSPECTION',
+        area_name: siteLabel,
+        customer_name: customerLabel,
+        photo_data: photo.photo,
+        photo_timestamp: photo.timestamp,
+        started_at: startedAt,
+      }))
+
+      const { error: photoError } = await supabase
+        .from('uk_cleaner_task_photos')
+        .insert(photoRows)
+
+      if (photoError) {
+        console.error('Failed to save ops inspection photos:', photoError)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      console.error('Error saving ops inspection:', error)
       return false
     }
   }

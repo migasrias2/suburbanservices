@@ -22,6 +22,42 @@ const toCompactDate = (value: string) => {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+const hoursFormatter = new Intl.NumberFormat(undefined, {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 1,
+})
+
+const normalizeToIsoDay = (value?: string | Date | null): string | null => {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const expandDateRange = (dates: string[]): string[] => {
+  if (!dates.length) return []
+  const sorted = [...dates].sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+  const start = new Date(sorted[0])
+  const end = new Date(sorted[sorted.length - 1])
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return sorted
+  }
+
+  const result: string[] = []
+  for (let current = new Date(start); current <= end; current.setDate(current.getDate() + 1)) {
+    const currentIso = normalizeToIsoDay(new Date(current))
+    if (currentIso) {
+      result.push(currentIso)
+    }
+  }
+
+  return result
+}
+
 type HoursWorkedAreaChartProps = {
   summary: AnalyticsSummary
   layout?: 'card' | 'inline'
@@ -79,25 +115,79 @@ const HoursWorkedChart: React.FC<HoursWorkedChartProps> = ({
         />
       </YAxis>
       <ChartTooltip
-        cursor={false}
-        content={<ChartTooltipContent indicator="line" className="!bg-white" labelFormatter={(value) => toCompactDate(String(value))} />}
+        cursor={{ stroke: 'var(--color-hours)', strokeOpacity: 0.25, strokeWidth: 1, strokeDasharray: '3 3' }}
+        content={
+          <ChartTooltipContent
+            indicator="line"
+            className="!bg-white"
+            labelFormatter={(value) => toCompactDate(String(value))}
+            formatter={(value) => {
+              const numericValue = typeof value === 'number' ? value : Number(value)
+              return (
+                <div className="flex w-full items-center justify-between gap-3">
+                  <span className="text-xs font-medium text-gray-500">Hours Worked</span>
+                  <span className="font-mono font-semibold text-[#00339B]">
+                    {Number.isFinite(numericValue) ? `${hoursFormatter.format(numericValue)}h` : '0h'}
+                  </span>
+                </div>
+              )
+            }}
+          />
+        }
       />
       <Area
         dataKey="hours"
-        type="natural"
+        type="monotone"
         stroke="var(--color-hours)"
         fill="var(--color-hours)"
         fillOpacity={0.22}
+        dot={{ r: 3, fill: '#00339B', stroke: '#fff', strokeWidth: 2 }}
+        activeDot={{ r: 5, fill: '#00339B', stroke: '#fff', strokeWidth: 3 }}
       />
     </AreaChart>
   </ChartContainer>
 )
 
 export const HoursWorkedAreaChart: React.FC<HoursWorkedAreaChartProps> = ({ summary, layout = 'card', className }) => {
-  const data = summary.hoursByDate.map((point) => ({
-    date: point.date,
-    hours: point.hours,
-  }))
+  const hoursByDay = new Map<string, number>()
+  summary.hoursByDate.forEach((point) => {
+    const normalized = normalizeToIsoDay(point.date)
+    if (normalized) {
+      hoursByDay.set(normalized, point.hours)
+    }
+  })
+
+  const candidateDates = [
+    ...summary.trend.flatMap((point) => {
+      const normalized = normalizeToIsoDay(point.date)
+      return normalized ? [normalized] : []
+    }),
+    ...summary.hoursByDate.flatMap((point) => {
+      const normalized = normalizeToIsoDay(point.date)
+      return normalized ? [normalized] : []
+    }),
+  ]
+
+  const orderedDates = candidateDates.length
+    ? expandDateRange(Array.from(new Set(candidateDates)))
+    : Array.from(hoursByDay.keys()).sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+
+  const data = orderedDates.length
+    ? orderedDates.map((date) => ({
+        date,
+        hours: hoursByDay.get(date) ?? 0,
+      }))
+    : summary.hoursByDate.map((point) => ({
+        date: point.date,
+        hours: point.hours,
+      }))
+
+  const totalHours = summary.totals.totalHoursWorked ?? data.reduce((total, point) => total + point.hours, 0)
+  const averageDailyHours = data.length ? totalHours / data.length : 0
+  const peakDay = data.reduce<HoursWorkedChartProps['data'][number] | null>((highest, current) => {
+    if (!highest) return current
+    return current.hours > highest.hours ? current : highest
+  }, null)
 
   if (layout === 'inline') {
     return (
@@ -116,9 +206,28 @@ export const HoursWorkedAreaChart: React.FC<HoursWorkedAreaChartProps> = ({ summ
 
   return (
     <AnalyticsChartCard
+      title="Hours Worked"
+      description="Cleaner coverage across the selected range"
+      footer={
+        peakDay
+          ? `Peak day ${toCompactDate(peakDay.date)} with ${hoursFormatter.format(peakDay.hours)}h captured.`
+          : undefined
+      }
       className={className}
     >
-      <HoursWorkedChart data={data} />
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-2 text-sm text-gray-600">
+          <div className="flex flex-col">
+            <span className="text-xs uppercase tracking-wide text-gray-400">Total hours</span>
+            <span className="text-xl font-semibold text-[#00339B]">{hoursFormatter.format(totalHours)}h</span>
+          </div>
+          <div className="flex flex-col text-right">
+            <span className="text-xs uppercase tracking-wide text-gray-400">Avg / day</span>
+            <span className="text-xl font-semibold text-[#00339B]">{hoursFormatter.format(averageDailyHours)}h</span>
+          </div>
+        </div>
+        <HoursWorkedChart data={data} />
+      </div>
     </AnalyticsChartCard>
   )
 }

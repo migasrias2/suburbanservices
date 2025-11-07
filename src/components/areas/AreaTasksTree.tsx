@@ -47,6 +47,10 @@ const buildTree = (tasks: AreaTask[]): TreeAreaGroup[] => {
   tasks.forEach((task) => {
     const customer = task.customer_name?.trim() || task.customer_name || 'Unassigned Customer'
     const area = task.area?.trim() || 'Unassigned Area'
+    const normalizedArea = area.toLowerCase()
+    if (/^clock\s*(in|out)/i.test(normalizedArea)) {
+      return
+    }
     if (!map.has(customer)) {
       map.set(customer, new Map())
     }

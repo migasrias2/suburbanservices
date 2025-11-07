@@ -17,7 +17,9 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
   const [isRegisterMode, setIsRegisterMode] = useState(false)
-  const [activeTab, setActiveTab] = useState<'cleaner' | 'manager' | 'admin'>('cleaner')
+  type AuthTab = 'cleaner' | 'manager' | 'ops_manager' | 'admin'
+
+  const [activeTab, setActiveTab] = useState<AuthTab>('cleaner')
   
   // Login state
   const [mobile, setMobile] = useState<string>('+44')
@@ -44,14 +46,25 @@ export default function Login() {
     setRegConfirmPassword('')
   }
 
+  const clearClockState = () => {
+    try {
+      localStorage.removeItem('currentClockInData')
+      localStorage.removeItem('currentClockInPhase')
+      localStorage.removeItem('currentSiteName')
+      localStorage.removeItem('recentClockOutAt')
+    } catch {
+      // no-op
+    }
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
       const loginData = {
-        mobile_number: activeTab === 'admin' ? undefined : mobile,
-        username: activeTab === 'admin' ? username : undefined,
+        mobile_number: activeTab === 'cleaner' || activeTab === 'manager' ? mobile : undefined,
+        username: activeTab === 'admin' || activeTab === 'ops_manager' ? username : undefined,
         password,
         user_type: activeTab
       }
@@ -62,8 +75,14 @@ export default function Login() {
         const normalizedName = setStoredCleanerName(result.user.name)
 
         // Store user session
+        clearClockState()
         localStorage.setItem('userType', result.user.user_type)
         localStorage.setItem('userId', result.user.id)
+        if (result.user.mobile_number) {
+          localStorage.setItem('userMobile', result.user.mobile_number)
+        } else {
+          localStorage.removeItem('userMobile')
+        }
         setStoredCleanerName(normalizedName)
 
         // Navigate based on user type
@@ -73,6 +92,9 @@ export default function Login() {
             break
           case 'manager':
             navigate('/manager-dashboard')
+            break
+          case 'ops_manager':
+            navigate('/ops-dashboard')
             break
           case 'admin':
             navigate('/admin-dashboard')
@@ -213,6 +235,11 @@ export default function Login() {
         // Store user session
         localStorage.setItem('userType', result.user.user_type)
         localStorage.setItem('userId', result.user.id)
+        if (result.user.mobile_number) {
+          localStorage.setItem('userMobile', result.user.mobile_number)
+        } else {
+          localStorage.removeItem('userMobile')
+        }
         setStoredCleanerName(normalizedName)
 
         // Navigate based on user type
@@ -222,6 +249,9 @@ export default function Login() {
             break
           case 'manager':
             navigate('/manager-dashboard')
+            break
+          case 'ops_manager':
+            navigate('/ops-dashboard')
             break
           case 'admin':
             navigate('/admin-dashboard')
@@ -311,7 +341,7 @@ export default function Login() {
             <Tabs
               value={activeTab}
               onValueChange={(value) => {
-                const nextTab = value as 'cleaner' | 'manager' | 'admin'
+                const nextTab = value as AuthTab
                 setActiveTab(nextTab)
                 if (nextTab !== 'cleaner') {
                   setIsRegisterMode(false)
@@ -320,7 +350,7 @@ export default function Login() {
               }}
               className="w-full"
             >
-              <TabsList className="grid w-full grid-cols-3 rounded-2xl p-1 mb-6 bg-[#0b2f6b]/8 backdrop-blur border border-[#0b2f6b]/20">
+              <TabsList className="grid w-full grid-cols-4 rounded-2xl p-1 mb-6 bg-[#0b2f6b]/8 backdrop-blur border border-[#0b2f6b]/20">
                 <TabsTrigger 
                   value="cleaner" 
                   className="rounded-xl text-sm font-medium py-2.5 px-3 text-[#0b2f6b]/80 transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0b2f6b] data-[state=active]:to-[#021540] data-[state=active]:text-white data-[state=active]:shadow-lg"
@@ -334,6 +364,12 @@ export default function Login() {
                 >
                   <UserCheck className="h-4 w-4 mr-1.5" />
                   Manager
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="ops_manager" 
+                  className="rounded-xl text-sm font-medium py-2.5 px-3 text-[#0b2f6b]/80 transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0b2f6b] data-[state=active]:to-[#021540] data-[state=active]:text-white data-[state=active]:shadow-lg"
+                >
+                  Ops
                 </TabsTrigger>
                 <TabsTrigger 
                   value="admin" 
@@ -532,6 +568,54 @@ export default function Login() {
                   </Button>
                 </form>
                 <p className="mt-4 text-xs text-center text-[#0b2f6b]/60">Manager accounts are provisioned by administrators.</p>
+              </TabsContent>
+
+              <TabsContent value="ops_manager" className="mt-0">
+                <form onSubmit={handleLogin} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="username-ops" className="text-[#0b2f6b]/80 font-medium text-sm">Username</Label>
+                    <Input
+                      id="username-ops"
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Enter your username"
+                      className="rounded-xl border-[#0b2f6b]/20 bg-white/90 focus:border-[#0b2f6b]/40 focus:ring-2 focus:ring-[#0b2f6b]/30 h-11 text-sm text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password-ops" className="text-[#0b2f6b]/80 font-medium text-sm">Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="password-ops"
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Enter your password"
+                        className="rounded-xl border-[#0b2f6b]/20 bg-white/90 focus:border-[#0b2f6b]/40 focus:ring-2 focus:ring-[#0b2f6b]/30 h-11 pr-12 text-sm text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
+                        required
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-[#0b2f6b]/40 hover:text-[#0b2f6b]"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                  <Button 
+                    type="submit" 
+                    className="w-full h-11 rounded-xl bg-gradient-to-r from-[#0b2f6b] to-[#021540] hover:from-[#07204a] hover:to-[#010a27] text-white font-semibold shadow-lg shadow-[#0b2f6b]/30 transition-all duration-200" 
+                    disabled={loading}
+                  >
+                    {loading ? 'Signing in...' : 'Sign in as Ops'}
+                  </Button>
+                </form>
+                <p className="mt-4 text-xs text-center text-[#0b2f6b]/60">Operations manager access is assigned by administrators.</p>
               </TabsContent>
 
               <TabsContent value="admin" className="mt-0">

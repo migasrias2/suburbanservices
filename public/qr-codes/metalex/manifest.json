@@ -1,0 +1,199 @@
+{
+  "generatedAt": "2025-11-03T12:19:44.723Z",
+  "customer": "Metalex",
+  "siteId": "metalex_main_site",
+  "areas": [
+    {
+      "areaName": "Men's Ablution",
+      "fileName": "metalex-mens-ablution.png",
+      "areaId": "metalex_mens_ablution",
+      "areaType": "BATHROOMS_ABLUTIONS",
+      "notes": "Deep clean, restock supplies, disinfect high touchpoints.",
+      "qrData": {
+        "id": "cf25fef7-b5e4-47b6-9a34-0b89c0ad86fe",
+        "type": "AREA",
+        "siteId": "metalex_main_site",
+        "areaId": "metalex_mens_ablution",
+        "customerName": "Metalex",
+        "areaType": "BATHROOMS_ABLUTIONS",
+        "metadata": {
+          "siteName": "Metalex",
+          "areaName": "Men's Ablution",
+          "label": "Men's Ablution – Metalex",
+          "category": "BATHROOMS_ABLUTIONS",
+          "notes": "Deep clean, restock supplies, disinfect high touchpoints.",
+          "generatedAt": "2025-11-03T12:19:44.723Z",
+          "generatedBy": "Metalex batch generator"
+        }
+      }
+    },
+    {
+      "areaName": "Ladies' Ablution",
+      "fileName": "metalex-ladies-ablution.png",
+      "areaId": "metalex_ladies_ablution",
+      "areaType": "BATHROOMS_ABLUTIONS",
+      "notes": "Deep clean, restock supplies, disinfect high touchpoints.",
+      "qrData": {
+        "id": "2e07d69a-7e8f-45ed-a9fc-9cad94496019",
+        "type": "AREA",
+        "siteId": "metalex_main_site",
+        "areaId": "metalex_ladies_ablution",
+        "customerName": "Metalex",
+        "areaType": "BATHROOMS_ABLUTIONS",
+        "metadata": {
+          "siteName": "Metalex",
+          "areaName": "Ladies' Ablution",
+          "label": "Ladies' Ablution – Metalex",
+          "category": "BATHROOMS_ABLUTIONS",
+          "notes": "Deep clean, restock supplies, disinfect high touchpoints.",
+          "generatedAt": "2025-11-03T12:19:44.723Z",
+          "generatedBy": "Metalex batch generator"
+        }
+      }
+    },
+    {
+      "areaName": "Reception",
+      "fileName": "metalex-reception.png",
+      "areaId": "metalex_reception",
+      "areaType": "RECEPTION_COMMON",
+      "notes": "Maintain front-of-house appearance, wipe counters, empty bins.",
+      "qrData": {
+        "id": "778dd4be-90e3-4dfb-93ec-5ca8ec1f9361",
+        "type": "AREA",
+        "siteId": "metalex_main_site",
+        "areaId": "metalex_reception",
+        "customerName": "Metalex",
+        "areaType": "RECEPTION_COMMON",
+        "metadata": {
+          "siteName": "Metalex",
+          "areaName": "Reception",
+          "label": "Reception – Metalex",
+          "category": "RECEPTION_COMMON",
+          "notes": "Maintain front-of-house appearance, wipe counters, empty bins.",
+          "generatedAt": "2025-11-03T12:19:44.723Z",
+          "generatedBy": "Metalex batch generator"
+        }
+      }
+    },
+    {
+      "areaName": "Hall",
+      "fileName": "metalex-hall.png",
+      "areaId": "metalex_hall",
+      "areaType": "GENERAL_AREAS",
+      "notes": "Sweep/mop floor, remove litter, tidy passage.",
+      "qrData": {
+        "id": "77139eac-d3ce-43f4-94bb-c1570b221b69",
+        "type": "AREA",
+        "siteId": "metalex_main_site",
+        "areaId": "metalex_hall",
+        "customerName": "Metalex",
+        "areaType": "GENERAL_AREAS",
+        "metadata": {
+          "siteName": "Metalex",
+          "areaName": "Hall",
+          "label": "Hall – Metalex",
+          "category": "GENERAL_AREAS",
+          "notes": "Sweep/mop floor, remove litter, tidy passage.",
+          "generatedAt": "2025-11-03T12:19:44.723Z",
+          "generatedBy": "Metalex batch generator"
+        }
+      }
+    },
+    {
+      "areaName": "Stairs",
+      "fileName": "metalex-stairs.png",
+      "areaId": "metalex_stairs",
+      "areaType": "GENERAL_AREAS",
+      "notes": "Vacuum/mop steps, wipe handrails.",
+      "qrData": {
+        "id": "1a45a482-fb6a-4c33-9fac-d88a32fd96e8",
+        "type": "AREA",
+        "siteId": "metalex_main_site",
+        "areaId": "metalex_stairs",
+        "customerName": "Metalex",
+        "areaType": "GENERAL_AREAS",
+        "metadata": {
+          "siteName": "Metalex",
+          "areaName": "Stairs",
+          "label": "Stairs – Metalex",
+          "category": "GENERAL_AREAS",
+          "notes": "Vacuum/mop steps, wipe handrails.",
+          "generatedAt": "2025-11-03T12:19:44.723Z",
+          "generatedBy": "Metalex batch generator"
+        }
+      }
+    },
+    {
+      "areaName": "Open Office",
+      "fileName": "metalex-open-office.png",
+      "areaId": "metalex_open_office",
+      "areaType": "ADMIN_OFFICE",
+      "notes": "Wipe desks, tidy workstations, empty bins.",
+      "qrData": {
+        "id": "9a067ce3-22e4-4153-91ff-e83108983e2e",
+        "type": "AREA",
+        "siteId": "metalex_main_site",
+        "areaId": "metalex_open_office",
+        "customerName": "Metalex",
+        "areaType": "ADMIN_OFFICE",
+        "metadata": {
+          "siteName": "Metalex",
+          "areaName": "Open Office",
+          "label": "Open Office – Metalex",
+          "category": "ADMIN_OFFICE",
+          "notes": "Wipe desks, tidy workstations, empty bins.",
+          "generatedAt": "2025-11-03T12:19:44.723Z",
+          "generatedBy": "Metalex batch generator"
+        }
+      }
+    },
+    {
+      "areaName": "Unit 11 – Reception (mop floors, wipe ledge)",
+      "fileName": "metalex-unit-11-reception-mop-floors-wipe-ledge.png",
+      "areaId": "metalex_unit_11_reception_mop_floors_wipe_ledge",
+      "areaType": "RECEPTION_COMMON",
+      "notes": "Mop floors and wipe ledges as specified.",
+      "qrData": {
+        "id": "a481a788-93cc-4118-854c-ba6772aba292",
+        "type": "AREA",
+        "siteId": "metalex_main_site",
+        "areaId": "metalex_unit_11_reception_mop_floors_wipe_ledge",
+        "customerName": "Metalex",
+        "areaType": "RECEPTION_COMMON",
+        "metadata": {
+          "siteName": "Metalex",
+          "areaName": "Unit 11 – Reception (mop floors, wipe ledge)",
+          "label": "Unit 11 – Reception (mop floors, wipe ledge) – Metalex",
+          "category": "RECEPTION_COMMON",
+          "notes": "Mop floors and wipe ledges as specified.",
+          "generatedAt": "2025-11-03T12:19:44.723Z",
+          "generatedBy": "Metalex batch generator"
+        }
+      }
+    },
+    {
+      "areaName": "Unit 11 – Rest Area (mop, tidy, wipe ledge)",
+      "fileName": "metalex-unit-11-rest-area-mop-tidy-wipe-ledge.png",
+      "areaId": "metalex_unit_11_rest_area_mop_tidy_wipe_ledge",
+      "areaType": "GENERAL_AREAS",
+      "notes": "Mop, tidy area, wipe ledges as specified.",
+      "qrData": {
+        "id": "aaa095f1-0a70-4485-8e80-85bf37795b58",
+        "type": "AREA",
+        "siteId": "metalex_main_site",
+        "areaId": "metalex_unit_11_rest_area_mop_tidy_wipe_ledge",
+        "customerName": "Metalex",
+        "areaType": "GENERAL_AREAS",
+        "metadata": {
+          "siteName": "Metalex",
+          "areaName": "Unit 11 – Rest Area (mop, tidy, wipe ledge)",
+          "label": "Unit 11 – Rest Area (mop, tidy, wipe ledge) – Metalex",
+          "category": "GENERAL_AREAS",
+          "notes": "Mop, tidy area, wipe ledges as specified.",
+          "generatedAt": "2025-11-03T12:19:44.723Z",
+          "generatedBy": "Metalex batch generator"
+        }
+      }
+    }
+  ]
+}

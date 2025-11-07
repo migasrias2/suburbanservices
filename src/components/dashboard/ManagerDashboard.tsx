@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { format } from 'date-fns'
 import { useQuery } from '@tanstack/react-query'
@@ -8,11 +8,20 @@ import { supabase } from '../../services/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
-import { fetchAllCleaners, fetchCleanersByIds, fetchManagerCleanerIds, deleteCleaner } from '../../services/managerService'
+import {
+  fetchAllCleaners,
+  fetchCleanersByIds,
+  fetchManagerCleanerIds,
+  deleteCleaner,
+  fetchManagerRecentActivity,
+  type CleanerSummary,
+  type ManagerActivityRow,
+} from '../../services/managerService'
 import { AREA_TASKS } from '../../services/qrService'
 import { normalizeCleanerName } from '../../lib/identity'
-import { defaultAnalyticsRange, toIsoRange } from '../../lib/utils'
+import { cn, defaultAnalyticsRange, toIsoRange } from '../../lib/utils'
 import { AssistRequestService } from '../../services/assistRequestService'
+import type { BathroomAssistRequest } from '../../services/supabase'
 import { fetchAnalyticsSummary, fetchDashboardSnapshot, type AnalyticsRole } from '../../services/analyticsService'
 import { Badge } from '../ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
@@ -144,6 +153,40 @@ const statusColors: Record<string, string> = {
 
 const normalizeStatus = (status: string | null) => (status ? status.toLowerCase().replace(/\s+/g, '_') : '')
 const getStatusColor = (status: string | null) => statusColors[normalizeStatus(status)] || 'bg-gray-400'
+
+type AssistStatusKey = BathroomAssistRequest['status'] | 'unknown'
+
+const assistStatusBadgeClasses: Record<AssistStatusKey, string> = {
+  pending: 'border border-amber-200 bg-amber-50 text-amber-700',
+  accepted: 'border border-blue-200 bg-blue-50 text-[#00339B]',
+  resolved: 'border border-emerald-200 bg-emerald-50 text-emerald-700',
+  escalated: 'border border-rose-200 bg-rose-50 text-rose-600',
+  cancelled: 'border border-slate-200 bg-slate-50 text-slate-500',
+  unknown: 'border border-slate-200 bg-slate-50 text-slate-500'
+}
+
+const assistAttentionContainerClasses: Record<AssistStatusKey, string> = {
+  pending: 'border-amber-200 bg-amber-50/60',
+  accepted: 'border-blue-200 bg-blue-50/60',
+  resolved: 'border-emerald-200 bg-emerald-50/60',
+  escalated: 'border-rose-200 bg-rose-50/60',
+  cancelled: 'border-slate-200 bg-slate-50/60',
+  unknown: 'border-slate-200 bg-slate-50/60'
+}
+
+const formatAssistStatus = (status?: BathroomAssistRequest['status'] | null) => {
+  if (!status) return 'Unknown'
+  return status
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ')
+}
+
+const getAssistStatusBadgeClasses = (status?: BathroomAssistRequest['status'] | null) =>
+  assistStatusBadgeClasses[status ?? 'unknown'] ?? assistStatusBadgeClasses.unknown
+
+const getAssistAttentionContainerClasses = (status?: BathroomAssistRequest['status'] | null) =>
+  assistAttentionContainerClasses[status ?? 'unknown'] ?? assistAttentionContainerClasses.unknown
 
 const formatTime = (iso: string | null, options?: Intl.DateTimeFormatOptions) =>
   iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', ...(options ?? {}) }) : '—'
@@ -328,12 +371,24 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const [photoFeedbackMap, setPhotoFeedbackMap] = useState<Record<number, 'up' | 'down' | null>>({})
   const [isSavingFeedback, setIsSavingFeedback] = useState(false)
   const [expandedAttendanceId, setExpandedAttendanceId] = useState<number | null>(null)
-  const [assistRequests, setAssistRequests] = useState<BathroomAssistRequest[]>([])
+  const [assistActiveRequests, setAssistActiveRequests] = useState<BathroomAssistRequest[]>([])
+  const [assistResolvedRequests, setAssistResolvedRequests] = useState<BathroomAssistRequest[]>([])
+  const [assistRequestsError, setAssistRequestsError] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date>(() => normalizeToStartOfDay(new Date()))
   const [isAutoDate, setIsAutoDate] = useState(true)
   const [now, setNow] = useState<Date>(() => new Date())
   const [todayRefreshKey, setTodayRefreshKey] = useState(0)
   const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null)
+  const isGlobalRole = role === 'admin' || role === 'ops_manager'
+  const isOpsManager = role === 'ops_manager'
+  const overviewSubtitle = isOpsManager
+    ? 'Monitor every cleaner, submission, and inspection across all sites.'
+    : 'Oversee live cleaners, submissions, and assistance updates from your manager control centre.'
+  const [globalActivity, setGlobalActivity] = useState<ManagerActivityRow[]>([])
+  const [isGlobalActivityLoading, setIsGlobalActivityLoading] = useState(false)
+  const [globalActivityError, setGlobalActivityError] = useState<string | null>(null)
+  const scopedManagerId = isGlobalRole ? undefined : managerId
+  const analyticsManagerId = isGlobalRole ? null : managerId
 
   const isSameDay = (left: Date, right: Date) =>
     left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth() && left.getDate() === right.getDate()
@@ -367,7 +422,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
       setIsListLoading(true)
 
       try {
-        const cleanerIds = await fetchManagerCleanerIds(managerId)
+        const cleanerIds = scopedManagerId ? await fetchManagerCleanerIds(scopedManagerId) : []
         const cleanerRoster = cleanerIds.length
           ? await fetchCleanersByIds(cleanerIds)
           : await fetchAllCleaners()
@@ -399,25 +454,60 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         }
 
         const cleanerMap = new Map<string, CleanerListItem>()
+        const rosterById = new Map(cleanerRoster.map((row) => [row.id, row]))
+        const rosterByName = new Map(
+          cleanerRoster
+            .map((row) => {
+              const fullName = `${row.first_name ?? ''} ${row.last_name ?? ''}`.trim()
+              const normalized = normalizeCleanerName(fullName)
+              return normalized ? [normalized.toLowerCase(), row] : null
+            })
+            .filter((entry): entry is [string, CleanerSummary] => Boolean(entry))
+        )
+
+        const resolveRosterMatchByName = (name: string | null | undefined) => {
+          if (!name) return null
+          const normalized = normalizeCleanerName(name)
+          if (!normalized) return null
+          return rosterByName.get(normalized.toLowerCase()) ?? null
+        }
 
         ;(trackingRows ?? []).forEach((row) => {
-          const key = row.cleaner_id || row.id
           const cleanerNameRaw = row.cleaner_name ?? (() => {
-            const rosterMatch = cleanerRoster.find((cleaner) => cleaner.id === row.cleaner_id)
+            const rosterMatch = row.cleaner_id ? rosterById.get(row.cleaner_id) : null
             if (!rosterMatch) return ''
             return `${rosterMatch.first_name ?? ''} ${rosterMatch.last_name ?? ''}`.trim()
           })()
 
           const cleanerName = normalizeCleanerName(cleanerNameRaw)
+          if (!cleanerName) return
 
-          if (!key || !cleanerName) return
+          let resolvedCleanerId = ''
+          if (row.cleaner_id !== null && row.cleaner_id !== undefined) {
+            resolvedCleanerId = String(row.cleaner_id).trim()
+          }
 
+          if (!resolvedCleanerId) {
+            const rosterMatch = resolveRosterMatchByName(row.cleaner_name)
+            if (rosterMatch?.id) {
+              resolvedCleanerId = rosterMatch.id
+            }
+          }
+
+          if (!resolvedCleanerId) {
+            const fallback = row.id ?? ''
+            resolvedCleanerId = fallback ? String(fallback).trim() : ''
+          }
+
+          if (!resolvedCleanerId) return
+
+          const key = resolvedCleanerId
           const rowTimestamp = row.timestamp || row.updated_at || row.created_at || new Date().toISOString()
           const existing = cleanerMap.get(key)
           if (!existing) {
             cleanerMap.set(key, {
-              id: row.id || key,
-              cleaner_id: row.cleaner_id || key,
+              id: row.id ? String(row.id) : key,
+              cleaner_id: key,
               cleaner_name: cleanerName,
               cleaner_name_normalized: cleanerName,
               customer_name: row.customer_name || null,
@@ -484,10 +574,25 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     }
 
     loadCleaners()
-    AssistRequestService.listResolved({ limit: 12 }).then(setAssistRequests).catch((error) => {
-      console.error('Failed to load bathroom assist summary', error)
-      setAssistRequests([])
-    })
+
+    const loadAssistRequests = async () => {
+      try {
+        const [active, resolved] = await Promise.all([
+          AssistRequestService.listRecent({ statuses: ['pending', 'accepted', 'escalated'], limit: 8 }),
+          AssistRequestService.listResolved({ limit: 8 })
+        ])
+        setAssistActiveRequests(active)
+        setAssistResolvedRequests(resolved)
+        setAssistRequestsError(null)
+      } catch (error) {
+        console.error('Failed to load bathroom assist summary', error)
+        setAssistActiveRequests([])
+        setAssistResolvedRequests([])
+        setAssistRequestsError('Unable to load assistance updates right now.')
+      }
+    }
+
+    loadAssistRequests()
   }, [managerId])
 
   useEffect(() => {
@@ -753,7 +858,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           .lt('clock_out', endIso)
           .order('clock_out', { ascending: false })
 
-        if (role !== 'admin' && managedCleanerIds.length) {
+        if (!isGlobalRole && managedCleanerIds.length) {
           clockInQuery = clockInQuery.in('cleaner_id', managedCleanerIds)
           clockOutQuery = clockOutQuery.in('cleaner_id', managedCleanerIds)
         }
@@ -774,7 +879,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         const cleanerNameSet = new Set(managedCleanerNames)
 
         const scopedRows = allRows.filter((row) => {
-          if (role === 'admin') return true
+          if (isGlobalRole) return true
 
           const candidateId = row.cleaner_id ?? row.cleaner_uuid
           if (candidateId && cleanerIdSet.has(String(candidateId).trim())) {
@@ -857,13 +962,13 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     }
 
     if (!managerId) return
-    if (role !== 'admin' && !managedCleanerIds.length && !managedCleanerNames.length && cleaners.length) {
+    if (!isGlobalRole && !managedCleanerIds.length && !managedCleanerNames.length && cleaners.length) {
       setDailyAttendance([])
       setIsDailyAttendanceLoading(false)
       return
     }
 
-    if (role !== 'admin' && !cleaners.length && isListLoading) {
+    if (!isGlobalRole && !cleaners.length && isListLoading) {
       return
     }
 
@@ -927,13 +1032,15 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   }
 
   const getAttendanceSiteLabel = (row: AttendanceRow) => {
-    if (row.site_name && !isPlaceholderLabel(row.site_name)) {
-      return row.site_name
+    const candidates = [row.site_name, row.customer_name]
+      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+      .filter((value): value is string => Boolean(value) && !isPlaceholderLabel(value))
+
+    if (candidates.length) {
+      return candidates[0]
     }
-    if (row.customer_name && !isPlaceholderLabel(row.customer_name)) {
-      return row.customer_name
-    }
-    return row.site_name || row.customer_name || 'Site'
+
+    return 'Site'
   }
 
   const renderAttendanceCard = (row: AttendanceRow) => {
@@ -1214,21 +1321,42 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
       .sort((a, b) => (b.latestTimestamp ?? Number.NEGATIVE_INFINITY) - (a.latestTimestamp ?? Number.NEGATIVE_INFINITY))
   }, [taskPhotoGroups])
 
-  const assistCards = useMemo(() => assistRequests.map((request) => ({
-    id: request.id,
-    location: request.location_label,
-    customer: request.customer_name,
-    reportedAt: request.reported_at,
-    acceptedAt: request.accepted_at,
-    resolvedAt: request.resolved_at,
-    status: request.status,
-    notes: request.notes,
-    materials: request.materials_used,
-    handledBy: request.resolved_by_name || request.accepted_by_name || 'Cleaner',
-    beforeMedia: Array.isArray(request.before_media) ? request.before_media : [],
-    afterMedia: Array.isArray(request.after_media) ? request.after_media : [],
-    escalated: request.status === 'escalated'
-  })), [assistRequests])
+  const assistActiveCards = useMemo(
+    () =>
+      assistActiveRequests.map((request) => ({
+        id: request.id,
+        location: request.location_label,
+        customer: request.customer_name,
+        reportedAt: request.reported_at,
+        acceptedAt: request.accepted_at,
+        acceptedByName: request.accepted_by_name,
+        status: request.status,
+        issueType: request.issue_type,
+        notes: request.notes,
+        materials: request.materials_used,
+        escalatedAt: request.escalated_at,
+        escalationReason: request.escalation_reason,
+        escalateAfter: request.escalate_after
+      })),
+    [assistActiveRequests]
+  )
+
+  const assistResolvedCards = useMemo(
+    () =>
+      assistResolvedRequests.map((request) => ({
+        id: request.id,
+        location: request.location_label,
+        customer: request.customer_name,
+        reportedAt: request.reported_at,
+        resolvedAt: request.resolved_at,
+        resolvedByName: request.resolved_by_name,
+        status: request.status,
+        issueType: request.issue_type,
+        notes: request.notes,
+        materials: request.materials_used
+      })),
+    [assistResolvedRequests]
+  )
 
   const areasToday = taskSummaries.length
   const photosCount = todaysPhotos.length
@@ -1364,10 +1492,10 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   }, [])
 
   const hoursTrendQuery = useQuery({
-    queryKey: ['manager-dashboard-hours-trend', role, managerId, hoursTrendRange.iso.start, hoursTrendRange.iso.end],
+    queryKey: ['manager-dashboard-hours-trend', role, analyticsManagerId, hoursTrendRange.iso.start, hoursTrendRange.iso.end],
     queryFn: () =>
       fetchAnalyticsSummary({
-        managerId,
+        managerId: analyticsManagerId,
         role,
         range: hoursTrendRange.iso,
       }),
@@ -1378,10 +1506,10 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const selectedDayIso = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate])
 
   const snapshotQuery = useQuery({
-    queryKey: ['manager-dashboard-snapshot', role, managerId, selectedDayIso],
+    queryKey: ['manager-dashboard-snapshot', role, analyticsManagerId, selectedDayIso],
     queryFn: () =>
       fetchDashboardSnapshot({
-        managerId,
+        managerId: analyticsManagerId,
         role,
         dayIso: selectedDayIso,
       }),
@@ -1447,7 +1575,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     setDeleteLoadingId(cleanerId)
 
     try {
-      await deleteCleaner(cleanerId)
+      await deleteCleaner({ cleanerId, cleanerName: cleaner.cleaner_name })
 
       const previouslySelectedId = selectedCleaner?.cleaner_id ?? null
       let nextSelectedCleaner: CleanerListItem | null = null
@@ -1538,6 +1666,59 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     displayedPhotosCount,
     displayedHoursWorked,
   ])
+
+  useEffect(() => {
+    if (!isGlobalRole || !managerId) {
+      setGlobalActivity([])
+      return
+    }
+
+    let cancelled = false
+
+    const loadActivity = async () => {
+      setIsGlobalActivityLoading(true)
+      try {
+        const rows = await fetchManagerRecentActivity(managerId, 40, role)
+        if (!cancelled) {
+          setGlobalActivity(rows)
+          setGlobalActivityError(null)
+        }
+      } catch (error) {
+        console.error('Failed to load global activity overview', error)
+        if (!cancelled) {
+          setGlobalActivity([])
+          setGlobalActivityError('Unable to load recent cleaner activity overview.')
+        }
+      } finally {
+        if (!cancelled) {
+          setIsGlobalActivityLoading(false)
+        }
+      }
+    }
+
+    loadActivity()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isGlobalRole, managerId, role])
+
+  const handleRefreshGlobalActivity = useCallback(() => {
+    if (!isGlobalRole || !managerId) return
+    setIsGlobalActivityLoading(true)
+    fetchManagerRecentActivity(managerId, 40, role)
+      .then((rows) => {
+        setGlobalActivity(rows)
+        setGlobalActivityError(null)
+      })
+      .catch((error) => {
+        console.error('Failed to refresh global activity overview', error)
+        setGlobalActivityError('Unable to refresh activity. Please try again later.')
+      })
+      .finally(() => setIsGlobalActivityLoading(false))
+  }, [isGlobalRole, managerId, role])
+
+  const globalActivityPreview = useMemo(() => globalActivity.slice(0, 12), [globalActivity])
 
   const toggleGroup = (key: string) => {
     setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -1648,7 +1829,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
             </div>
           </div>
           <p className="mt-5 max-w-3xl text-sm text-slate-500">
-            Oversee live cleaners, submissions, and assistance updates from your manager control centre.
+            {overviewSubtitle}
           </p>
         </section>
 
@@ -1684,62 +1865,199 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           })}
         </section>
 
+        {isGlobalRole && (
+          <section className="rounded-[36px] border border-white/70 bg-white/85 shadow-[0_30px_80px_rgba(0,51,155,0.08)] backdrop-blur">
+            <div className="flex flex-col gap-4 border-b border-blue-100 px-8 py-6 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-[#00339B]">Cleaner activity overview</h2>
+                <p className="text-sm text-slate-500">Latest site check-ins, area scans, and task logs across all cleaners.</p>
+              </div>
+              <Button
+                variant="ghost"
+                onClick={handleRefreshGlobalActivity}
+                disabled={isGlobalActivityLoading}
+                className="rounded-full border border-blue-100 px-6 py-2 text-sm font-semibold text-[#00339B] hover:bg-blue-50"
+              >
+                {isGlobalActivityLoading ? 'Refreshing…' : 'Refresh'}
+              </Button>
+            </div>
+            <div className="space-y-3 px-8 py-6">
+              {isGlobalActivityLoading ? (
+                <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-6 text-center text-sm text-slate-500">
+                  Loading recent activity…
+                </div>
+              ) : globalActivityError ? (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-6 text-center text-sm text-rose-600">
+                  {globalActivityError}
+                </div>
+              ) : globalActivityPreview.length ? (
+                globalActivityPreview.map((row) => (
+                  <div
+                    key={row.id}
+                    className="rounded-[24px] border border-blue-100 bg-white/95 p-4 shadow-sm shadow-blue-100/40"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[#00339B]">
+                      <span className="font-semibold">{row.action || 'Activity recorded'}</span>
+                      <span className="text-xs text-[#00339B]/70">
+                        {row.timestamp ? format(new Date(row.timestamp), 'MMM d, yyyy • p') : '—'}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#00339B]/70">
+                      {row.cleaner_name ? <span className="font-semibold">{row.cleaner_name}</span> : null}
+                      {row.site ? <span>• {row.site}</span> : null}
+                      {row.area ? <span>• {row.area}</span> : null}
+                    </div>
+                    {row.detail ? (
+                      <p className="mt-2 text-xs text-slate-500">{row.detail}</p>
+                    ) : null}
+                    {row.comments ? (
+                      <p className="mt-1 text-xs text-slate-500/80">{row.comments}</p>
+                    ) : null}
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/40 p-6 text-center text-sm text-slate-500">
+                  No cleaner activity recorded for this period.
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         <section className="grid gap-6 xl:grid-cols-2">
           <Card className="rounded-[36px] border border-white/70 bg-white/80 shadow-[0_26px_70px_rgba(0,51,155,0.1)] backdrop-blur">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-xl font-semibold text-[#00339B]">Activity</CardTitle>
-              <p className="text-sm text-slate-500">Latest cleaner logs and bathroom assist updates.</p>
+              <CardTitle className="text-xl font-semibold text-[#00339B]">Assistance</CardTitle>
+              <p className="text-sm text-slate-500">
+                Monitor bathroom assist requests needing cleaner action and keep track of recent resolutions.
+              </p>
             </CardHeader>
             <CardContent className="space-y-8">
-              <div>
-                <div className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1">
-                  {selectedLogsPreview.length ? (
-                    selectedLogsPreview.map((log) => (
-                      <div
-                        key={log.id}
-                        className="flex items-start gap-3 rounded-[24px] border border-blue-100 bg-blue-50/50 p-4 shadow-sm"
-                      >
-                        <div
-                          className={`flex h-10 w-10 items-center justify-center rounded-2xl text-[10px] font-semibold uppercase text-white ${getStatusColor(log.action)}`}
-                        >
-                          {log.action.slice(0, 3).toUpperCase()}
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-sm font-semibold text-[#0f235f]">{log.action}</p>
-                          <p className="text-xs text-slate-500">{log.site_area || '—'}</p>
-                          <p className="text-[11px] text-slate-400">{formatDateTime(log.timestamp)}</p>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-6 text-center text-sm text-slate-500">
-                      No recent activity recorded.
+              {assistRequestsError ? (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-6 text-center text-sm text-rose-600">
+                  {assistRequestsError}
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8aa5ff]">Needs attention</p>
+                      {assistActiveCards.length > 0 && (
+                        <span className="text-[11px] font-medium text-slate-400">{assistActiveCards.length} open</span>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {assistCards.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8aa5ff]">Assistance</p>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    {assistCards.slice(0, 4).map((assist) => (
-                      <div key={assist.id} className="rounded-[24px] border border-blue-100 bg-blue-50/40 p-4 shadow-sm">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-sm font-semibold text-[#00339B]">{assist.location}</span>
-                          <Badge className="rounded-full bg-white/80 text-xs uppercase tracking-wide text-[#00339B]">
-                            {assist.status}
-                          </Badge>
+                    <div className="mt-4 space-y-3">
+                      {assistActiveCards.length ? (
+                        assistActiveCards.map((assist) => (
+                          <div
+                            key={assist.id}
+                            className={cn(
+                              'rounded-[24px] border p-5 shadow-sm transition',
+                              getAssistAttentionContainerClasses(assist.status)
+                            )}
+                          >
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-semibold text-[#00339B]">{assist.location}</p>
+                                  <p className="text-xs text-slate-500">{assist.customer ?? 'Unknown customer'}</p>
+                                </div>
+                                <Badge
+                                  className={cn(
+                                    'rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide',
+                                    getAssistStatusBadgeClasses(assist.status)
+                                  )}
+                                >
+                                  {formatAssistStatus(assist.status)}
+                                </Badge>
+                              </div>
+                              {assist.issueType && (
+                                <p className="text-xs font-medium text-[#0f235f]">{assist.issueType}</p>
+                              )}
+                            </div>
+                            <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
+                              <span className="font-semibold text-rose-500">
+                                Reported {formatDateTime(assist.reportedAt)}
+                              </span>
+                              {assist.acceptedAt && (
+                                <span className="font-semibold text-[#00339B]">
+                                  Accepted {formatDateTime(assist.acceptedAt)}
+                                  {assist.acceptedByName ? ` • ${assist.acceptedByName}` : ''}
+                                </span>
+                              )}
+                              {assist.escalatedAt && (
+                                <span className="font-semibold text-rose-600">
+                                  Escalated {formatDateTime(assist.escalatedAt)}
+                                </span>
+                              )}
+                              {!assist.acceptedAt && assist.escalateAfter && (
+                                <span className="font-medium text-amber-600">
+                                  Escalates after {formatDateTime(assist.escalateAfter)}
+                                </span>
+                              )}
+                            </div>
+                            {(assist.notes || assist.escalationReason) && (
+                              <div className="mt-3 space-y-1 text-xs text-slate-500">
+                                {assist.notes && <p>Notes: {assist.notes}</p>}
+                                {assist.escalationReason && <p>Escalation reason: {assist.escalationReason}</p>}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-6 text-center text-sm text-slate-500">
+                          No requests need attention right now.
                         </div>
-                        <p className="mt-1 text-xs text-slate-500">{assist.customer ?? 'Unknown customer'}</p>
-                        <p className="mt-3 text-[11px] text-slate-400">Reported {formatDateTime(assist.reportedAt)}</p>
-                        {assist.resolvedAt && (
-                          <p className="text-[11px] text-emerald-600">Resolved {formatDateTime(assist.resolvedAt)}</p>
-                        )}
-                      </div>
-                    ))}
+                      )}
+                    </div>
                   </div>
-                </div>
+
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8aa5ff]">Recently resolved</p>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      {assistResolvedCards.length ? (
+                        assistResolvedCards.map((assist) => (
+                          <div
+                            key={assist.id}
+                            className="rounded-[24px] border border-blue-100 bg-blue-50/40 p-4 shadow-sm"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-sm font-semibold text-[#00339B]">{assist.location}</span>
+                              <Badge
+                                className={cn(
+                                  'rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide',
+                                  getAssistStatusBadgeClasses(assist.status)
+                                )}
+                              >
+                                {formatAssistStatus(assist.status)}
+                              </Badge>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-500">{assist.customer ?? 'Unknown customer'}</p>
+                            {assist.issueType && (
+                              <p className="mt-2 text-xs text-[#0f235f]">{assist.issueType}</p>
+                            )}
+                            <p className="mt-3 text-[11px] text-slate-400">
+                              Reported {formatDateTime(assist.reportedAt)}
+                            </p>
+                            {assist.resolvedAt && (
+                              <p className="text-[11px] text-emerald-600">
+                                Resolved {formatDateTime(assist.resolvedAt)}
+                                {assist.resolvedByName ? ` • ${assist.resolvedByName}` : ''}
+                              </p>
+                            )}
+                            {assist.notes && (
+                              <p className="mt-2 text-xs text-slate-500">Notes: {assist.notes}</p>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="sm:col-span-2 rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-6 text-center text-sm text-slate-500">
+                          No recent resolutions yet.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

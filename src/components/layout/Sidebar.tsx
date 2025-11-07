@@ -10,14 +10,15 @@ import {
   FileText,
   Settings,
   X,
-  Clock
+  Clock,
+  CalendarDays
 } from 'lucide-react'
 import { Button } from '../ui/button'
 
 interface SidebarProps {
   isOpen: boolean
   onClose: () => void
-  userType: 'cleaner' | 'manager' | 'admin'
+  userType: 'cleaner' | 'manager' | 'ops_manager' | 'admin'
   userName: string
 }
 
@@ -29,6 +30,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, userType, use
     localStorage.removeItem('userType')
     localStorage.removeItem('userId')
     localStorage.removeItem('userName')
+    localStorage.removeItem('currentClockInData')
+    localStorage.removeItem('currentClockInPhase')
+    localStorage.removeItem('currentSiteName')
+    localStorage.removeItem('recentClockOutAt')
     navigate('/login')
   }
 
@@ -48,7 +53,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, userType, use
     { icon: BarChart3, label: 'Analytics', path: '/analytics' },
   ]
 
-  const menuItems = userType === 'cleaner' ? cleanerMenuItems : managerMenuItems
+  const opsManagerMenuItems = [
+    { icon: BarChart3, label: 'Dashboard', path: '/ops-dashboard' },
+    { icon: Clock, label: 'Clock In', path: '/clock-in' },
+    { icon: CalendarDays, label: 'Calendar', path: '/ops-calendar' },
+    { icon: BarChart3, label: 'Analytics', path: '/analytics' },
+  ]
+
+  const menuItems = userType === 'cleaner'
+    ? cleanerMenuItems
+    : userType === 'ops_manager'
+      ? opsManagerMenuItems
+      : managerMenuItems
 
   const isActive = (path: string) => location.pathname === path
 
