@@ -1575,7 +1575,8 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     setDeleteLoadingId(cleanerId)
 
     try {
-      await deleteCleaner({ cleanerId, cleanerName: cleaner.cleaner_name })
+      const { summary } = await deleteCleaner({ cleanerId, cleanerName: cleaner.cleaner_name })
+      console.info('Cleaner deletion summary', summary)
 
       const previouslySelectedId = selectedCleaner?.cleaner_id ?? null
       let nextSelectedCleaner: CleanerListItem | null = null

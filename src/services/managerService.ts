@@ -67,7 +67,11 @@ type DeleteCleanerOptions = {
   cleanerName?: string | null
 }
 
-export async function deleteCleaner({ cleanerId, cleanerName }: DeleteCleanerOptions): Promise<void> {
+type DeleteCleanerSummary = Record<string, number>
+
+export async function deleteCleaner({ cleanerId, cleanerName }: DeleteCleanerOptions): Promise<{
+  summary: DeleteCleanerSummary
+}> {
   const trimmedId = typeof cleanerId === 'string' ? cleanerId.trim() : ''
 
   if (!trimmedId) {
@@ -75,146 +79,33 @@ export async function deleteCleaner({ cleanerId, cleanerName }: DeleteCleanerOpt
   }
 
   const normalizedCleanerName = cleanerName ? normalizeCleanerName(cleanerName) : null
-  const numericCleanerId = normalizeCleanerNumericId(trimmedId)
 
-  const candidateIdSet = new Set<string>()
-  candidateIdSet.add(trimmedId)
+  const { data, error } = await supabase.rpc('manager_delete_cleaner', {
+    p_cleaner_identifier: trimmedId,
+    p_cleaner_name: normalizedCleanerName ?? null,
+  })
 
-  const lowerVariant = trimmedId.toLowerCase()
-  if (lowerVariant !== trimmedId) {
-    candidateIdSet.add(lowerVariant)
+  if (error) {
+    console.error('manager_delete_cleaner RPC failed', error)
+    throw error
   }
 
-  const upperVariant = trimmedId.toUpperCase()
-  if (upperVariant !== trimmedId) {
-    candidateIdSet.add(upperVariant)
-  }
+  const summary: DeleteCleanerSummary = {}
 
-  if (numericCleanerId !== null) {
-    candidateIdSet.add(String(numericCleanerId))
-  }
-
-  const candidateIds = Array.from(candidateIdSet)
-
-  const cleanupTargets: Array<{
-    table: string
-    column: string
-    required: boolean
-  }> = [
-    { table: 'manager_cleaners', column: 'cleaner_id', required: true },
-    { table: 'live_tracking', column: 'cleaner_id', required: true },
-    { table: 'uk_cleaner_live_tracking', column: 'cleaner_id', required: false },
-    { table: 'cleaner_logs', column: 'cleaner_id', required: false },
-    { table: 'uk_cleaner_logs', column: 'cleaner_id', required: false },
-    { table: 'uk_cleaner_task_selections', column: 'cleaner_id', required: false },
-    { table: 'uk_cleaner_task_photos', column: 'cleaner_id', required: false },
-  ]
-
-  for (const target of cleanupTargets) {
-    let lastError: unknown = null
-
-    for (const candidate of candidateIds) {
-      const { error } = await supabase
-        .from(target.table)
-        .delete()
-        .eq(target.column, candidate)
-
-      if (error) {
-        lastError = error
-        continue
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+      if (typeof value === 'number') {
+        summary[key] = value
+      } else if (typeof value === 'string') {
+        const parsed = Number(value)
+        if (!Number.isNaN(parsed)) {
+          summary[key] = parsed
+        }
       }
-
-      lastError = null
-    }
-
-    if (lastError) {
-      if (target.required) {
-        throw lastError
-      }
-
-      console.warn(`Failed to delete related records for cleaner from ${target.table}`, lastError)
     }
   }
 
-  if (normalizedCleanerName) {
-    const { error: liveTrackingNameCleanupError } = await supabase
-      .from('live_tracking')
-      .delete()
-      .ilike('cleaner_name', normalizedCleanerName)
-      .is('cleaner_id', null)
-
-    if (liveTrackingNameCleanupError) {
-      console.warn('Failed to remove orphan live_tracking rows for cleaner name', liveTrackingNameCleanupError)
-    }
-
-    const { error: ukLiveTrackingNameCleanupError } = await supabase
-      .from('uk_cleaner_live_tracking')
-      .delete()
-      .ilike('cleaner_name', normalizedCleanerName)
-      .is('cleaner_id', null)
-
-    if (ukLiveTrackingNameCleanupError) {
-      console.warn('Failed to remove orphan uk_live_tracking rows for cleaner name', ukLiveTrackingNameCleanupError)
-    }
-  }
-
-  if (numericCleanerId !== null) {
-    const { error: numericAttendanceError } = await supabase
-      .from('time_attendance')
-      .delete()
-      .eq('cleaner_id', numericCleanerId)
-
-    if (numericAttendanceError) {
-      console.warn('Failed to remove numeric-linked time_attendance records for cleaner', numericAttendanceError)
-    }
-  }
-
-  const uuidCandidates = Array.from(
-    new Set(
-      [trimmedId, trimmedId.toLowerCase(), trimmedId.toUpperCase()].filter((value) => value.includes('-'))
-    )
-  )
-
-  if (uuidCandidates.length) {
-    const { error: uuidAttendanceError } = await supabase
-      .from('time_attendance')
-      .delete()
-      .in('cleaner_uuid', uuidCandidates)
-
-    if (uuidAttendanceError) {
-      console.warn('Failed to remove uuid-linked time_attendance records for cleaner', uuidAttendanceError)
-    }
-  }
-
-  let cleanersDeleteError: unknown = null
-  for (const candidate of candidateIds) {
-    const { error } = await supabase
-      .from('cleaners')
-      .delete()
-      .eq('id', candidate)
-
-    if (error) {
-      cleanersDeleteError = error
-      continue
-    }
-
-    cleanersDeleteError = null
-  }
-
-  if (cleanersDeleteError) {
-    throw cleanersDeleteError
-  }
-
-  for (const candidate of candidateIds) {
-    const { error: legacyCleanerDeleteError } = await supabase
-      .from('uk_cleaners')
-      .delete()
-      .eq('id', candidate)
-
-    if (legacyCleanerDeleteError) {
-      console.warn('Failed to remove cleaner from legacy uk_cleaners table', legacyCleanerDeleteError)
-    }
-  }
+  return { summary }
 }
 
 export async function resolveManagerCleanerRoster(managerId?: string | null): Promise<CleanerSummary[]> {

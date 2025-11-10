@@ -151,7 +151,7 @@ export function FullScreenCalendar({
       return (
         <div className="space-y-2 text-[#00339B]">
           <p className="text-sm font-semibold">{format(day, 'PPP')}</p>
-          <p className="text-xs font-medium text-[#00339B]/70">No attendance or cleaner logs recorded.</p>
+          <p className="text-xs font-medium text-[#00339B]/70">No events recorded for this day.</p>
         </div>
       )
     }
@@ -163,14 +163,14 @@ export function FullScreenCalendar({
         <div>
           <p className="text-base font-semibold">{format(day, 'PPP')}</p>
           <p className="text-xs font-medium uppercase tracking-wide text-[#00339B]/70">
-            {entry.events.length} shift{entry.events.length === 1 ? '' : 's'} · {logs.length}{' '}
+            {entry.events.length} event{entry.events.length === 1 ? '' : 's'} · {logs.length}{' '}
             log{logs.length === 1 ? '' : 's'}
           </p>
         </div>
 
         {entry.events.length ? (
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#00339B]/60">Shifts</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#00339B]/60">Events</p>
             <div className="space-y-1.5">
               {entry.events.slice(0, 5).map((event) => (
                 <div
@@ -349,7 +349,7 @@ export function FullScreenCalendar({
                           </button>
                           {events.length ? (
                             <span className="text-[10px] font-semibold text-[#00339B]/70">
-                              {events.length} shift{events.length === 1 ? '' : 's'}
+                              {events.length} event{events.length === 1 ? '' : 's'}
                             </span>
                           ) : null}
                         </header>
@@ -435,12 +435,12 @@ export function FullScreenCalendar({
             <div className="flex-1 space-y-3">
               <div>
                 <h3 className="text-lg font-semibold text-[#00339B]">{format(selectedDay, 'PPP')}</h3>
-                <p className="text-xs font-medium uppercase tracking-wide text-[#00339B]/60">Summary of cleaner attendance and logs</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-[#00339B]/60">Summary of events and logs</p>
               </div>
 
               {selectedDayData?.events?.length ? (
                 <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4 shadow-sm shadow-blue-100/50">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[#00339B]/80">Shifts</h4>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[#00339B]/80">Events</h4>
                   <div className="mt-2 space-y-2">
                     {selectedDayData.events.map((event) => (
                       <div key={event.id} className="rounded-xl border border-blue-100 bg-white/90 p-3 shadow-sm shadow-blue-100/40">
@@ -454,7 +454,7 @@ export function FullScreenCalendar({
 
               {selectedDayData?.logs?.length ? (
                 <div className="rounded-2xl border border-blue-100 bg-white/90 p-4 shadow-sm shadow-blue-100/50">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[#00339B]/80">Cleaner Logs</h4>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[#00339B]/80">Logs</h4>
                   <div className="mt-2 space-y-2">
                     {selectedDayData.logs.map((log) => (
                       <div key={log.id} className="rounded-xl border border-blue-100 bg-blue-50/40 p-3">
@@ -481,7 +481,7 @@ export function FullScreenCalendar({
 
               {!selectedDayData?.events?.length && !selectedDayData?.logs?.length ? (
                 <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/40 p-6 text-center text-sm font-medium text-[#00339B]/70">
-                  {emptyState ?? 'No attendance or cleaner logs for this day.'}
+                  {emptyState ?? 'No events or logs for this day.'}
                 </div>
               ) : null}
             </div>
