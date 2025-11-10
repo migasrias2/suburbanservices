@@ -1,6 +1,6 @@
 import QRCode from 'qrcode'
 import { supabase } from './supabase'
-import { v4 as uuidv4 } from 'uuid'
+import { v4 as uuidv4, validate as uuidValidate } from 'uuid'
 import { getStoredCleanerName, normalizeCleanerName, normalizeCleanerNumericId } from '../lib/identity'
 
 export type AreaType = 
@@ -77,6 +77,13 @@ export interface ManualQRCodeResult {
   dataUrl: string
   storageUrl: string
   storagePath: string
+}
+
+const isUuid = (value: string | null | undefined): boolean => {
+  if (!value) {
+    return false
+  }
+  return uuidValidate(value)
 }
 
 type TimeAttendanceRecord = {
