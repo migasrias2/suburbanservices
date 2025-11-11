@@ -321,6 +321,34 @@ export class QRService {
     }
   }
 
+  private static clearLocalClockInState() {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.removeItem('currentClockInPhase')
+      localStorage.removeItem('currentClockInData')
+      localStorage.removeItem('currentSiteName')
+    } catch (error) {
+      console.warn('Failed to clear local clock-in state:', error)
+    }
+  }
+
+  private static getLocalClockInAgeMs(): number | null {
+    if (typeof window === 'undefined') return null
+    try {
+      const raw = localStorage.getItem('currentClockInData')
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      const timestamp = parsed?.time
+      if (!timestamp) return null
+      const time = new Date(timestamp).getTime()
+      if (!Number.isFinite(time)) return null
+      return Date.now() - time
+    } catch (error) {
+      console.warn('Failed to read local clock-in age:', error)
+      return null
+    }
+  }
+
   private static normalizeAreaTypeValue(value?: string | null): AreaType | null {
     if (!value) return null
     const raw = value.toString().trim()
@@ -1378,12 +1406,8 @@ export class QRService {
       const selectColumns =
         'id, cleaner_id, cleaner_uuid, cleaner_name, cleaner_mobile, customer_name, site_name, clock_in, clock_out, notes, clock_in_qr'
 
-      const matchesRecord = (candidate?: Partial<TimeAttendanceRecord> | null) => {
+      const matchesCleanerIdentity = (candidate?: Partial<TimeAttendanceRecord> | null): boolean => {
         if (!candidate) return false
-
-        if (clockInQr && candidate.clock_in_qr && candidate.clock_in_qr === clockInQr) {
-          return true
-        }
 
         if (trimmedCleanerId && candidate.cleaner_uuid) {
           if (candidate.cleaner_uuid.trim().toLowerCase() === trimmedCleanerId.toLowerCase()) {
@@ -1416,79 +1440,97 @@ export class QRService {
         return false
       }
 
+      const matchesRecord = (candidate?: Partial<TimeAttendanceRecord> | null) => {
+        if (!candidate) return false
+
+        if (clockInQr && candidate.clock_in_qr && candidate.clock_in_qr === clockInQr) {
+          if (matchesCleanerIdentity(candidate)) {
+            return true
+          }
+        }
+
+        return matchesCleanerIdentity(candidate)
+      }
+
       const queryFactories: Array<() => Promise<{ data: TimeAttendanceRecord[] | null; error: any }>> = []
 
       if (numericCleanerId !== null) {
-        queryFactories.push(() =>
-          supabase
+        queryFactories.push(async () => {
+          const { data, error } = await supabase
             .from('time_attendance')
             .select(selectColumns)
             .eq('cleaner_id', numericCleanerId)
             .is('clock_out', null)
             .order('id', { ascending: false })
-            .limit(3),
-        )
+            .limit(3)
+          return { data, error }
+        })
       }
 
       if (trimmedCleanerId && isUuid(trimmedCleanerId)) {
-        queryFactories.push(() =>
-          supabase
+        queryFactories.push(async () => {
+          const { data, error } = await supabase
             .from('time_attendance')
             .select(selectColumns)
             .eq('cleaner_uuid', trimmedCleanerId)
             .is('clock_out', null)
             .order('id', { ascending: false })
-            .limit(3),
-        )
+            .limit(3)
+          return { data, error }
+        })
       }
 
       if (normalizedCleanerName) {
-        queryFactories.push(() =>
-          supabase
+        queryFactories.push(async () => {
+          const { data, error } = await supabase
             .from('time_attendance')
             .select(selectColumns)
             .eq('cleaner_name', normalizedCleanerName)
             .is('clock_out', null)
             .order('id', { ascending: false })
-            .limit(3),
-        )
+            .limit(3)
+          return { data, error }
+        })
       }
 
       if (cleanerMobile) {
-        queryFactories.push(() =>
-          supabase
+        queryFactories.push(async () => {
+          const { data, error } = await supabase
             .from('time_attendance')
             .select(selectColumns)
             .eq('cleaner_mobile', cleanerMobile)
             .is('clock_out', null)
             .order('id', { ascending: false })
-            .limit(3),
-        )
+            .limit(3)
+          return { data, error }
+        })
       }
 
       const allowFuzzy = options?.allowFuzzy ?? true
       if (allowFuzzy && normalizedCleanerName && normalizedCleanerName !== 'Unknown Cleaner') {
-        queryFactories.push(() =>
-          supabase
+        queryFactories.push(async () => {
+          const { data, error } = await supabase
             .from('time_attendance')
             .select(selectColumns)
             .ilike('cleaner_name', `%${normalizedCleanerName}%`)
             .is('clock_out', null)
             .order('id', { ascending: false })
-            .limit(5),
-        )
+            .limit(5)
+          return { data, error }
+        })
       }
 
       if (clockInQr) {
-        queryFactories.push(() =>
-          supabase
+        queryFactories.push(async () => {
+          const { data, error } = await supabase
             .from('time_attendance')
             .select(selectColumns)
             .eq('clock_in_qr', clockInQr)
             .is('clock_out', null)
             .order('id', { ascending: false })
-            .limit(5),
-        )
+            .limit(5)
+          return { data, error }
+        })
       }
 
       for (const buildQuery of queryFactories) {
@@ -1543,9 +1585,17 @@ export class QRService {
         console.log('Latest open session:', openRecord)
       }
 
-      if (!isOpen && localActive) {
-        console.warn('Supabase did not return an active clock-in, but local state indicates an active session. Trusting local state.')
-        return true
+      if (!isOpen) {
+        if (localActive) {
+          const localAge = this.getLocalClockInAgeMs()
+          if (localAge !== null && localAge < 5 * 60 * 1000) {
+            console.warn('Supabase did not return an active clock-in, but recent local state indicates an active session. Trusting local state temporarily.')
+            return true
+          }
+          console.warn('Supabase did not return an active clock-in, and local state appears stale. Clearing local clock-in data.')
+          this.clearLocalClockInState()
+        }
+        return false
       }
 
       return isOpen
@@ -1582,9 +1632,17 @@ export class QRService {
       console.log('Is currently clocked in?', isActive)
       
       const result = !isActive
-      if (result && localActive) {
-        console.warn('Supabase indicated no active clock-in, but local state shows active session. Treating as still clocked in.')
-        return false
+      if (result) {
+        const refreshedLocalState = this.hasLocalActiveClockIn(cleanerId)
+        if (refreshedLocalState) {
+          const localAge = this.getLocalClockInAgeMs()
+          if (localAge !== null && localAge < 5 * 60 * 1000) {
+            console.warn('Supabase indicated no active clock-in, but recent local state shows an active session. Treating as still clocked in.')
+            return false
+          }
+          console.warn('Supabase indicated no active clock-in, and local state appears stale. Clearing local clock-in data.')
+          this.clearLocalClockInState()
+        }
       }
       console.log('Should prevent clock-out?', result)
       
