@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { Image as ImageIcon, ArrowRight, Clock, MapPin, Search, ChevronDown, ChevronLeft, ChevronRight, ThumbsUp, ThumbsDown, X, CalendarDays, Trash2, Loader2 } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '../ui/hover-card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import {
@@ -1655,6 +1656,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         label: 'Hours worked',
         value: hoursWorkedValue,
         helper: helperOrError('Total hours logged'),
+        breakdown: snapshot?.hoursBreakdown,
       },
     ]
   }, [
@@ -1844,10 +1846,14 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
               : metric.value === null
                 ? '—'
                 : ''
-            return (
+
+            const content = (
               <div
                 key={metric.key}
-                className="group relative overflow-hidden rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_22px_50px_rgba(0,51,155,0.08)] backdrop-blur transition hover:-translate-y-1 hover:shadow-[0_30px_70px_rgba(0,51,155,0.18)]"
+                className={cn(
+                  "group relative overflow-hidden rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_22px_50px_rgba(0,51,155,0.08)] backdrop-blur transition hover:-translate-y-1 hover:shadow-[0_30px_70px_rgba(0,51,155,0.18)]",
+                  metric.breakdown && "cursor-help hover:border-blue-200"
+                )}
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-[#00339B]/10 via-[#5f80ff]/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                 <div className="relative flex flex-col gap-3">
@@ -1863,6 +1869,74 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                 </div>
               </div>
             )
+
+            if (metric.breakdown && metric.breakdown.length > 0) {
+              // Aggregate by site
+              const sites = new Map<string, { name: string; totalHours: number; cleaners: Map<string, number> }>()
+
+              metric.breakdown.forEach((detail) => {
+                const siteName = detail.siteName || 'Unknown Site'
+                if (!sites.has(siteName)) {
+                  sites.set(siteName, { name: siteName, totalHours: 0, cleaners: new Map() })
+                }
+                const site = sites.get(siteName)!
+                site.totalHours += detail.hours
+
+                const cleanerName = detail.cleanerName || 'Unknown Cleaner'
+                const currentCleanerHours = site.cleaners.get(cleanerName) ?? 0
+                site.cleaners.set(cleanerName, currentCleanerHours + detail.hours)
+              })
+
+              const hoursBreakdown = Array.from(sites.values())
+                .sort((a, b) => b.totalHours - a.totalHours)
+                .map((site) => ({
+                  ...site,
+                  cleaners: Array.from(site.cleaners.entries())
+                    .map(([name, hours]) => ({ name, hours }))
+                    .sort((a, b) => b.hours - a.hours),
+                }))
+
+              return (
+                <HoverCard key={metric.key} openDelay={100} closeDelay={100}>
+                  <HoverCardTrigger asChild>
+                    {content}
+                  </HoverCardTrigger>
+                  <HoverCardContent className="w-80 rounded-[24px] border border-blue-100 bg-white/95 p-0 shadow-xl backdrop-blur-sm" align="start" side="bottom">
+                    <div className="flex flex-col max-h-[400px]">
+                      <div className="sticky top-0 z-10 border-b border-blue-50 bg-white/95 px-4 py-3 backdrop-blur-sm">
+                        <h4 className="text-sm font-semibold text-[#00339B]">Hours by Site</h4>
+                      </div>
+                      <div className="overflow-y-auto p-2 custom-scrollbar">
+                        {hoursBreakdown.map((site) => (
+                          <div key={site.name} className="mb-2 last:mb-0 rounded-2xl border border-blue-50 bg-blue-50/30 p-3">
+                            <div className="mb-2 flex items-center justify-between">
+                              <span className="font-semibold text-[#00339B] text-sm truncate max-w-[180px]" title={site.name}>
+                                {site.name}
+                              </span>
+                              <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-[#00339B]">
+                                {site.totalHours.toFixed(1)}h
+                              </span>
+                            </div>
+                            <div className="space-y-1.5 pl-1">
+                              {site.cleaners.map((cleaner) => (
+                                <div key={cleaner.name} className="flex items-center justify-between text-xs text-slate-600">
+                                  <span className="truncate max-w-[180px]" title={cleaner.name}>
+                                    {cleaner.name}
+                                  </span>
+                                  <span className="font-mono font-medium shrink-0 ml-2">{cleaner.hours.toFixed(1)}h</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
+              )
+            }
+
+            return content
           })}
         </section>
 

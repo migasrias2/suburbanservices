@@ -102,6 +102,11 @@ export type DashboardSnapshot = {
   photosTaken: number
   hoursWorked: number
   attendanceCount: number
+  hoursBreakdown?: {
+    cleanerName: string
+    siteName: string
+    hours: number
+  }[]
 }
 
 export type DashboardSnapshotParams = {
@@ -293,7 +298,7 @@ export async function fetchDashboardSnapshot({ managerId, role, dayIso }: Dashbo
 
   const attendanceQuery = supabase
     .from('time_attendance')
-    .select('id, cleaner_id, cleaner_uuid, cleaner_name, clock_in, clock_out')
+    .select('id, cleaner_id, cleaner_uuid, cleaner_name, customer_name, site_name, clock_in, clock_out')
     .gte('clock_in', start)
     .lte('clock_in', end)
 
@@ -359,12 +364,22 @@ export async function fetchDashboardSnapshot({ managerId, role, dayIso }: Dashbo
     ? new Date(hasValidDayEnd ? Math.min(Date.now(), parsedDayEnd.getTime()) : Date.now())
     : null
 
+  const hoursBreakdown: { cleanerName: string; siteName: string; hours: number }[] = []
+
   const hoursWorked = attendanceRows.reduce((total, row) => {
     const hours = hoursBetween(row.clock_in, row.clock_out, {
       fallbackEnd: !row.clock_out ? fallbackNowForOpenShifts : undefined,
       clampEnd: hasValidDayEnd ? parsedDayEnd : undefined,
     })
-    return hours ? total + hours : total
+    if (hours) {
+      hoursBreakdown.push({
+        cleanerName: row.cleaner_name || 'Unknown Cleaner',
+        siteName: row.site_name || 'Unknown Site',
+        hours: hours,
+      })
+      return total + hours
+    }
+    return total
   }, 0)
 
   return {
@@ -375,6 +390,7 @@ export async function fetchDashboardSnapshot({ managerId, role, dayIso }: Dashbo
     photosTaken,
     hoursWorked: Number(hoursWorked.toFixed(2)),
     attendanceCount: attendanceRows.length,
+    hoursBreakdown,
   }
 }
 

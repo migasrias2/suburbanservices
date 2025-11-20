@@ -64,8 +64,14 @@ type HoursWorkedAreaChartProps = {
   className?: string
 }
 
+type CleanerSiteHours = {
+  cleanerName: string
+  siteName: string
+  hours: number
+}
+
 type HoursWorkedChartProps = {
-  data: Array<{ date: string; hours: number }>
+  data: Array<{ date: string; hours: number; details?: CleanerSiteHours[] }>
   containerClassName?: string
   margin?: { top: number; right: number; bottom: number; left: number }
   xAxisHeight?: number
@@ -121,14 +127,34 @@ const HoursWorkedChart: React.FC<HoursWorkedChartProps> = ({
             indicator="line"
             className="!bg-white"
             labelFormatter={(value) => toCompactDate(String(value))}
-            formatter={(value) => {
+            formatter={(value, name, item, index, payload: any) => {
               const numericValue = typeof value === 'number' ? value : Number(value)
+              const details = payload?.details || []
+
               return (
-                <div className="flex w-full items-center justify-between gap-3">
-                  <span className="text-xs font-medium text-gray-500">Hours Worked</span>
-                  <span className="font-mono font-semibold text-[#00339B]">
-                    {Number.isFinite(numericValue) ? `${hoursFormatter.format(numericValue)}h` : '0h'}
-                  </span>
+                <div className="flex min-w-[220px] flex-col gap-3">
+                  <div className="flex w-full items-center justify-between gap-3">
+                    <span className="text-xs font-medium text-gray-500">Hours Worked</span>
+                    <span className="font-mono font-semibold text-[#00339B]">
+                      {Number.isFinite(numericValue) ? `${hoursFormatter.format(numericValue)}h` : '0h'}
+                    </span>
+                  </div>
+                  {details.length > 0 && (
+                    <div className="mt-1 flex flex-col gap-2 border-t border-slate-100 pt-3">
+                      <span className="text-xs font-medium text-slate-400">Breakdown</span>
+                      <div className="flex max-h-[240px] flex-col gap-2 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200">
+                        {details.map((d: CleanerSiteHours, i: number) => (
+                          <div key={i} className="flex flex-col rounded-md bg-slate-50 p-2 text-xs">
+                            <div className="flex justify-between gap-2">
+                              <span className="truncate font-medium text-slate-700">{d.cleanerName}</span>
+                              <span className="shrink-0 font-mono text-slate-600">{d.hours.toFixed(1)}h</span>
+                            </div>
+                            <span className="truncate text-[10px] text-slate-400">{d.siteName}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             }}
@@ -149,11 +175,11 @@ const HoursWorkedChart: React.FC<HoursWorkedChartProps> = ({
 )
 
 export const HoursWorkedAreaChart: React.FC<HoursWorkedAreaChartProps> = ({ summary, layout = 'card', className }) => {
-  const hoursByDay = new Map<string, number>()
+  const hoursByDay = new Map<string, { hours: number; details: CleanerSiteHours[] }>()
   summary.hoursByDate.forEach((point) => {
     const normalized = normalizeToIsoDay(point.date)
     if (normalized) {
-      hoursByDay.set(normalized, point.hours)
+      hoursByDay.set(normalized, { hours: point.hours, details: point.details || [] })
     }
   })
 
@@ -173,13 +199,18 @@ export const HoursWorkedAreaChart: React.FC<HoursWorkedAreaChartProps> = ({ summ
     : Array.from(hoursByDay.keys()).sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
 
   const data = orderedDates.length
-    ? orderedDates.map((date) => ({
-        date,
-        hours: hoursByDay.get(date) ?? 0,
-      }))
+    ? orderedDates.map((date) => {
+        const entry = hoursByDay.get(date)
+        return {
+          date,
+          hours: entry?.hours ?? 0,
+          details: entry?.details ?? [],
+        }
+      })
     : summary.hoursByDate.map((point) => ({
         date: point.date,
         hours: point.hours,
+        details: point.details || [],
       }))
 
   const totalHours = summary.totals.totalHoursWorked ?? data.reduce((total, point) => total + point.hours, 0)

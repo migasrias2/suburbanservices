@@ -1,4 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
+import { cn } from '@/lib/utils'
 
 export type AnalyticsKpiCardProps = {
   title: string
@@ -9,6 +11,7 @@ export type AnalyticsKpiCardProps = {
     delta: number
     label?: string
   }
+  hoverContent?: React.ReactNode
 }
 
 export const AnalyticsKpiCard: React.FC<AnalyticsKpiCardProps> = ({
@@ -17,9 +20,15 @@ export const AnalyticsKpiCard: React.FC<AnalyticsKpiCardProps> = ({
   subtitle,
   accentClassName = 'bg-[#00339B]/10 text-[#00339B]',
   trend,
+  hoverContent,
 }) => {
-  return (
-    <Card className="rounded-3xl border border-gray-100 bg-white shadow-sm">
+  const cardContent = (
+    <Card
+      className={cn(
+        'rounded-3xl border border-gray-100 bg-white shadow-sm transition-all',
+        hoverContent && 'cursor-help hover:shadow-md hover:border-blue-100'
+      )}
+    >
       <CardHeader className="flex flex-col gap-1">
         <CardTitle className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
           {title}
@@ -44,13 +53,19 @@ export const AnalyticsKpiCard: React.FC<AnalyticsKpiCardProps> = ({
       </CardContent>
     </Card>
   )
+
+  if (hoverContent) {
+    return (
+      <HoverCard openDelay={100} closeDelay={100}>
+        <HoverCardTrigger asChild>
+          {cardContent}
+        </HoverCardTrigger>
+        <HoverCardContent className="w-80 p-0" align="start" side="bottom">
+          {hoverContent}
+        </HoverCardContent>
+      </HoverCard>
+    )
+  }
+
+  return cardContent
 }
-
-
-
-
-
-
-
-
-

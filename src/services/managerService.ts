@@ -5,6 +5,18 @@ type ManagerRole = 'manager' | 'ops_manager' | 'admin'
 
 const CLEANER_SUMMARY_FIELDS = 'id, first_name, last_name, created_at, email, mobile_number, is_active' as const
 
+/**
+ * Temporary fallbacks for manager → cleaner assignments to support customers
+ * that have not yet been migrated to the manager_cleaners mapping table.
+ *
+ * Key: manager_id (uuid)
+ * Value: array of cleaner_id (uuid)
+ */
+const MANAGER_CLEANER_FALLBACKS: Record<string, string[]> = {
+  // Metalex manager → Rebecca Miller
+  '4d1381ae-332f-4ff4-8ae3-f062dd5b487f': ['dfaf59c4-1093-44c6-844f-7dea4885547e']
+}
+
 export type CleanerSummary = Pick<
   Cleaner,
   'id' | 'first_name' | 'last_name' | 'created_at' | 'email' | 'mobile_number' | 'is_active'
@@ -15,19 +27,30 @@ export async function fetchManagerCleanerIds(managerId: string): Promise<string[
     return []
   }
 
-  const { data, error } = await supabase
-    .from('manager_cleaners')
-    .select('cleaner_id')
-    .eq('manager_id', managerId)
+  try {
+    const { data, error } = await supabase
+      .from('manager_cleaners')
+      .select('cleaner_id')
+      .eq('manager_id', managerId)
 
-  if (error) {
-    console.error('Failed to load manager_cleaners mapping', error)
-    throw error
+    if (error) {
+      console.error('Failed to load manager_cleaners mapping', error)
+      throw error
+    }
+
+    const ids = (data ?? [])
+      .map((row) => row.cleaner_id)
+      .filter((cleanerId): cleanerId is string => Boolean(cleanerId))
+
+    if (ids.length > 0) {
+      return ids
+    }
+  } catch (error) {
+    console.warn('Falling back to manual cleaner mapping', error)
   }
 
-  return (data ?? [])
-    .map((row) => row.cleaner_id)
-    .filter((cleanerId): cleanerId is string => Boolean(cleanerId))
+  const fallback = MANAGER_CLEANER_FALLBACKS[managerId]
+  return fallback ? [...fallback] : []
 }
 
 export async function fetchCleanersByIds(cleanerIds: string[]): Promise<CleanerSummary[]> {
