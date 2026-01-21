@@ -3,6 +3,7 @@ import { AlertCircle, CheckCircle2, Clock, QrCode, Camera, X } from 'lucide-reac
 import QrScanner from 'qr-scanner'
 import { QRService, QRCodeData } from '../../services/qrService'
 import { clearDraft } from '../../lib/offlineStore'
+import { normalizeCleanerName } from '../../lib/identity'
 import { supabase } from '../../services/supabase'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
@@ -177,11 +178,17 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
         // Force-close any lingering open attendance records and deactivate live tracking
         try {
           const nowIso = new Date().toISOString()
+          const normalizedName = normalizeCleanerName(cleanerName)
           await supabase
             .from('time_attendance')
             .update({ clock_out: nowIso })
-            .eq('cleaner_name', cleanerName)
+            .eq('cleaner_name', normalizedName)
             .is('clock_out', null)
+          await supabase
+            .from('time_attendance')
+            .update({ clock_out: nowIso })
+            .eq('cleaner_name', normalizedName)
+            .eq('clock_out', '')
           await supabase
             .from('live_tracking')
             .update({ is_active: false, event_type: 'clock_out' })

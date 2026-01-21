@@ -60,11 +60,15 @@ export default function ClockInPage() {
           .from('time_attendance')
           .select('*')
           .eq('cleaner_name', userName)
-          .is('clock_out', null)
           .order('id', { ascending: false })
-          .limit(1)
+          .limit(5)
 
-        const hasOpenClockIn = !error && data && data.length > 0
+        const openRecords = (data ?? []).filter((row) => {
+          if (row.clock_out === null || row.clock_out === undefined) return true
+          if (typeof row.clock_out === 'string' && row.clock_out.trim() === '') return true
+          return false
+        })
+        const hasOpenClockIn = !error && openRecords.length > 0
 
         if (!hasOpenClockIn) {
           // No active session → reset any stale local state
@@ -80,7 +84,7 @@ export default function ClockInPage() {
           localStorage.setItem('currentClockInPhase', 'workflow')
           // Hydrate display data if missing
           if (!clockInData) {
-            const record = data[0]
+            const record = openRecords[0]
             const hydrated = {
               time: record.clock_in || new Date().toISOString(),
               siteName: record.site_name || record.customer_name || 'Work Site',

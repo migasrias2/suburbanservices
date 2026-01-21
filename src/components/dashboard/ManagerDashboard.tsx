@@ -20,6 +20,8 @@ import {
 } from '../../services/managerService'
 import { AREA_TASKS } from '../../services/qrService'
 import { normalizeCleanerName } from '../../lib/identity'
+import { getCleanerNamesForSiteTokens } from '../../lib/analyticsSchedule'
+import { buildCustomerScopeMatcher, resolveManagerCustomerScope } from '../../lib/managerScope'
 import { cn, defaultAnalyticsRange, toIsoRange } from '../../lib/utils'
 import { AssistRequestService } from '../../services/assistRequestService'
 import type { BathroomAssistRequest } from '../../services/supabase'
@@ -382,6 +384,16 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null)
   const isGlobalRole = role === 'admin' || role === 'ops_manager'
   const isOpsManager = role === 'ops_manager'
+  const customerScope = useMemo(() => resolveManagerCustomerScope(managerId, managerName), [managerId, managerName])
+  const matchesCustomerScope = useMemo(() => buildCustomerScopeMatcher(customerScope), [customerScope])
+  const scheduledCleanerNames = useMemo(() => getCleanerNamesForSiteTokens(customerScope), [customerScope])
+  const scheduledCleanerSet = useMemo(() => {
+    return new Set(
+      scheduledCleanerNames
+        .map((name) => normalizeCleanerName(name).toLowerCase())
+        .filter(Boolean),
+    )
+  }, [scheduledCleanerNames])
   const overviewSubtitle = isOpsManager
     ? 'Monitor every cleaner, submission, and inspection across all sites.'
     : 'Oversee live cleaners, submissions, and assistance updates from your manager control centre.'
@@ -454,6 +466,12 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           console.warn('Failed to load live_tracking data', trackingError)
         }
 
+        const scopedTrackingRows = customerScope.length
+          ? (trackingRows ?? []).filter((row) =>
+              matchesCustomerScope(row.customer_name, row.site_area, row.site_id),
+            )
+          : (trackingRows ?? [])
+
         const cleanerMap = new Map<string, CleanerListItem>()
         const rosterById = new Map(cleanerRoster.map((row) => [row.id, row]))
         const rosterByName = new Map(
@@ -473,7 +491,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           return rosterByName.get(normalized.toLowerCase()) ?? null
         }
 
-        ;(trackingRows ?? []).forEach((row) => {
+        scopedTrackingRows.forEach((row) => {
           const cleanerNameRaw = row.cleaner_name ?? (() => {
             const rosterMatch = row.cleaner_id ? rosterById.get(row.cleaner_id) : null
             if (!rosterMatch) return ''
@@ -538,6 +556,12 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         cleanerRoster.forEach((row) => {
           const name = `${row.first_name ?? ''} ${row.last_name ?? ''}`.trim() || 'Cleaner'
           const normalizedName = normalizeCleanerName(name)
+          const normalizedKey = normalizedName.toLowerCase()
+
+          if (customerScope.length && scheduledCleanerSet.size > 0 && !scheduledCleanerSet.has(normalizedKey)) {
+            return
+          }
+
           if (!cleanerMap.has(row.id)) {
             cleanerMap.set(row.id, {
               id: row.id,
@@ -582,8 +606,18 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           AssistRequestService.listRecent({ statuses: ['pending', 'accepted', 'escalated'], limit: 8 }),
           AssistRequestService.listResolved({ limit: 8 })
         ])
-        setAssistActiveRequests(active)
-        setAssistResolvedRequests(resolved)
+        const scopedActive = customerScope.length
+          ? active.filter((request) =>
+              matchesCustomerScope(request.customer_name, request.location_label),
+            )
+          : active
+        const scopedResolved = customerScope.length
+          ? resolved.filter((request) =>
+              matchesCustomerScope(request.customer_name, request.location_label),
+            )
+          : resolved
+        setAssistActiveRequests(scopedActive)
+        setAssistResolvedRequests(scopedResolved)
         setAssistRequestsError(null)
       } catch (error) {
         console.error('Failed to load bathroom assist summary', error)
@@ -594,7 +628,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     }
 
     loadAssistRequests()
-  }, [managerId])
+  }, [managerId, customerScope, matchesCustomerScope, scheduledCleanerSet])
 
   useEffect(() => {
     if (!isAutoDate) return
@@ -614,10 +648,6 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
       const nameTokens = Array.from(new Set(cleanerName.split(' ').filter(Boolean)))
       const shouldRunFuzzyAttendance = nameTokens.length > 1
       const cleanerId = selectedCleaner.cleaner_id
-      const targetManagerId = 'df0bf2e7-1a07-4876-949c-6cfe8fe0fac6'
-      const isAvtradeManager = managerId === targetManagerId
-      const matchesAvtrade = (value: string | null | undefined) =>
-        value ? value.toLowerCase().includes('avtrade') : false
 
       const attendanceExactQuery = supabase
         .from('time_attendance')
@@ -635,20 +665,12 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
             .limit(60)
         : null
 
-      if (isAvtradeManager) {
-        attendanceExactQuery.or('customer_name.ilike.%avtrade%,site_name.ilike.%avtrade%')
-        attendanceFuzzyQuery?.or('customer_name.ilike.%avtrade%,site_name.ilike.%avtrade%')
-      }
-
       const logsQuery = supabase
         .from('uk_cleaner_logs')
         .select('*')
         .or(`cleaner_id.eq.${cleanerId},cleaner_name.eq.${cleanerName}`)
         .order('timestamp', { ascending: false })
         .limit(120)
-      if (isAvtradeManager) {
-        logsQuery.like('customer_name', '%avtrade%')
-      }
 
       const tasksQuery = supabase
         .from('uk_cleaner_task_selections')
@@ -663,12 +685,6 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         .eq('cleaner_id', selectedCleaner.cleaner_id)
         .order('photo_timestamp', { ascending: false })
         .limit(80)
-
-      if (isAvtradeManager) {
-        logsQuery.or('site_area.ilike.%avtrade%,comments.ilike.%avtrade%')
-        tasksQuery.or('area_type.ilike.%avtrade%,qr_code_id.ilike.%avtrade%')
-        photosQuery.or('area_type.ilike.%avtrade%,qr_code_id.ilike.%avtrade%')
-      }
 
       const [logsPromise, tasksPromise, photosPromise] = [logsQuery, tasksQuery, photosQuery]
 
@@ -753,10 +769,16 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         }
       })
 
+      const shouldIncludeAttendance = (row: AttendanceRow) =>
+        !customerScope.length || matchesCustomerScope(row.customer_name, row.site_name)
+
       const attendanceByKey = new Map<string, AttendanceRow>()
       const combineRows = (rows?: AttendanceRow[] | null) => {
         if (!rows) return
         rows.forEach((row) => {
+          if (!shouldIncludeAttendance(row)) {
+            return
+          }
           const normalizedRowName = normalizeCleanerName(row.cleaner_name)
           const clockInKey = row.clock_in ? Math.floor(new Date(row.clock_in).getTime() / 1000) : null
           const clockOutKey = row.clock_out ? Math.floor(new Date(row.clock_out).getTime() / 1000) : null
@@ -775,10 +797,26 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         combineRows(attendanceFuzzyRes.data)
       }
 
+      const filteredLogs = customerScope.length
+        ? (logsRes?.data ?? []).filter((row) =>
+            matchesCustomerScope(row.customer_name, row.site_area, row.action),
+          )
+        : (logsRes?.data ?? [])
+      const filteredTasks = customerScope.length
+        ? tasksWithMetadata.filter((row) =>
+            matchesCustomerScope(row.customer_name, row.area_name, row.area_type, row.qr_code_id),
+          )
+        : tasksWithMetadata
+      const filteredPhotos = customerScope.length
+        ? photosWithMetadata.filter((row) =>
+            matchesCustomerScope(row.customer_name, row.area_name, row.area_type, row.qr_code_id),
+          )
+        : photosWithMetadata
+
       setAttendance(Array.from(attendanceByKey.values()))
-      setLogs(logsRes?.data ?? [])
-      setTasks(tasksWithMetadata)
-      const photoRows = photosWithMetadata
+      setLogs(filteredLogs)
+      setTasks(filteredTasks)
+      const photoRows = filteredPhotos
       setPhotos(photoRows)
 
       // fetch feedback for these photos
@@ -805,7 +843,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     }
 
     loadDetail()
-  }, [selectedCleaner])
+  }, [selectedCleaner, customerScope, matchesCustomerScope])
 
   const filteredCleaners = useMemo(() => {
     if (!search.trim()) return cleaners
@@ -895,6 +933,10 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           return false
         })
 
+        const customerScopedRows = customerScope.length
+          ? scopedRows.filter((row) => matchesCustomerScope(row.customer_name, row.site_name))
+          : scopedRows
+
         const attendanceMap = new Map<string, AttendanceRow>()
 
         const getRowKey = (row: AttendanceRow & { cleaner_uuid?: string | null }) => {
@@ -907,7 +949,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           return `fallback::${cleanerIdentity ?? 'unknown'}::${clockInKey}`
         }
 
-        scopedRows.forEach((row) => {
+        customerScopedRows.forEach((row) => {
           const cleanerName = normalizeCleanerName(row.cleaner_name ?? 'Cleaner')
           const parsedCleanerId = (() => {
             if (typeof row.cleaner_id === 'number') return row.cleaner_id
@@ -983,6 +1025,8 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     managedCleanerNamesKey,
     managerId,
     role,
+    customerScope,
+    matchesCustomerScope,
     selectedDate,
     todayRefreshKey,
   ])

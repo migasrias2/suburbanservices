@@ -162,6 +162,30 @@ export const buildScheduleLabel = (entry: ScheduleEntry): string => {
   return `${entry.cleaner} • ${daysLabel} • ${entry.startTime} - ${entry.endTime}`
 }
 
+export const getCleanerNamesForSiteTokens = (siteTokens: string[]): string[] => {
+  const normalizedTokens = siteTokens
+    .map((token) => token.trim().toLowerCase())
+    .filter(Boolean)
+
+  if (!normalizedTokens.length) {
+    return []
+  }
+
+  const matchesSite = (site: string) => {
+    const normalizedSite = site.trim().toLowerCase()
+    if (!normalizedSite) return false
+    return normalizedTokens.some((token) => normalizedSite.includes(token))
+  }
+
+  const names = new Set<string>()
+  CLEANER_SCHEDULES.forEach((entry) => {
+    if (matchesSite(entry.site)) {
+      names.add(entry.cleaner)
+    }
+  })
+
+  return Array.from(names)
+}
 
 
 

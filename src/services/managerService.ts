@@ -1,4 +1,5 @@
 import { normalizeCleanerName, normalizeCleanerNumericId } from '../lib/identity'
+import { buildCustomerScopeMatcher, resolveManagerCustomerScope } from '../lib/managerScope'
 import { supabase, type Cleaner } from './supabase'
 
 type ManagerRole = 'manager' | 'ops_manager' | 'admin'
@@ -640,12 +641,20 @@ export async function fetchManagerRecentActivity(
     })
   })
 
-  const datedEntries = entries
+  const customerScope = resolveManagerCustomerScope(managerId ?? null, null)
+  const matchesCustomerScope = buildCustomerScopeMatcher(customerScope)
+  const scopedEntries = customerScope.length
+    ? entries.filter((entry) =>
+        matchesCustomerScope(entry.site, entry.area, entry.detail, entry.comments),
+      )
+    : entries
+
+  const datedEntries = scopedEntries
     .filter((entry) => entry.timestamp)
     .sort((a, b) => toTimestamp(b.timestamp) - toTimestamp(a.timestamp))
 
-  if (datedEntries.length < entries.length) {
-    const undatedEntries = entries.filter((entry) => !entry.timestamp)
+  if (datedEntries.length < scopedEntries.length) {
+    const undatedEntries = scopedEntries.filter((entry) => !entry.timestamp)
     datedEntries.push(...undatedEntries)
   }
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { Camera, QrCode, AlertCircle, CheckCircle2 } from 'lucide-react'
 import QrScanner from 'qr-scanner'
 import { QRService, QRCodeData } from '../../services/qrService'
@@ -47,6 +47,29 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   const [isProcessing, setIsProcessing] = useState(false)
   const [wrongType, setWrongType] = useState<QRCodeData['type'] | null>(null)
   const [showClockOut, setShowClockOut] = useState(false)
+  const [hasHandledSuccess, setHasHandledSuccess] = useState(false)
+  const handledSuccessRef = useRef(false)
+
+  const stopScanning = useCallback(() => {
+    if (qrScanner) {
+      qrScanner.stop()
+      setQrScanner(null)
+    }
+    setIsScanning(false)
+  }, [qrScanner])
+
+  const finalizeSuccess = useCallback((qrData: QRCodeData) => {
+    if (handledSuccessRef.current) return
+    handledSuccessRef.current = true
+    setHasHandledSuccess(true)
+    setLastScan({
+      data: qrData,
+      timestamp: new Date(),
+      success: true,
+    })
+    stopScanning()
+    onScanSuccess?.(qrData)
+  }, [hasHandledSuccess, stopScanning, onScanSuccess])
 
   useEffect(() => {
     return () => {
@@ -103,6 +126,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
       setError(null)
       setLastScan(null)
       setIsScanning(true)
+      handledSuccessRef.current = false
+      setHasHandledSuccess(false)
 
       if (qrScanner) {
         qrScanner.stop()
@@ -114,6 +139,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         videoRef.current,
         async (result) => {
           try {
+            if (handledSuccessRef.current || hasHandledSuccess) return
+
             let qrData = QRService.parseQRCode(result.data)
             
             if (!qrData) {
@@ -176,13 +203,6 @@ export const QRScanner: React.FC<QRScannerProps> = ({
             if (shouldGoToTasks) {
               if (!previewMode) {
                 const result = await QRService.processQRScan(qrData, cleanerId, cleanerName, location)
-                const scanRecord = {
-                  data: qrData,
-                  timestamp: new Date(),
-                  success: result.success,
-                }
-                setLastScan(scanRecord)
-
                 if (!result.success) {
                   const errorMessage = result.message || 'Failed to process QR code scan'
                   setError(errorMessage)
@@ -192,26 +212,16 @@ export const QRScanner: React.FC<QRScannerProps> = ({
                   }, 2000)
                   return
                 }
-              } else {
-                setLastScan({ data: qrData, timestamp: new Date(), success: true })
               }
 
               // Delegate to parent to render tasks UI; avoid duplicate headers/buttons
-              stopScanning()
-              onScanSuccess?.(qrData)
+              finalizeSuccess(qrData)
               return
             }
 
             if (previewMode) {
-              stopScanning()
-              setLastScan({ data: qrData, timestamp: new Date(), success: true })
-              onScanSuccess?.(qrData)
+              finalizeSuccess(qrData)
             } else {
-              // For CLOCK_IN flows, move forward immediately once recognized
-              if (qrData.type === 'CLOCK_IN' && (!allowedTypes || allowedTypes.includes('CLOCK_IN'))) {
-                onScanSuccess?.(qrData)
-              }
-
               // Process in the background for CLOCK_IN/CLOCK_OUT/FEEDBACK
               const result = await QRService.processQRScan(qrData, cleanerId, cleanerName, location)
               
@@ -222,7 +232,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
               })
 
               if (result.success) {
-                onScanSuccess?.(qrData)
+                finalizeSuccess(qrData)
               } else {
                 const errorMessage = result.message || 'Failed to process QR code scan'
                 setError(errorMessage)
@@ -258,14 +268,6 @@ export const QRScanner: React.FC<QRScannerProps> = ({
       setError('Failed to start camera. Please check your camera permissions.')
       setIsScanning(false)
     }
-  }
-
-  const stopScanning = () => {
-    if (qrScanner) {
-      qrScanner.stop()
-      setQrScanner(null)
-    }
-    setIsScanning(false)
   }
 
   const getQRTypeColor = (type: QRCodeData['type']) => {

@@ -1406,6 +1406,12 @@ export class QRService {
       const selectColumns =
         'id, cleaner_id, cleaner_uuid, cleaner_name, cleaner_mobile, customer_name, site_name, clock_in, clock_out, notes, clock_in_qr'
 
+      const isOpenClockOutValue = (value?: string | null) => {
+        if (value === null || value === undefined) return true
+        if (typeof value === 'string' && value.trim() === '') return true
+        return false
+      }
+
       const matchesCleanerIdentity = (candidate?: Partial<TimeAttendanceRecord> | null): boolean => {
         if (!candidate) return false
 
@@ -1460,9 +1466,8 @@ export class QRService {
             .from('time_attendance')
             .select(selectColumns)
             .eq('cleaner_id', numericCleanerId)
-            .is('clock_out', null)
             .order('id', { ascending: false })
-            .limit(3)
+            .limit(10)
           return { data, error }
         })
       }
@@ -1473,9 +1478,8 @@ export class QRService {
             .from('time_attendance')
             .select(selectColumns)
             .eq('cleaner_uuid', trimmedCleanerId)
-            .is('clock_out', null)
             .order('id', { ascending: false })
-            .limit(3)
+            .limit(10)
           return { data, error }
         })
       }
@@ -1486,9 +1490,8 @@ export class QRService {
             .from('time_attendance')
             .select(selectColumns)
             .eq('cleaner_name', normalizedCleanerName)
-            .is('clock_out', null)
             .order('id', { ascending: false })
-            .limit(3)
+            .limit(10)
           return { data, error }
         })
       }
@@ -1499,9 +1502,8 @@ export class QRService {
             .from('time_attendance')
             .select(selectColumns)
             .eq('cleaner_mobile', cleanerMobile)
-            .is('clock_out', null)
             .order('id', { ascending: false })
-            .limit(3)
+            .limit(10)
           return { data, error }
         })
       }
@@ -1513,9 +1515,8 @@ export class QRService {
             .from('time_attendance')
             .select(selectColumns)
             .ilike('cleaner_name', `%${normalizedCleanerName}%`)
-            .is('clock_out', null)
             .order('id', { ascending: false })
-            .limit(5)
+            .limit(10)
           return { data, error }
         })
       }
@@ -1526,9 +1527,8 @@ export class QRService {
             .from('time_attendance')
             .select(selectColumns)
             .eq('clock_in_qr', clockInQr)
-            .is('clock_out', null)
             .order('id', { ascending: false })
-            .limit(5)
+            .limit(10)
           return { data, error }
         })
       }
@@ -1540,7 +1540,7 @@ export class QRService {
           continue
         }
 
-        const rows = data ?? []
+        const rows = (data ?? []).filter((row) => isOpenClockOutValue(row.clock_out))
         const match = rows.find((row) => matchesRecord(row))
         if (match) {
           return match as TimeAttendanceRecord

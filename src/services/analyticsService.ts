@@ -128,6 +128,8 @@ const toDateKey = (iso?: string | null) => {
   return d.toISOString().slice(0, 10)
 }
 
+const toUtcDateKey = (value: Date): string => value.toISOString().slice(0, 10)
+
 type HoursBetweenOptions = {
   fallbackEnd?: string | Date | null
   clampEnd?: string | Date | null
@@ -174,6 +176,57 @@ const minutesBetween = (start?: string | null, end?: string | null, options?: Ho
 const hoursBetween = (start?: string | null, end?: string | null, options?: HoursBetweenOptions): number | null => {
   const minutes = minutesBetween(start, end, options)
   return minutes === null ? null : minutes / 60
+}
+
+const addHoursByDay = (
+  hoursByDate: Map<string, number>,
+  start?: string | null,
+  end?: string | null,
+  options?: HoursBetweenOptions,
+): number => {
+  const startDate = toValidDate(start)
+  if (!startDate) return 0
+
+  let endDate = toValidDate(end)
+  if (!endDate && options?.fallbackEnd) {
+    endDate = toValidDate(options.fallbackEnd)
+  }
+  if (!endDate) return 0
+
+  const clampEndDate = toValidDate(options?.clampEnd ?? null)
+  if (clampEndDate && endDate.getTime() > clampEndDate.getTime()) {
+    endDate = clampEndDate
+  }
+
+  if (endDate.getTime() <= startDate.getTime()) return 0
+
+  let totalHours = 0
+  let cursor = new Date(startDate)
+
+  while (cursor < endDate) {
+    const dayEnd = new Date(cursor)
+    dayEnd.setUTCHours(23, 59, 59, 999)
+    const segmentEnd = endDate < dayEnd ? endDate : dayEnd
+    const diff = segmentEnd.getTime() - cursor.getTime()
+    if (diff > 0) {
+      const hours = diff / (1000 * 60 * 60)
+      const dateKey = toUtcDateKey(cursor)
+      const current = hoursByDate.get(dateKey) ?? 0
+      hoursByDate.set(dateKey, current + hours)
+      totalHours += hours
+    }
+
+    if (segmentEnd >= endDate) {
+      break
+    }
+
+    const nextDay = new Date(dayEnd)
+    nextDay.setUTCHours(0, 0, 0, 0)
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1)
+    cursor = nextDay
+  }
+
+  return totalHours
 }
 
 const parseTasks = (value?: string | null): string[] => {
@@ -569,14 +622,12 @@ export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAna
     const referenceDate = referenceIso ? new Date(referenceIso) : null
     const isRowCurrentDay = referenceDate ? isSameCalendarDay(referenceDate, now) : false
 
-    const hours = hoursBetween(row.clock_in, row.clock_out, {
+    const shiftHours = addHoursByDay(hoursByDate, row.clock_in, row.clock_out, {
       fallbackEnd: !row.clock_out && isRowCurrentDay ? now : undefined,
       clampEnd: range.end,
     })
-    if (hours) {
-      totalHoursWorked += hours
-      const dateTotal = hoursByDate.get(dateKey) ?? 0
-      hoursByDate.set(dateKey, dateTotal + hours)
+    if (shiftHours) {
+      totalHoursWorked += shiftHours
     }
 
     const schedule = getScheduleForCleaner(cleanerName)

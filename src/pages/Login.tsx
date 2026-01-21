@@ -276,6 +276,21 @@ export default function Login() {
     }
   }
 
+  const handleQuickManagerLogin = (userId: string, name: string) => {
+    setLoading(true)
+    try {
+      const normalizedName = setStoredCleanerName(name)
+      clearClockState()
+      localStorage.setItem('userType', 'manager')
+      localStorage.setItem('userId', userId)
+      localStorage.removeItem('userMobile')
+      setStoredCleanerName(normalizedName)
+      navigate('/manager-dashboard')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div
       className="relative min-h-screen flex items-center justify-center p-4 sm:p-6"
@@ -568,6 +583,18 @@ export default function Login() {
                   </Button>
                 </form>
                 <p className="mt-4 text-xs text-center text-[#0b2f6b]/60">Manager accounts are provisioned by administrators.</p>
+                <div className="mt-5 rounded-2xl border border-dashed border-[#0b2f6b]/20 bg-white/70 p-4 text-center">
+                  <p className="text-xs font-medium text-[#0b2f6b]/70 mb-3">Quick access</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full rounded-xl border-[#0b2f6b]/30 text-[#0b2f6b] hover:bg-[#0b2f6b]/5"
+                    onClick={() => handleQuickManagerLogin('psm-manager', 'James')}
+                    disabled={loading}
+                  >
+                    PSM Marine (James)
+                  </Button>
+                </div>
               </TabsContent>
 
               <TabsContent value="ops_manager" className="mt-0">
