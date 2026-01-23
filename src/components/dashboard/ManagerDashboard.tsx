@@ -378,6 +378,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const [assistActiveRequests, setAssistActiveRequests] = useState<BathroomAssistRequest[]>([])
   const [assistResolvedRequests, setAssistResolvedRequests] = useState<BathroomAssistRequest[]>([])
   const [assistRequestsError, setAssistRequestsError] = useState<string | null>(null)
+  const [expandedResolvedId, setExpandedResolvedId] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date>(() => normalizeToStartOfDay(new Date()))
   const [isAutoDate, setIsAutoDate] = useState(true)
   const [now, setNow] = useState<Date>(() => new Date())
@@ -1421,6 +1422,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         resolvedByName: request.resolved_by_name,
         status: request.status,
         issueType: request.issue_type,
+        issueDescription: request.issue_description,
         notes: request.notes,
         materials: request.materials_used
       })),
@@ -2170,9 +2172,16 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       {assistResolvedCards.length ? (
                         assistResolvedCards.map((assist) => (
-                          <div
+                          <button
                             key={assist.id}
-                            className="rounded-[24px] border border-blue-100 bg-blue-50/40 p-4 shadow-sm"
+                            type="button"
+                            onClick={() =>
+                              setExpandedResolvedId((current) => (current === assist.id ? null : assist.id))
+                            }
+                            className={cn(
+                              'rounded-[24px] border border-blue-100 bg-blue-50/40 p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50/60',
+                              expandedResolvedId === assist.id && 'bg-white'
+                            )}
                           >
                             <div className="flex items-center justify-between gap-3">
                               <span className="text-sm font-semibold text-[#00339B]">{assist.location}</span>
@@ -2198,10 +2207,27 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                                 {assist.resolvedByName ? ` • ${assist.resolvedByName}` : ''}
                               </p>
                             )}
-                            {assist.notes && (
+                            {expandedResolvedId === assist.id && (
+                              <div className="mt-3 rounded-2xl border border-blue-100 bg-white/80 p-3 text-xs text-slate-600">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                  Issue details
+                                </p>
+                                <p className="mt-1">
+                                  {assist.issueType ? `Issue: ${assist.issueType}` : 'Issue: Not provided'}
+                                </p>
+                                <p className="mt-1">
+                                  {assist.issueDescription
+                                    ? `Description: ${assist.issueDescription}`
+                                    : 'Description: Not provided'}
+                                </p>
+                                {assist.notes && <p className="mt-1">Notes: {assist.notes}</p>}
+                                {assist.materials && <p className="mt-1">Materials: {assist.materials}</p>}
+                              </div>
+                            )}
+                            {assist.notes && expandedResolvedId !== assist.id && (
                               <p className="mt-2 text-xs text-slate-500">Notes: {assist.notes}</p>
                             )}
-                          </div>
+                          </button>
                         ))
                       ) : (
                         <div className="sm:col-span-2 rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-6 text-center text-sm text-slate-500">
