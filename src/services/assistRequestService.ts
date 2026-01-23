@@ -35,11 +35,23 @@ export type ResolveAssistRequestInput = {
   afterMedia?: AssistMedia[]
 }
 
+export type ResolveAssistRequestManagerInput = {
+  requestId: string
+  managerId: string
+  managerName: string
+  resolvedById?: string | null
+  resolvedByName?: string | null
+  notes?: string
+  materialsUsed?: string
+  afterMedia?: AssistMedia[]
+}
+
 export type ListResolvedOptions = {
   customerName?: string
   locationLabel?: string
   status?: Array<BathroomAssistRequest['status']>
   limit?: number
+  resolvedSince?: string
 }
 
 export type ListRecentOptions = {
@@ -107,6 +119,10 @@ export class AssistRequestService {
       query.in('status', options.status)
     } else {
       query.in('status', ['resolved', 'escalated'])
+    }
+
+    if (options.resolvedSince) {
+      query.gte('resolved_at', options.resolvedSince)
     }
 
     const { data, error } = await query
@@ -237,6 +253,52 @@ export class AssistRequestService {
       cleanerName: input.cleanerName,
       customerName: data.customer_name
     })
+    return data
+  }
+
+  static async resolveAsManager(input: ResolveAssistRequestManagerInput) {
+    const resolvedById = input.resolvedById ?? null
+    const resolvedByName = input.resolvedByName ?? input.managerName
+    const { data, error } = await supabase
+      .from<BathroomAssistRequest>('bathroom_assist_requests')
+      .update({
+        status: 'resolved',
+        resolved_at: new Date().toISOString(),
+        resolved_by: resolvedById,
+        resolved_by_name: resolvedByName,
+        after_media: sanitizeMedia(input.afterMedia),
+        notes: input.notes || null,
+        materials_used: input.materialsUsed || null
+      })
+      .eq('id', input.requestId)
+      .select('*')
+      .single()
+
+    if (error) throw error
+
+    try {
+      await this.logEvent({
+        request_id: input.requestId,
+        event_type: 'resolved',
+        actor_role: 'manager',
+        actor_id: input.managerId,
+        actor_name: input.managerName,
+        payload: {
+          notes: input.notes || null,
+          materialsUsed: input.materialsUsed || null,
+          attachments: sanitizeMedia(input.afterMedia)
+        }
+      })
+    } catch (eventError) {
+      console.warn('Failed to log manager resolution', eventError)
+    }
+
+    await queueNotification('customers', `Bathroom issue resolved in ${data.location_label}`, {
+      cleanerId: resolvedById ?? undefined,
+      cleanerName: resolvedByName ?? undefined,
+      customerName: data.customer_name
+    })
+
     return data
   }
 

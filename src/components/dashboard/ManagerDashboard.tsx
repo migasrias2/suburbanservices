@@ -32,6 +32,7 @@ import { Calendar } from '../ui/calendar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '../ui/dialog'
 import { HoursWorkedAreaChart } from '../analytics/HoursWorkedAreaChart'
 import { SidebarTrigger } from '@/components/ui/sidebar'
+import { toast } from '@/hooks/use-toast'
 
 interface ManagerDashboardProps {
   managerId: string
@@ -600,35 +601,57 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
     loadCleaners()
 
-    const loadAssistRequests = async () => {
-      try {
-        const [active, resolved] = await Promise.all([
-          AssistRequestService.listRecent({ statuses: ['pending', 'accepted', 'escalated'], limit: 8 }),
-          AssistRequestService.listResolved({ limit: 8 })
-        ])
-        const scopedActive = customerScope.length
-          ? active.filter((request) =>
-              matchesCustomerScope(request.customer_name, request.location_label),
-            )
-          : active
-        const scopedResolved = customerScope.length
-          ? resolved.filter((request) =>
-              matchesCustomerScope(request.customer_name, request.location_label),
-            )
-          : resolved
-        setAssistActiveRequests(scopedActive)
-        setAssistResolvedRequests(scopedResolved)
-        setAssistRequestsError(null)
-      } catch (error) {
-        console.error('Failed to load bathroom assist summary', error)
-        setAssistActiveRequests([])
-        setAssistResolvedRequests([])
-        setAssistRequestsError('Unable to load assistance updates right now.')
-      }
-    }
-
-    loadAssistRequests()
   }, [managerId, customerScope, matchesCustomerScope, scheduledCleanerSet])
+
+  const refreshAssistRequests = useCallback(async () => {
+    try {
+      const resolvedSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      const [active, resolved] = await Promise.all([
+        AssistRequestService.listRecent({ statuses: ['pending', 'accepted', 'escalated'], limit: 8 }),
+        AssistRequestService.listResolved({ limit: 8, resolvedSince })
+      ])
+      const scopedActive = customerScope.length
+        ? active.filter((request) =>
+            matchesCustomerScope(request.customer_name, request.location_label),
+          )
+        : active
+      const scopedResolved = customerScope.length
+        ? resolved.filter((request) =>
+            matchesCustomerScope(request.customer_name, request.location_label),
+          )
+        : resolved
+      setAssistActiveRequests(scopedActive)
+      setAssistResolvedRequests(scopedResolved)
+      setAssistRequestsError(null)
+    } catch (error) {
+      console.error('Failed to load bathroom assist summary', error)
+      setAssistActiveRequests([])
+      setAssistResolvedRequests([])
+      setAssistRequestsError('Unable to load assistance updates right now.')
+    }
+  }, [customerScope, matchesCustomerScope])
+
+  useEffect(() => {
+    refreshAssistRequests()
+  }, [refreshAssistRequests])
+
+  const resolveRequest = async (request: { id: string, location: string, acceptedById?: string | null }) => {
+    try {
+      await AssistRequestService.resolveAsManager({
+        requestId: request.id,
+        managerId,
+        managerName,
+        resolvedById: request.acceptedById ?? null,
+        resolvedByName: managerName,
+        afterMedia: []
+      })
+      toast({ title: 'Request resolved', description: `${request.location} marked complete.` })
+      refreshAssistRequests()
+    } catch (error) {
+      console.error(error)
+      toast({ title: 'Could not resolve request', description: 'Please try again.', variant: 'destructive' })
+    }
+  }
 
   useEffect(() => {
     if (!isAutoDate) return
@@ -1374,6 +1397,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         customer: request.customer_name,
         reportedAt: request.reported_at,
         acceptedAt: request.accepted_at,
+        acceptedById: request.accepted_by,
         acceptedByName: request.accepted_by_name,
         status: request.status,
         issueType: request.issue_type,
@@ -2121,6 +2145,16 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                                 {assist.escalationReason && <p>Escalation reason: {assist.escalationReason}</p>}
                               </div>
                             )}
+                            <div className="mt-4 flex justify-end">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => resolveRequest(assist)}
+                                className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                              >
+                                Mark Resolved
+                              </Button>
+                            </div>
                           </div>
                         ))
                       ) : (
