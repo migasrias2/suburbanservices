@@ -66,6 +66,23 @@ const sanitizeMedia = (media?: AssistMedia[] | null) =>
     type: item.type || 'before'
   }))
 
+const normalizeMetadata = (value?: Record<string, any> | null) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {}
+  }
+  return { ...value }
+}
+
+const mergeResolvedHiddenBy = (metadata: Record<string, any>, managerId: string) => {
+  const current = Array.isArray(metadata.resolved_hidden_by) ? metadata.resolved_hidden_by : []
+  const normalized = current.map((entry: any) => String(entry)).filter(Boolean)
+  if (!normalized.includes(managerId)) {
+    normalized.push(managerId)
+  }
+  metadata.resolved_hidden_by = normalized
+  return metadata
+}
+
 const queueNotification = async (recipient: string, content: string, payload?: Record<string, any>) => {
   try {
     await supabase.from('messages').insert({
@@ -300,6 +317,24 @@ export class AssistRequestService {
     })
 
     return data
+  }
+
+  static async hideResolvedForManager(input: { managerId: string; requests: Array<Pick<BathroomAssistRequest, 'id' | 'metadata'>> }) {
+    if (!input.managerId || !input.requests.length) {
+      return
+    }
+
+    for (const request of input.requests) {
+      const metadata = mergeResolvedHiddenBy(normalizeMetadata(request.metadata), input.managerId)
+      const { error } = await supabase
+        .from<BathroomAssistRequest>('bathroom_assist_requests')
+        .update({ metadata })
+        .eq('id', request.id)
+
+      if (error) {
+        throw error
+      }
+    }
   }
 
   static async escalateOverdueRequests(reason = 'No cleaner accepted in time') {

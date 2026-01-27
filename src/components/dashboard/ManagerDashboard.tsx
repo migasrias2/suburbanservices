@@ -22,15 +22,14 @@ import { AREA_TASKS } from '../../services/qrService'
 import { normalizeCleanerName } from '../../lib/identity'
 import { getCleanerNamesForSiteTokens } from '../../lib/analyticsSchedule'
 import { buildCustomerScopeMatcher, resolveManagerCustomerScope } from '../../lib/managerScope'
-import { cn, defaultAnalyticsRange, toIsoRange } from '../../lib/utils'
+import { cn } from '../../lib/utils'
 import { AssistRequestService } from '../../services/assistRequestService'
 import type { BathroomAssistRequest } from '../../services/supabase'
-import { fetchAnalyticsSummary, fetchDashboardSnapshot, type AnalyticsRole } from '../../services/analyticsService'
+import { fetchDashboardSnapshot, type AnalyticsRole } from '../../services/analyticsService'
 import { Badge } from '../ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Calendar } from '../ui/calendar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '../ui/dialog'
-import { HoursWorkedAreaChart } from '../analytics/HoursWorkedAreaChart'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { toast } from '@/hooks/use-toast'
 
@@ -379,6 +378,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const [assistResolvedRequests, setAssistResolvedRequests] = useState<BathroomAssistRequest[]>([])
   const [assistRequestsError, setAssistRequestsError] = useState<string | null>(null)
   const [expandedResolvedId, setExpandedResolvedId] = useState<string | null>(null)
+  const [isClearingResolved, setIsClearingResolved] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date>(() => normalizeToStartOfDay(new Date()))
   const [isAutoDate, setIsAutoDate] = useState(true)
   const [now, setNow] = useState<Date>(() => new Date())
@@ -396,6 +396,20 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         .filter(Boolean),
     )
   }, [scheduledCleanerNames])
+  const scheduledCleanerMatchers = useMemo(
+    () => Array.from(scheduledCleanerSet).filter(Boolean),
+    [scheduledCleanerSet],
+  )
+  const matchesScheduledCleaner = useCallback(
+    (normalizedKey: string) => {
+      if (!scheduledCleanerSet.size) return true
+      if (scheduledCleanerSet.has(normalizedKey)) return true
+      return scheduledCleanerMatchers.some(
+        (candidate) => normalizedKey.startsWith(candidate) || candidate.startsWith(normalizedKey),
+      )
+    },
+    [scheduledCleanerMatchers, scheduledCleanerSet],
+  )
   const overviewSubtitle = isOpsManager
     ? 'Monitor every cleaner, submission, and inspection across all sites.'
     : 'Oversee live cleaners, submissions, and assistance updates from your manager control centre.'
@@ -404,6 +418,17 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const [globalActivityError, setGlobalActivityError] = useState<string | null>(null)
   const scopedManagerId = isGlobalRole ? undefined : managerId
   const analyticsManagerId = isGlobalRole ? null : managerId
+
+  const isResolvedHiddenForManager = useCallback(
+    (request: BathroomAssistRequest) => {
+      if (!managerId) return false
+      const metadata = request.metadata
+      if (!metadata || typeof metadata !== 'object') return false
+      const hidden = Array.isArray(metadata.resolved_hidden_by) ? metadata.resolved_hidden_by : []
+      return hidden.map((entry: any) => String(entry)).includes(managerId)
+    },
+    [managerId],
+  )
 
   const isSameDay = (left: Date, right: Date) =>
     left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth() && left.getDate() === right.getDate()
@@ -560,7 +585,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           const normalizedName = normalizeCleanerName(name)
           const normalizedKey = normalizedName.toLowerCase()
 
-          if (customerScope.length && scheduledCleanerSet.size > 0 && !scheduledCleanerSet.has(normalizedKey)) {
+          if (customerScope.length && scheduledCleanerSet.size > 0 && !matchesScheduledCleaner(normalizedKey)) {
             return
           }
 
@@ -602,7 +627,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
     loadCleaners()
 
-  }, [managerId, customerScope, matchesCustomerScope, scheduledCleanerSet])
+  }, [managerId, customerScope, matchesCustomerScope, matchesScheduledCleaner, scheduledCleanerSet])
 
   const refreshAssistRequests = useCallback(async () => {
     try {
@@ -616,11 +641,12 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
             matchesCustomerScope(request.customer_name, request.location_label),
           )
         : active
-      const scopedResolved = customerScope.length
+      let scopedResolved = customerScope.length
         ? resolved.filter((request) =>
             matchesCustomerScope(request.customer_name, request.location_label),
           )
         : resolved
+      scopedResolved = scopedResolved.filter((request) => !isResolvedHiddenForManager(request))
       setAssistActiveRequests(scopedActive)
       setAssistResolvedRequests(scopedResolved)
       setAssistRequestsError(null)
@@ -630,7 +656,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
       setAssistResolvedRequests([])
       setAssistRequestsError('Unable to load assistance updates right now.')
     }
-  }, [customerScope, matchesCustomerScope])
+  }, [customerScope, matchesCustomerScope, isResolvedHiddenForManager])
 
   useEffect(() => {
     refreshAssistRequests()
@@ -651,6 +677,32 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     } catch (error) {
       console.error(error)
       toast({ title: 'Could not resolve request', description: 'Please try again.', variant: 'destructive' })
+    }
+  }
+
+  const handleClearResolved = async () => {
+    if (!managerId) {
+      toast({ title: 'Missing manager ID', description: 'Please sign in again to clear resolved requests.', variant: 'destructive' })
+      return
+    }
+    if (!assistResolvedRequests.length || isClearingResolved) {
+      return
+    }
+    setIsClearingResolved(true)
+    try {
+      await AssistRequestService.hideResolvedForManager({
+        managerId,
+        requests: assistResolvedRequests
+      })
+      setAssistResolvedRequests([])
+      setExpandedResolvedId(null)
+      toast({ title: 'Cleared', description: 'Recently resolved requests were cleared.' })
+      refreshAssistRequests()
+    } catch (error) {
+      console.error(error)
+      toast({ title: 'Could not clear resolved requests', description: 'Please try again.', variant: 'destructive' })
+    } finally {
+      setIsClearingResolved(false)
     }
   }
 
@@ -1540,40 +1592,6 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     return activeKeys.size
   }, [isSelectedDateToday, todaysAttendance])
 
-  const hoursWorkedApprox = useMemo(() => {
-    if (!isSelectedDateToday) return 0
-    const nowInstant = new Date()
-    const totalHours = todaysAttendance.reduce(
-      (sum, row) => sum + calculateHoursBetween(row.clock_in, row.clock_out, nowInstant),
-      0,
-    )
-    return Number(totalHours.toFixed(1))
-  }, [isSelectedDateToday, todaysAttendance])
-
-  const hoursTrendRange = useMemo(() => {
-    const baseRange = defaultAnalyticsRange(14)
-    const isoRange = toIsoRange(baseRange)
-    const formatterOptions: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' }
-    const startLabel = baseRange.start.toLocaleDateString(undefined, formatterOptions)
-    const endLabel = baseRange.end.toLocaleDateString(undefined, formatterOptions)
-    return {
-      iso: isoRange,
-      label: `${startLabel} - ${endLabel}`,
-    }
-  }, [])
-
-  const hoursTrendQuery = useQuery({
-    queryKey: ['manager-dashboard-hours-trend', role, analyticsManagerId, hoursTrendRange.iso.start, hoursTrendRange.iso.end],
-    queryFn: () =>
-      fetchAnalyticsSummary({
-        managerId: analyticsManagerId,
-        role,
-        range: hoursTrendRange.iso,
-      }),
-    staleTime: 5 * 60 * 1000,
-    enabled: Boolean(managerId),
-  })
-
   const selectedDayIso = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate])
 
   const snapshotQuery = useQuery({
@@ -1600,7 +1618,6 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const snapshotIsCurrentDay = snapshot?.isCurrentDay ?? isSelectedDateToday
   const displayedAreasCount = snapshot?.areasCleaned ?? areasToday
   const displayedPhotosCount = snapshot?.photosTaken ?? photosCount
-  const displayedHoursWorked = snapshot?.hoursWorked ?? (snapshotIsCurrentDay ? hoursWorkedApprox : 0)
   const displayedAttendanceCount = snapshot?.attendanceCount ?? recordsCount
 
   const handleResetDate = () => {
@@ -1616,9 +1633,6 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     setIsAutoDate(isSameDay(normalizedDate, normalizeToStartOfDay(now)))
   }
 
-  const handleGoToAnalytics = () => {
-    navigate('/analytics')
-  }
 
   const handleCleanerSelect = (cleaner: CleanerListItem) => {
     setSelectedCleaner(cleaner)
@@ -1692,12 +1706,10 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     const cleanersOnlineBase = snapshot?.cleanersOnline ?? (snapshotIsCurrentDay ? cleanersOnlineApprox ?? 0 : null)
     const areasCleanedBase = displayedAreasCount
     const photosTakenBase = displayedPhotosCount
-    const hoursWorkedBase = displayedHoursWorked
 
     const cleanersOnlineValue = isLoading ? undefined : toDisplayNumber(cleanersOnlineBase)
     const areasCleanedValue = isLoading ? undefined : toDisplayNumber(areasCleanedBase)
     const photosTakenValue = isLoading ? undefined : toDisplayNumber(photosTakenBase)
-    const hoursWorkedValue = isLoading ? undefined : toDisplayNumber(hoursWorkedBase)
 
     const unavailableLabel = isError ? 'Unable to load metric' : 'Live metric only available for today'
     const helperOrError = (defaultText: string) => (isError ? 'Unable to load metric' : defaultText)
@@ -1721,13 +1733,6 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         value: photosTakenValue,
         helper: helperOrError('Task photo uploads'),
       },
-      {
-        key: 'hours-worked',
-        label: 'Hours worked',
-        value: hoursWorkedValue,
-        helper: helperOrError('Total hours logged'),
-        breakdown: snapshot?.hoursBreakdown,
-      },
     ]
   }, [
     snapshotQuery.isLoading,
@@ -1737,7 +1742,6 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     cleanersOnlineApprox,
     displayedAreasCount,
     displayedPhotosCount,
-    displayedHoursWorked,
   ])
 
   useEffect(() => {
@@ -2168,7 +2172,21 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                   </div>
 
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8aa5ff]">Recently resolved</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8aa5ff]">Recently resolved</p>
+                      {assistResolvedCards.length > 0 && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleClearResolved}
+                          disabled={isClearingResolved}
+                          className="h-8 px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 hover:text-slate-700"
+                        >
+                          {isClearingResolved ? 'Clearing…' : 'Clear'}
+                        </Button>
+                      )}
+                    </div>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       {assistResolvedCards.length ? (
                         assistResolvedCards.map((assist) => (
@@ -2207,6 +2225,11 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                                 {assist.resolvedByName ? ` • ${assist.resolvedByName}` : ''}
                               </p>
                             )}
+                            {expandedResolvedId !== assist.id && (
+                              <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                Show more
+                              </p>
+                            )}
                             {expandedResolvedId === assist.id && (
                               <div className="mt-3 rounded-2xl border border-blue-100 bg-white/80 p-3 text-xs text-slate-600">
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
@@ -2241,51 +2264,6 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
             </CardContent>
           </Card>
 
-          <Card className="rounded-[36px] border border-white/70 bg-white/80 shadow-[0_26px_70px_rgba(0,51,155,0.1)] backdrop-blur">
-            <CardHeader className="space-y-4 pb-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div className="space-y-2">
-                  <CardTitle className="text-xl font-semibold text-[#00339B]">Analytics</CardTitle>
-                  <p className="text-sm text-slate-500">Total hours trend pulled from attendance.</p>
-                </div>
-                <span className="text-[11px] font-medium text-slate-400">{hoursTrendRange.label}</span>
-              </div>
-            </CardHeader>
-          <CardContent className="space-y-6 pb-4">
-            <div>
-              {hoursTrendQuery.isLoading ? (
-                <div className="rounded-[24px] border border-blue-100 bg-white/70 p-6">
-                  <div className="flex h-48 items-center justify-center">
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#00339B] border-t-transparent" />
-                  </div>
-                </div>
-              ) : hoursTrendQuery.isError ? (
-                <div className="rounded-[24px] border border-rose-200 bg-rose-50/70 p-6 text-center text-sm text-rose-600">
-                  Unable to load hours trend right now.
-                </div>
-              ) : hoursTrendQuery.data?.hoursByDate?.length ? (
-                <HoursWorkedAreaChart summary={hoursTrendQuery.data} layout="inline" />
-              ) : (
-                <div className="rounded-[24px] border border-dashed border-blue-200 bg-blue-50/30 p-6 text-center text-sm text-slate-500">
-                  No hours recorded for this range yet.
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col gap-4 rounded-[28px] border border-white/80 bg-gradient-to-br from-[#f6f8ff] via-white/90 to-white px-6 py-5 shadow-[0_16px_40px_rgba(0,51,155,0.08)] sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-[#00339B]">
-                <span className="font-semibold">Need deeper insights?</span>{' '}
-                <span className="text-slate-500">Open the full analytics workspace to review trends, exports, and reports.</span>
-              </p>
-              <Button
-                type="button"
-                onClick={handleGoToAnalytics}
-                className="w-full rounded-full bg-[#00339B] px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#00297a] sm:w-auto"
-              >
-                Go
-              </Button>
-            </div>
-          </CardContent>
-          </Card>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-2">

@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import { Clock, MapPin, CheckCircle2, AlertCircle, QrCode, BarChart3, ClipboardCheck, ListTodo } from 'lucide-react'
+import { Clock, MapPin, CheckCircle2, AlertCircle, QrCode, ClipboardCheck, ListTodo } from 'lucide-react'
 import { supabase, UKCleaner, LiveTracking } from '../../services/supabase'
 import { QRService, TaskSelection, AreaType, AREA_TASKS } from '../../services/qrService'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { Alert, AlertDescription } from '../ui/alert'
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '../ui/chart'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { BathroomAssistPanel } from '../qr/BathroomAssistPanel'
 
@@ -29,8 +27,6 @@ export const CleanerDashboard: React.FC<CleanerDashboardProps> = ({
     tasksSelected: 0,
     tasksCompleted: 0
   })
-  const [weeklyData, setWeeklyData] = useState<any[]>([])
-  const [activityData, setActivityData] = useState<any[]>([])
   const [taskSelections, setTaskSelections] = useState<TaskSelection[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -38,7 +34,6 @@ export const CleanerDashboard: React.FC<CleanerDashboardProps> = ({
     loadCleanerData()
     loadCurrentStatus()
     loadTodayStats()
-    loadWeeklyData()
     loadTodayTasks()
 
     // Set up real-time updates
@@ -121,43 +116,6 @@ export const CleanerDashboard: React.FC<CleanerDashboardProps> = ({
     const today = new Date().toISOString().split('T')[0]
     const selections = await QRService.getTaskSelections(cleanerId, today)
     setTaskSelections(selections)
-  }
-
-  const loadWeeklyData = async () => {
-    const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    const weeklyStats = []
-
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date()
-      date.setDate(date.getDate() - i)
-      const dateStr = date.toISOString().split('T')[0]
-
-      const { data, error } = await supabase
-        .from('uk_cleaner_logs')
-        .select('*')
-        .eq('cleaner_id', cleanerId)
-        .gte('timestamp', `${dateStr}T00:00:00.000Z`)
-        .lt('timestamp', `${dateStr}T23:59:59.999Z`)
-
-      if (!error && data) {
-        weeklyStats.push({
-          day: weekDays[date.getDay() === 0 ? 6 : date.getDay() - 1],
-          scans: data.length,
-          clockIns: data.filter(log => log.action.includes('Clock In')).length,
-          areas: new Set(data.map(log => log.site_area).filter(Boolean)).size
-        })
-      }
-    }
-
-    setWeeklyData(weeklyStats)
-
-    // Activity breakdown
-    const activityBreakdown = [
-      { name: 'QR Scans', value: todayStats.scans, color: '#3b82f6' },
-      { name: 'Clock Ins', value: todayStats.clockIns, color: '#10b981' },
-      { name: 'Areas', value: todayStats.areas, color: '#6366f1' }
-    ]
-    setActivityData(activityBreakdown)
   }
 
 
@@ -300,110 +258,6 @@ export const CleanerDashboard: React.FC<CleanerDashboardProps> = ({
             </Card>
           </div>
 
-          {/* Analytics Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Weekly Activity Chart */}
-            <Card className="card-modern border-0 shadow-xl">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-3 text-xl font-semibold">
-                  <div className="p-2 rounded-xl" style={{ backgroundColor: '#e6eefc' }}>
-                    <BarChart3 className="h-6 w-6" style={{ color: '#00339B' }} />
-                  </div>
-                  Weekly Activity
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  <ChartContainer
-                    config={{
-                      scans: {
-                        label: "QR Scans",
-                        color: "#3b82f6",
-                      },
-                      clockIns: {
-                        label: "Clock Ins",
-                        color: "#10b981",
-                      },
-                      areas: {
-                        label: "Areas",
-                        color: "#6366f1",
-                      },
-                    }}
-                  >
-                    <BarChart data={weeklyData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="day" />
-                      <YAxis />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Bar dataKey="scans" fill="#00339B" name="QR Scans" />
-                      <Bar dataKey="clockIns" fill="#10b981" name="Clock Ins" />
-                      <Bar dataKey="areas" fill="#6366f1" name="Areas" />
-                    </BarChart>
-                  </ChartContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Activity Breakdown */}
-            <Card className="card-modern border-0 shadow-xl">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-3 text-xl font-semibold">
-                  <div className="p-2 rounded-xl bg-green-100">
-                    <QrCode className="h-6 w-6 text-green-600" />
-                  </div>
-                  Today's Breakdown
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  <ChartContainer
-                    config={{
-                      scans: {
-                        label: "QR Scans",
-                        color: "#3b82f6",
-                      },
-                      clockIns: {
-                        label: "Clock Ins", 
-                        color: "#10b981",
-                      },
-                      areas: {
-                        label: "Areas",
-                        color: "#6366f1",
-                      },
-                    }}
-                  >
-                    <PieChart>
-                      <Pie
-                        data={activityData}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {activityData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                    </PieChart>
-                  </ChartContainer>
-                </div>
-                {/* Legend */}
-                <div className="flex justify-center gap-4 mt-4">
-                  {activityData.map((item, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <div 
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: item.color }}
-                      />
-                      <span className="text-sm text-gray-600">{item.name}: {item.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </TabsContent>
         <TabsContent value="assist">
           <BathroomAssistPanel cleanerId={cleanerId} cleanerName={cleanerName} />
