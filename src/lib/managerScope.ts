@@ -10,7 +10,7 @@ const MANAGER_CUSTOMER_SCOPES: ManagerCustomerScope[] = [
     customerTokens: ['avtrade'],
   },
   {
-    managerIds: ['psm-manager'],
+    managerIds: ['ce2c8d1a-6e0a-4d78-9746-2cd32983455f'],
     managerNames: ['james'],
     customerTokens: ['psm marine', 'psm'],
   },

@@ -475,7 +475,8 @@ export const AreaTasksPage = () => {
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = (e: React.MouseEvent) => {
+    e.preventDefault();
     if (!pendingDelete) return;
     deleteMutation.mutate(pendingDelete.id);
   };

@@ -1601,6 +1601,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         managerId: analyticsManagerId,
         role,
         dayIso: selectedDayIso,
+        customerScope,
       }),
     enabled: Boolean(managerId),
     staleTime: 60 * 1000,
@@ -2336,6 +2337,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
             </CardContent>
           </Card>
 
+          {!['James Manager', 'James', 'James Spenceley'].includes(managerName) && (
           <Card className="rounded-[36px] border border-white/70 bg-white/85 shadow-[0_30px_80px_rgba(0,51,155,0.1)] backdrop-blur">
             <CardHeader className="space-y-1">
               <CardTitle className="text-xl font-semibold text-[#00339B]">Calendar</CardTitle>
@@ -2357,6 +2359,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
               </div>
             </CardContent>
           </Card>
+          )}
         </section>
       </div>
 
@@ -2562,9 +2565,8 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         </DialogContent>
       </Dialog>
 
-      {currentPhoto &&
-        createPortal(
-          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-6">
+      {currentPhoto && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-6 animate-in fade-in duration-200">
             <div className="relative w-full max-w-4xl rounded-[32px] border border-[#d9e3ff] bg-[#f6f8ff] shadow-[0_35px_80px_rgba(0,0,0,0.25)] p-6 sm:p-8">
               <button
                 type="button"
@@ -2648,9 +2650,8 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                 </div>
               </div>
             </div>
-          </div>,
-          document.body
-        )}
+          </div>
+      )}
     </>
   )
 }

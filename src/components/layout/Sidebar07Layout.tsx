@@ -116,14 +116,22 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
           },
         ]
       case 'manager':
+        // Filter out Analytics for James (checking both formats of name)
+        const filteredManagerItems = managerMenuItems.filter(item => {
+          if (item.label === 'Analytics' && (userName === 'James Manager' || userName === 'James' || userName === 'James Spenceley')) {
+            return false;
+          }
+          return true;
+        });
+
         return [
           {
             title: 'Overview',
-            items: [managerMenuItems[0]],
+            items: [filteredManagerItems[0]],
           },
           {
             title: 'Performance',
-            items: managerMenuItems.slice(1),
+            items: filteredManagerItems.slice(1),
           },
         ]
       case 'ops_manager':

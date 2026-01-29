@@ -10,6 +10,7 @@ import {
   isClockInOnTime,
 } from '../lib/analyticsSchedule'
 import { normalizeCleanerName, normalizeCleanerNumericId } from '../lib/identity'
+import { buildCustomerScopeMatcher } from '../lib/managerScope'
 
 export type AnalyticsRole = 'manager' | 'ops_manager' | 'admin'
 
@@ -113,6 +114,7 @@ export type DashboardSnapshotParams = {
   managerId?: string | null
   role: AnalyticsRole
   dayIso: string
+  customerScope?: string[]
 }
 
 export type FetchAnalyticsParams = {
@@ -340,7 +342,12 @@ const buildCleanerScope = async (managerId: string | undefined | null, role: Ana
   }
 }
 
-export async function fetchDashboardSnapshot({ managerId, role, dayIso }: DashboardSnapshotParams): Promise<DashboardSnapshot> {
+export async function fetchDashboardSnapshot({
+  managerId,
+  role,
+  dayIso,
+  customerScope = []
+}: DashboardSnapshotParams): Promise<DashboardSnapshot> {
   const day = parseLocalDayIso(dayIso)
 
   const today = new Date()
@@ -348,6 +355,23 @@ export async function fetchDashboardSnapshot({ managerId, role, dayIso }: Dashbo
   const { start, end } = toDayBounds(dayIso)
 
   const scope = await buildCleanerScope(managerId ?? undefined, role)
+  const matchesScope = buildCustomerScopeMatcher(customerScope)
+
+  let allowedQrCodeIds: Set<string> | null = null
+  if (customerScope.length > 0) {
+    const { data: qrData } = await supabase
+      .from('building_qr_codes')
+      .select('qr_code_id, customer_name')
+    
+    if (qrData) {
+      allowedQrCodeIds = new Set(
+        qrData
+          .filter((q) => matchesScope(q.customer_name))
+          .map((q) => q.qr_code_id)
+          .filter(Boolean) as string[]
+      )
+    }
+  }
 
   const attendanceQuery = supabase
     .from('time_attendance')
@@ -357,13 +381,13 @@ export async function fetchDashboardSnapshot({ managerId, role, dayIso }: Dashbo
 
   const selectionsQuery = supabase
     .from('uk_cleaner_task_selections')
-    .select('id, cleaner_id, cleaner_name, completed_tasks, timestamp')
+    .select('id, cleaner_id, cleaner_name, completed_tasks, timestamp, qr_code_id')
     .gte('timestamp', start)
     .lte('timestamp', end)
 
   const photosQuery = supabase
     .from('uk_cleaner_task_photos')
-    .select('id, cleaner_id, cleaner_name, photo_timestamp')
+    .select('id, cleaner_id, cleaner_name, photo_timestamp, qr_code_id, customer_name')
     .gte('photo_timestamp', start)
     .lte('photo_timestamp', end)
 
@@ -379,15 +403,50 @@ export async function fetchDashboardSnapshot({ managerId, role, dayIso }: Dashbo
     throw photosRes.error
   }
 
-  const attendanceRows = (attendanceRes.data ?? []).filter((row) =>
-    scope.matchesCleanerScope({ cleaner_id: row.cleaner_uuid ?? row.cleaner_id, cleaner_name: row.cleaner_name }),
-  )
-  const selectionRows = (selectionsRes.data ?? []).filter((row) =>
-    scope.matchesCleanerScope({ cleaner_id: row.cleaner_id, cleaner_name: row.cleaner_name }),
-  )
-  const photoRows = (photosRes.data ?? []).filter((row) =>
-    scope.matchesCleanerScope({ cleaner_id: row.cleaner_id, cleaner_name: row.cleaner_name }),
-  )
+  const attendanceRows = (attendanceRes.data ?? [])
+    .filter((row) =>
+      scope.matchesCleanerScope({ cleaner_id: row.cleaner_uuid ?? row.cleaner_id, cleaner_name: row.cleaner_name }),
+    )
+    .filter((row) => {
+      if (!customerScope.length) return true
+      return matchesScope(row.customer_name, row.site_name)
+    })
+
+  const selectionRows = (selectionsRes.data ?? [])
+    .filter((row) => scope.matchesCleanerScope({ cleaner_id: row.cleaner_id, cleaner_name: row.cleaner_name }))
+    .filter((row) => {
+      if (!customerScope.length) return true
+      // If we have a QR code, check if it belongs to the allowed set
+      if (allowedQrCodeIds && row.qr_code_id) {
+        return allowedQrCodeIds.has(row.qr_code_id)
+      }
+      // If no QR code, we might be overcounting if we only rely on cleaner scope.
+      // But typically task selections have a QR code.
+      // If it's missing, we fall back to cleaner scope (already checked).
+      // To be strict: if we have a scope and no QR code, we might want to exclude it?
+      // Let's assume valid rows have QR codes for now.
+      return !!row.qr_code_id
+    })
+
+  const photoRows = (photosRes.data ?? [])
+    .filter((row) => scope.matchesCleanerScope({ cleaner_id: row.cleaner_id, cleaner_name: row.cleaner_name }))
+    .filter((row) => {
+      if (!customerScope.length) return true
+      
+      // Use customer_name if available (it is selected now)
+      // @ts-ignore - types might not be updated yet
+      if (row.customer_name && matchesScope(row.customer_name)) {
+        return true
+      }
+
+      // Fallback to QR code check
+      if (allowedQrCodeIds && row.qr_code_id) {
+        return allowedQrCodeIds.has(row.qr_code_id)
+      }
+      
+      // If we have scope but no match on customer/QR, it's filtered out
+      return false
+    })
 
   let cleanersOnline: number | null = null
   if (isCurrentDay) {
