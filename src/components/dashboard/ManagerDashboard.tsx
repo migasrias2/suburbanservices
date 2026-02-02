@@ -386,7 +386,10 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null)
   const isGlobalRole = role === 'admin' || role === 'ops_manager'
   const isOpsManager = role === 'ops_manager'
-  const customerScope = useMemo(() => resolveManagerCustomerScope(managerId, managerName), [managerId, managerName])
+  const customerScope = useMemo(
+    () => (role === 'admin' ? [] : resolveManagerCustomerScope(managerId, managerName)),
+    [managerId, managerName, role],
+  )
   const matchesCustomerScope = useMemo(() => buildCustomerScopeMatcher(customerScope), [customerScope])
   const scheduledCleanerNames = useMemo(() => getCleanerNamesForSiteTokens(customerScope), [customerScope])
   const scheduledCleanerSet = useMemo(() => {
@@ -974,8 +977,9 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           .order('clock_out', { ascending: false })
 
         if (!isGlobalRole && managedCleanerIds.length) {
-          clockInQuery = clockInQuery.in('cleaner_id', managedCleanerIds)
-          clockOutQuery = clockOutQuery.in('cleaner_id', managedCleanerIds)
+          // Use cleaner_uuid for filtering as cleaner_id is integer and managedCleanerIds are UUIDs
+          clockInQuery = clockInQuery.in('cleaner_uuid', managedCleanerIds)
+          clockOutQuery = clockOutQuery.in('cleaner_uuid', managedCleanerIds)
         }
 
         const [clockInRes, clockOutRes] = await Promise.all([clockInQuery, clockOutQuery])

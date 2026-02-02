@@ -31,7 +31,7 @@ export type AttendanceRecord = {
 }
 
 export type TaskSelectionRecord = {
-  id: number
+  id: string
   cleaner_id: string
   cleaner_name: string | null
   qr_code_id: string | null
