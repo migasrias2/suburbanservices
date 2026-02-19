@@ -2,6 +2,7 @@ import QRCode from 'qrcode'
 import { supabase } from './supabase'
 import { v4 as uuidv4, validate as uuidValidate } from 'uuid'
 import { getStoredCleanerName, normalizeCleanerName, normalizeCleanerNumericId } from '../lib/identity'
+import { autoLinkCleanerToCustomer } from './managerService'
 
 export type AreaType = 
   | 'BATHROOMS_ABLUTIONS'
@@ -990,11 +991,16 @@ export class QRService {
   static fromPlainText(text: string): QRCodeData {
     const raw = (text || '').trim()
     const lower = raw.toLowerCase()
+    const normalized = lower
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
     let type: QRCodeData['type'] = 'AREA'
-    if (lower.includes('clock') && (lower.includes('in') || lower.includes('clock-in'))) type = 'CLOCK_IN'
-    else if (lower.includes('clock') && (lower.includes('out') || lower.includes('clock-out'))) type = 'CLOCK_OUT'
-    else if (lower.includes('feedback')) type = 'FEEDBACK'
-    else if (lower.includes('task')) type = 'TASK'
+    // Check clock-out before clock-in to avoid false positives like "Marine" containing "in"
+    if (/\b(clock\s*out|check\s*out|clockout|checkout)\b/.test(normalized)) type = 'CLOCK_OUT'
+    else if (/\b(clock\s*in|check\s*in|clockin|checkin)\b/.test(normalized)) type = 'CLOCK_IN'
+    else if (/\bfeedback\b/.test(normalized)) type = 'FEEDBACK'
+    else if (/\btask\b/.test(normalized)) type = 'TASK'
 
     // Very loose extraction of names (first token as customer/site hint)
     const firstToken = raw.split(/\s|[:\-–]/)[0]
@@ -1154,6 +1160,7 @@ export class QRService {
       let siteArea = ''
       const siteLabelRaw = this.deriveSiteLabel(qrData, qrData.siteId)
       const siteLabel = this.prettifySiteLabel(siteLabelRaw) || siteLabelRaw || 'Site'
+      const customerLabel = this.deriveCustomerLabel(qrData, siteLabel)
       const normalizedType = this.normalizeQrType(qrData.type) ?? 'AREA'
       const clockInReference = this.resolveClockInReference(qrData)
       const localClockedIn = this.hasLocalActiveClockIn(cleanerId)
@@ -1177,6 +1184,8 @@ export class QRService {
           if (!clockInResult.success) {
             return { success: false, message: clockInResult.message }
           }
+
+          await autoLinkCleanerToCustomer(customerLabel, cleanerId)
           break
           
         case 'CLOCK_OUT':
@@ -1236,7 +1245,6 @@ export class QRService {
 
       // Log to database
       try {
-        const customerLabel = this.deriveCustomerLabel(qrData, siteLabel)
         const { error } = await supabase
           .from('cleaner_logs')
           .insert({

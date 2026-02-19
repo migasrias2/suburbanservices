@@ -69,7 +69,7 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
         videoRef.current,
         async (result) => {
           try {
-            const qrData = QRService.parseQRCode(result.data)
+            let qrData = QRService.parseQRCode(result.data)
             
             if (!qrData) {
               setValidationResult({
@@ -77,6 +77,33 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
                 message: 'Invalid QR code format'
               })
               return
+            }
+
+            const scannedType = QRService.normalizeQrType(qrData.type)
+
+            // Resolve canonical payload when possible, but keep scan type if DB metadata is stale.
+            try {
+              const { data: dbRow } = await supabase
+                .from('building_qr_codes')
+                .select('qr_code_url')
+                .eq('qr_code_id', qrData.id)
+                .eq('is_active', true)
+                .limit(1)
+                .maybeSingle()
+
+              if (dbRow?.qr_code_url) {
+                const resolved = QRService.parseQRCode(dbRow.qr_code_url)
+                if (resolved) {
+                  const resolvedType = QRService.normalizeQrType(resolved.type)
+                  if (scannedType && resolvedType && scannedType !== resolvedType) {
+                    qrData = { ...resolved, type: scannedType }
+                  } else {
+                    qrData = resolved
+                  }
+                }
+              }
+            } catch {
+              // Ignore metadata lookup errors and continue with scanned payload.
             }
 
             const normalizedType = QRService.normalizeQrType(qrData.type)

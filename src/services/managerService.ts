@@ -1,5 +1,9 @@
 import { normalizeCleanerName, normalizeCleanerNumericId } from '../lib/identity'
-import { buildCustomerScopeMatcher, resolveManagerCustomerScope } from '../lib/managerScope'
+import {
+  buildCustomerScopeMatcher,
+  resolveManagerCustomerScope,
+  resolveManagerIdsForCustomer,
+} from '../lib/managerScope'
 import { supabase, type Cleaner } from './supabase'
 
 type ManagerRole = 'manager' | 'ops_manager' | 'admin'
@@ -671,6 +675,37 @@ export async function assignCleanerToManager(managerId: string, cleanerId: strin
     console.error('Failed to assign cleaner to manager', error)
     throw error
   }
+}
+
+export async function autoLinkCleanerToCustomer(
+  customerLabel: string | null | undefined,
+  cleanerId: string,
+): Promise<string[]> {
+  if (!cleanerId) {
+    return []
+  }
+
+  const managerIds = resolveManagerIdsForCustomer(customerLabel)
+  if (!managerIds.length) {
+    return []
+  }
+
+  await Promise.all(
+    managerIds.map(async (managerId) => {
+      try {
+        await assignCleanerToManager(managerId, cleanerId)
+      } catch (error) {
+        console.warn('Failed to auto-link cleaner to manager', {
+          managerId,
+          cleanerId,
+          customerLabel,
+          error,
+        })
+      }
+    }),
+  )
+
+  return managerIds
 }
 
 export async function removeCleanerFromManager(managerId: string, cleanerId: string): Promise<void> {

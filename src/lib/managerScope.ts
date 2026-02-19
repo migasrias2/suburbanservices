@@ -69,3 +69,30 @@ export const buildCustomerScopeMatcher = (scopeTokens: string[]) => {
     })
   }
 }
+
+export const resolveManagerIdsForCustomer = (customerLabel?: string | null): string[] => {
+  const normalizedLabel = normalizeValue(customerLabel ?? undefined)
+  if (!normalizedLabel) {
+    return []
+  }
+
+  const managerIds = new Set<string>()
+
+  for (const scope of MANAGER_CUSTOMER_SCOPES) {
+    if (!scope.managerIds?.length) {
+      continue
+    }
+
+    const matchesCustomer = buildCustomerScopeMatcher(scope.customerTokens)
+    if (matchesCustomer(customerLabel)) {
+      for (const managerId of scope.managerIds) {
+        const normalizedId = normalizeValue(managerId)
+        if (normalizedId) {
+          managerIds.add(managerId.trim())
+        }
+      }
+    }
+  }
+
+  return Array.from(managerIds)
+}

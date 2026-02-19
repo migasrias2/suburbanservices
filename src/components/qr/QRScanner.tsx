@@ -159,6 +159,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
             if (isProcessing) return
             setIsProcessing(true)
 
+            const scannedType = QRService.normalizeQrType(qrData.type)
+
             // Resolve canonical data from database by qr_code_id if available
             try {
               const { data: rows } = await (await import('../../services/supabase')).supabase
@@ -171,7 +173,13 @@ export const QRScanner: React.FC<QRScannerProps> = ({
               if (rows?.qr_code_url) {
                 const resolved = QRService.parseQRCode(rows.qr_code_url)
                 if (resolved) {
-                  qrData = resolved
+                  const resolvedType = QRService.normalizeQrType(resolved.type)
+                  // Keep the freshly scanned action type when DB metadata is stale/mis-typed.
+                  if (scannedType && resolvedType && scannedType !== resolvedType) {
+                    qrData = { ...resolved, type: scannedType }
+                  } else {
+                    qrData = resolved
+                  }
                 }
               }
             } catch {}
