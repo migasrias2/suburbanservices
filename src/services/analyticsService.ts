@@ -387,7 +387,7 @@ export async function fetchDashboardSnapshot({
 
   const photosQuery = supabase
     .from('uk_cleaner_task_photos')
-    .select('id, cleaner_id, cleaner_name, photo_timestamp, qr_code_id, customer_name')
+    .select('id, cleaner_id, cleaner_name, photo_timestamp, qr_code_id')
     .gte('photo_timestamp', start)
     .lte('photo_timestamp', end)
 
@@ -432,20 +432,10 @@ export async function fetchDashboardSnapshot({
     .filter((row) => scope.matchesCleanerScope({ cleaner_id: row.cleaner_id, cleaner_name: row.cleaner_name }))
     .filter((row) => {
       if (!customerScope.length) return true
-      
-      // Use customer_name if available (it is selected now)
-      // @ts-ignore - types might not be updated yet
-      if (row.customer_name && matchesScope(row.customer_name)) {
-        return true
-      }
 
-      // Fallback to QR code check
-      if (allowedQrCodeIds && row.qr_code_id) {
-        return allowedQrCodeIds.has(row.qr_code_id)
-      }
-      
-      // If we have scope but no match on customer/QR, it's filtered out
-      return false
+      // Customer scoping for photos is resolved via QR ownership metadata.
+      if (!allowedQrCodeIds || !row.qr_code_id) return false
+      return allowedQrCodeIds.has(row.qr_code_id)
     })
 
   let cleanersOnline: number | null = null

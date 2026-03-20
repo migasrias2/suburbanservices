@@ -148,41 +148,68 @@ export const QRScanner: React.FC<QRScannerProps> = ({
               return
             }
 
-            // Ignore scans that don't match allowed types for this step
-            if (allowedTypes && !allowedTypes.includes(qrData.type)) {
-              setWrongType(qrData.type)
-              setTimeout(() => setWrongType(null), 1200)
-              return
-            }
-
             // Throttle processing to avoid duplicate spam
             if (isProcessing) return
             setIsProcessing(true)
 
             const scannedType = QRService.normalizeQrType(qrData.type)
+            const rawPayload = result.data?.trim() || ''
 
-            // Resolve canonical data from database by qr_code_id if available
+            // Resolve canonical data from database before type-gating.
+            // Some legacy QR payloads are stale/mis-typed while DB metadata is correct.
             try {
-              const { data: rows } = await (await import('../../services/supabase')).supabase
+              const supabaseClient = (await import('../../services/supabase')).supabase
+              const canonicalSelect = 'qr_code_url, area_description, is_active'
+
+              const { data: byIdRow } = await supabaseClient
                 .from('building_qr_codes')
-                .select('qr_code_url, is_active')
+                .select(canonicalSelect)
                 .eq('qr_code_id', qrData.id)
                 .eq('is_active', true)
                 .limit(1)
                 .maybeSingle()
-              if (rows?.qr_code_url) {
-                const resolved = QRService.parseQRCode(rows.qr_code_url)
+
+              let canonicalRow = byIdRow
+              if (!canonicalRow && rawPayload) {
+                const { data: byPayloadRow } = await supabaseClient
+                  .from('building_qr_codes')
+                  .select(canonicalSelect)
+                  .eq('qr_code_url', rawPayload)
+                  .eq('is_active', true)
+                  .limit(1)
+                  .maybeSingle()
+                canonicalRow = byPayloadRow
+              }
+
+              if (canonicalRow?.qr_code_url) {
+                const resolved = QRService.parseQRCode(canonicalRow.qr_code_url)
                 if (resolved) {
                   const resolvedType = QRService.normalizeQrType(resolved.type)
-                  // Keep the freshly scanned action type when DB metadata is stale/mis-typed.
+
+                  // Keep scanned action type by default, but if this scanner has strict allowed
+                  // types and DB canonical type matches one of them, trust canonical type.
                   if (scannedType && resolvedType && scannedType !== resolvedType) {
-                    qrData = { ...resolved, type: scannedType }
+                    const preferredType =
+                      allowedTypes && allowedTypes.includes(resolvedType) ? resolvedType : scannedType
+                    qrData = { ...resolved, type: preferredType }
                   } else {
                     qrData = resolved
+                  }
+                } else {
+                  const rowType = QRService.normalizeQrType(canonicalRow.area_description)
+                  if (rowType) {
+                    qrData = { ...qrData, type: rowType }
                   }
                 }
               }
             } catch {}
+
+            // Enforce type restrictions after canonical resolution.
+            if (allowedTypes && !allowedTypes.includes(qrData.type)) {
+              setWrongType(qrData.type)
+              setTimeout(() => setWrongType(null), 1200)
+              return
+            }
 
             // Get user location if available
             let location: { latitude: number; longitude: number } | undefined

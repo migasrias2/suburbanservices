@@ -191,6 +191,11 @@ const getAssistStatusBadgeClasses = (status?: BathroomAssistRequest['status'] | 
 const getAssistAttentionContainerClasses = (status?: BathroomAssistRequest['status'] | null) =>
   assistAttentionContainerClasses[status ?? 'unknown'] ?? assistAttentionContainerClasses.unknown
 
+const ASSISTANCE_HIDDEN_MANAGER_IDS = new Set([
+  '6d72f75b-9baa-4577-ba92-16c1a5474f44',
+  'bcda2a69-79ee-45e5-8ee6-c2a132beb576',
+])
+
 const formatTime = (iso: string | null, options?: Intl.DateTimeFormatOptions) =>
   iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', ...(options ?? {}) }) : '—'
 const formatDateTime = (iso: string | null) =>
@@ -352,6 +357,10 @@ const buildPhotoDateKey = (photo: TaskPhotoRow) => {
   return 'unknown-date'
 }
 
+const DETAIL_HISTORY_WINDOW_DAYS = 180
+const DETAIL_TASK_LIMIT = 400
+const DETAIL_PHOTO_LIMIT = 2000
+
 export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, managerName, role }) => {
   const navigate = useNavigate()
   const [isListLoading, setIsListLoading] = useState(true)
@@ -386,6 +395,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null)
   const isGlobalRole = role === 'admin' || role === 'ops_manager'
   const isOpsManager = role === 'ops_manager'
+  const isAssistanceEnabled = isGlobalRole || !ASSISTANCE_HIDDEN_MANAGER_IDS.has(managerId)
   const customerScope = useMemo(
     () => (role === 'admin' ? [] : resolveManagerCustomerScope(managerId, managerName)),
     [managerId, managerName, role],
@@ -415,7 +425,9 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   )
   const overviewSubtitle = isOpsManager
     ? 'Monitor every cleaner, submission, and inspection across all sites.'
-    : 'Oversee live cleaners, submissions, and assistance updates from your manager control centre.'
+    : isAssistanceEnabled
+      ? 'Oversee live cleaners, submissions, and assistance updates from your manager control centre.'
+      : 'Oversee live cleaners and submissions from your manager control centre.'
   const [globalActivity, setGlobalActivity] = useState<ManagerActivityRow[]>([])
   const [isGlobalActivityLoading, setIsGlobalActivityLoading] = useState(false)
   const [globalActivityError, setGlobalActivityError] = useState<string | null>(null)
@@ -633,6 +645,13 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   }, [managerId, customerScope, matchesCustomerScope, matchesScheduledCleaner, scheduledCleanerSet])
 
   const refreshAssistRequests = useCallback(async () => {
+    if (!isAssistanceEnabled) {
+      setAssistActiveRequests([])
+      setAssistResolvedRequests([])
+      setAssistRequestsError(null)
+      return
+    }
+
     try {
       const resolvedSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
       const [active, resolved] = await Promise.all([
@@ -659,7 +678,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
       setAssistResolvedRequests([])
       setAssistRequestsError('Unable to load assistance updates right now.')
     }
-  }, [customerScope, matchesCustomerScope, isResolvedHiddenForManager])
+  }, [customerScope, isAssistanceEnabled, matchesCustomerScope, isResolvedHiddenForManager])
 
   useEffect(() => {
     refreshAssistRequests()
@@ -727,6 +746,9 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
       const nameTokens = Array.from(new Set(cleanerName.split(' ').filter(Boolean)))
       const shouldRunFuzzyAttendance = nameTokens.length > 1
       const cleanerId = selectedCleaner.cleaner_id
+      const detailWindowStartIso = new Date(
+        Date.now() - DETAIL_HISTORY_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+      ).toISOString()
 
       const attendanceExactQuery = supabase
         .from('time_attendance')
@@ -755,15 +777,17 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         .from('uk_cleaner_task_selections')
         .select('*')
         .or(`cleaner_id.eq.${cleanerId},cleaner_name.eq.${cleanerName}`)
+        .gte('timestamp', detailWindowStartIso)
         .order('timestamp', { ascending: false })
-        .limit(80)
+        .limit(DETAIL_TASK_LIMIT)
 
       const photosQuery = supabase
         .from('uk_cleaner_task_photos')
         .select('*')
-        .eq('cleaner_id', selectedCleaner.cleaner_id)
+        .or(`cleaner_id.eq.${cleanerId},cleaner_name.eq.${cleanerName}`)
+        .gte('photo_timestamp', detailWindowStartIso)
         .order('photo_timestamp', { ascending: false })
-        .limit(80)
+        .limit(DETAIL_PHOTO_LIMIT)
 
       const [logsPromise, tasksPromise, photosPromise] = [logsQuery, tasksQuery, photosQuery]
 
@@ -828,7 +852,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
       const tasksWithMetadata: TaskSelectionRow[] = rawTaskRows.map((row) => {
         const meta = row.qr_code_id ? qrMetadata.get(row.qr_code_id) : undefined
-        const areaLabel = resolveAreaDisplayLabel(meta?.area, row.area_name, row.area_type)
+        const areaLabel = resolveAreaDisplayLabel(meta?.area, row.area_name, row.qr_code_id, row.area_type)
         const customerLabel = resolveCustomerDisplayLabel(meta?.customer, row.customer_name)
         return {
           ...row,
@@ -839,7 +863,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
       const photosWithMetadata: TaskPhotoRow[] = rawPhotoRows.map((row) => {
         const meta = row.qr_code_id ? qrMetadata.get(row.qr_code_id) : undefined
-        const areaLabel = resolveAreaDisplayLabel(meta?.area, row.area_name, row.area_type)
+        const areaLabel = resolveAreaDisplayLabel(meta?.area, row.area_name, row.qr_code_id, row.area_type)
         const customerLabel = resolveCustomerDisplayLabel(meta?.customer, row.customer_name)
         return {
           ...row,
@@ -1274,7 +1298,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     todaysTasks.map((row) => {
       const selected = JSON.parse(row.selected_tasks || '[]') as string[]
       const completed = JSON.parse(row.completed_tasks || '[]') as string[]
-      const areaLabel = resolveAreaDisplayLabel(row.area_name, row.area_type)
+      const areaLabel = resolveAreaDisplayLabel(row.area_name, row.qr_code_id, row.area_type)
       return {
         id: row.id,
         area: areaLabel,
@@ -1291,7 +1315,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     const groups = new Map<string, TaskPhotoGroup>()
 
     photos.forEach((photo) => {
-      const resolvedAreaLabel = resolveAreaDisplayLabel(photo.area_name, photo.area_type)
+      const resolvedAreaLabel = resolveAreaDisplayLabel(photo.area_name, photo.qr_code_id, photo.area_type)
       const resolvedCustomerLabel = resolveCustomerDisplayLabel(photo.customer_name)
       const { key: computedAreaKey, label: areaLabel, customer: areaCustomer } = deriveAreaIdentity({
         ...photo,
@@ -2078,7 +2102,8 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           </section>
         )}
 
-        <section className="grid gap-6 xl:grid-cols-2">
+        {isAssistanceEnabled && (
+          <section className="grid gap-6 xl:grid-cols-2">
           <Card className="rounded-[36px] border border-white/70 bg-white/80 shadow-[0_26px_70px_rgba(0,51,155,0.1)] backdrop-blur">
             <CardHeader className="space-y-1">
               <CardTitle className="text-xl font-semibold text-[#00339B]">Assistance</CardTitle>
@@ -2269,7 +2294,8 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
             </CardContent>
           </Card>
 
-        </section>
+          </section>
+        )}
 
         <section className="grid gap-6 xl:grid-cols-2">
           <Card className="rounded-[36px] border border-white/70 bg-white/85 shadow-[0_30px_80px_rgba(0,51,155,0.1)] backdrop-blur">

@@ -18,6 +18,71 @@ export interface LoginData {
   user_type: 'cleaner' | 'manager' | 'admin' | 'ops_manager'
 }
 
+type AuthUserRecord = {
+  id: string
+  first_name: string
+  last_name: string
+  mobile_number?: string | null
+  email?: string | null
+  employee_id?: string | null
+  username?: string | null
+  role?: string | null
+  manager_type?: string | null
+  user_type?: string | null
+  type?: string | null
+  is_active?: boolean | null
+  password_hash?: string | null
+}
+
+const normalizePhoneDigits = (value: string) => value.replace(/\D/g, '')
+
+const toUkE164 = (value: string): string | null => {
+  const digits = normalizePhoneDigits(value)
+  if (!digits) return null
+
+  if (digits.startsWith('44')) {
+    return `+${digits}`
+  }
+
+  if (digits.startsWith('0')) {
+    return `+44${digits.slice(1)}`
+  }
+
+  // Handle already-entered UK national number without leading zero.
+  if (digits.length === 10) {
+    return `+44${digits}`
+  }
+
+  return value.startsWith('+') ? `+${digits}` : null
+}
+
+const buildUkMobileCandidates = (value: string): string[] => {
+  const raw = value.trim()
+  const digits = normalizePhoneDigits(raw)
+  const candidates = new Set<string>()
+
+  if (raw) {
+    candidates.add(raw)
+  }
+
+  if (digits) {
+    candidates.add(digits)
+    candidates.add(`+${digits}`)
+  }
+
+  const e164 = toUkE164(raw)
+  if (e164) {
+    candidates.add(e164)
+    const e164Digits = normalizePhoneDigits(e164)
+    if (e164Digits.startsWith('44') && e164Digits.length > 2) {
+      candidates.add(`0${e164Digits.slice(2)}`)
+      candidates.add(e164Digits.slice(2))
+    }
+  }
+
+  return Array.from(candidates).filter(Boolean)
+}
+
 export const authService = {
   // Hash password
   async hashPassword(password: string): Promise<string> {
@@ -201,11 +266,28 @@ export const authService = {
         throw new Error(loginData.user_type === 'ops_manager' ? 'Username is required' : 'Mobile number is required')
       }
 
-      const { data, error } = await (supabase as any)
-        .from(tableName)
-        .select('*')
-        .eq(identifierField, identifier)
-        .single()
+      let data: AuthUserRecord | null = null
+      let error: { message?: string } | null = null
+
+      if (loginData.user_type === 'ops_manager') {
+        const result = await (supabase as any)
+          .from(tableName)
+          .select('*')
+          .eq(identifierField, identifier)
+          .single()
+        data = (result.data as AuthUserRecord | null) ?? null
+        error = (result.error as { message?: string } | null) ?? null
+      } else {
+        const mobileCandidates = buildUkMobileCandidates(identifier)
+        const result = await (supabase as any)
+          .from(tableName)
+          .select('*')
+          .in(identifierField, mobileCandidates)
+          .limit(1)
+
+        data = (Array.isArray(result.data) ? result.data[0] : null) as AuthUserRecord | null
+        error = (result.error as { message?: string } | null) ?? null
+      }
 
       if (error || !data) {
         throw new Error('Invalid credentials')
@@ -230,8 +312,10 @@ export const authService = {
       let isValidPassword = await this.verifyPassword(loginData.password, hashedPassword)
       
       // Fallback for PSM Marine if hash verification fails (legacy/manual entry support)
-      if (!isValidPassword && 
-          identifier === '+447939574841' && 
+      const normalizedIdentifier = loginData.user_type === 'ops_manager' ? null : toUkE164(identifier)
+
+      if (!isValidPassword &&
+          normalizedIdentifier === '+447939574841' &&
           loginData.password === 'James123!') {
         isValidPassword = true
       }

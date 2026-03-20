@@ -19,7 +19,10 @@ const CLEANER_SUMMARY_FIELDS = 'id, first_name, last_name, created_at, email, mo
  */
 const MANAGER_CLEANER_FALLBACKS: Record<string, string[]> = {
   // Metalex manager → Rebecca Miller
-  '4d1381ae-332f-4ff4-8ae3-f062dd5b487f': ['dfaf59c4-1093-44c6-844f-7dea4885547e']
+  '4d1381ae-332f-4ff4-8ae3-f062dd5b487f': ['dfaf59c4-1093-44c6-844f-7dea4885547e'],
+  // Adams manager(s) → Gill Dickson
+  '6d72f75b-9baa-4577-ba92-16c1a5474f44': ['b7a454ee-7505-43bf-958c-4d82d1428e8c'],
+  'bcda2a69-79ee-45e5-8ee6-c2a132beb576': ['b7a454ee-7505-43bf-958c-4d82d1428e8c'],
 }
 
 export type CleanerSummary = Pick<
@@ -213,7 +216,8 @@ const resolveActivityDisplayLabel = (
   return null
 }
 
-const ACTIVITY_WINDOW_MS = 5 * 24 * 60 * 60 * 1000
+const ACTIVITY_WINDOW_DAYS = 30
+const ACTIVITY_WINDOW_MS = ACTIVITY_WINDOW_DAYS * 24 * 60 * 60 * 1000
 
 const parseTaskList = (value?: string | null): string[] => {
   if (!value) return []
@@ -416,6 +420,12 @@ export async function fetchManagerRecentActivity(
     .limit(limit * 2)
 
   photosBuilder = photosBuilder.gte('photo_timestamp', windowStartIso)
+
+  if (restrictToManagedCleaners && trimmedCleanerIds.length) {
+    // Scope at the query layer so managers don't lose results to global ordering limits.
+    selectionsBuilder = selectionsBuilder.in('cleaner_id', trimmedCleanerIds)
+    photosBuilder = photosBuilder.in('cleaner_id', trimmedCleanerIds)
+  }
 
   const [selectionsRes, photosRes] = await Promise.all([selectionsBuilder, photosBuilder])
 
