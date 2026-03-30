@@ -1338,6 +1338,11 @@ export class QRService {
           })
 
         if (attendanceError) {
+          // Handle the duplicate prevention trigger gracefully
+          if (attendanceError.message?.includes('Duplicate clock-in')) {
+            console.warn('Duplicate clock-in prevented by database trigger')
+            return { success: true, message: 'Clock-in already recorded' }
+          }
           console.error('Error logging clock-in to time_attendance:', attendanceError)
           return { success: false, message: 'Failed to log clock-in. Please try again.' }
         }

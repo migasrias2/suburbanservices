@@ -45,6 +45,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   const [isCheckingPermission, setIsCheckingPermission] = useState(false)
   // Task selector is handled by parent workflow; do not embed here
   const [isProcessing, setIsProcessing] = useState(false)
+  const processingRef = useRef(false)
+  const lastScanCodeRef = useRef<{ code: string; time: number } | null>(null)
   const [wrongType, setWrongType] = useState<QRCodeData['type'] | null>(null)
   const [showClockOut, setShowClockOut] = useState(false)
   const [hasHandledSuccess, setHasHandledSuccess] = useState(false)
@@ -148,8 +150,19 @@ export const QRScanner: React.FC<QRScannerProps> = ({
               return
             }
 
-            // Throttle processing to avoid duplicate spam
-            if (isProcessing) return
+            // Deduplicate: ignore same QR code scanned within 10 seconds
+            const now = Date.now()
+            if (lastScanCodeRef.current &&
+                lastScanCodeRef.current.code === result.data &&
+                now - lastScanCodeRef.current.time < 10000) {
+              return
+            }
+            lastScanCodeRef.current = { code: result.data, time: now }
+
+            // Synchronous guard via ref to prevent duplicate processing
+            // (useState is async and captured in closures — useless for this)
+            if (processingRef.current) return
+            processingRef.current = true
             setIsProcessing(true)
 
             const scannedType = QRService.normalizeQrType(qrData.type)
@@ -208,6 +221,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
             if (allowedTypes && !allowedTypes.includes(qrData.type)) {
               setWrongType(qrData.type)
               setTimeout(() => setWrongType(null), 1200)
+              processingRef.current = false
+              setIsProcessing(false)
               return
             }
 
@@ -285,7 +300,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
             setError('Error processing QR code')
             onScanError?.('Error processing QR code')
           } finally {
-            setTimeout(() => setIsProcessing(false), 800)
+            processingRef.current = false
+            setIsProcessing(false)
           }
         },
         {
