@@ -1,10 +1,10 @@
 import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { 
-  QrCode, 
-  BarChart3, 
-  Users, 
-  LogOut, 
+import {
+  QrCode,
+  BarChart3,
+  Users,
+  LogOut,
   Home,
   Camera,
   FileText,
@@ -14,6 +14,7 @@ import {
   CalendarDays
 } from 'lucide-react'
 import { Button } from '../ui/button'
+import { useAuth } from '../../contexts/AuthContext'
 
 interface SidebarProps {
   isOpen: boolean
@@ -25,15 +26,10 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, userType, userName }) => {
   const navigate = useNavigate()
   const location = useLocation()
+  const { signOut } = useAuth()
 
-  const handleLogout = () => {
-    localStorage.removeItem('userType')
-    localStorage.removeItem('userId')
-    localStorage.removeItem('userName')
-    localStorage.removeItem('currentClockInData')
-    localStorage.removeItem('currentClockInPhase')
-    localStorage.removeItem('currentSiteName')
-    localStorage.removeItem('recentClockOutAt')
+  const handleLogout = async () => {
+    await signOut()
     navigate('/login')
   }
 

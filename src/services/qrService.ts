@@ -727,18 +727,34 @@ export class QRService {
   static async saveRemoteDraft(draft: any) {
     try {
       const cleanerName = getStoredCleanerName()
-      await supabase
+      const payload = {
+        cleaner_name: cleanerName,
+        qr_code_id: draft.qrCodeId,
+        area_type: draft.areaType,
+        step: draft.step,
+        current_task_index: draft.currentTaskIndex,
+        state: draft.state,
+        updated_at: new Date().toISOString()
+      }
+
+      // Try to update existing non-finalized draft for this cleaner
+      const { data } = await supabase
         .from('work_drafts')
-        .upsert({
-          cleaner_id: draft.cleanerId,
-          cleaner_name: cleanerName,
-          qr_code_id: draft.qrCodeId,
-          area_type: draft.areaType,
-          step: draft.step,
-          current_task_index: draft.currentTaskIndex,
-          state: draft.state,
-          is_finalized: false
-        }, { onConflict: 'id' })
+        .update(payload)
+        .eq('cleaner_id', draft.cleanerId)
+        .eq('is_finalized', false)
+        .select('id')
+
+      // If no existing draft, insert a new one
+      if (!data?.length) {
+        await supabase
+          .from('work_drafts')
+          .insert({
+            cleaner_id: draft.cleanerId,
+            ...payload,
+            is_finalized: false
+          })
+      }
     } catch (e) {
       console.warn('saveRemoteDraft failed (will retry later):', e)
     }

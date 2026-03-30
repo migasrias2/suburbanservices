@@ -112,7 +112,13 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
 
     const nextCompletions = tasks.map(task => {
       if (initialMap?.has(task.id)) {
-        return initialMap.get(task.id) as TaskCompletion
+        const restored = initialMap.get(task.id) as TaskCompletion
+        // If task was marked completed but photos were lost (e.g. remote draft
+        // without photo data), reset completed so the cleaner re-takes photos
+        if (restored.completed && (!restored.photos || restored.photos.length === 0)) {
+          return { ...restored, completed: false }
+        }
+        return restored
       }
       return { taskId: task.id, completed: false, photos: [] }
     })
@@ -121,8 +127,12 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
 
     if (initialMap) {
       setConfirmedPhotos(initialState?.confirmedPhotos || {})
+      // Navigate to first task that's missing a photo so the cleaner isn't
+      // stuck on the last task with earlier tasks incomplete
+      const firstIncomplete = nextCompletions.findIndex(tc => (tc.photos?.length || 0) === 0)
       const maxIndex = Math.max(nextCompletions.length - 1, 0)
-      const nextIndex = Math.min(Math.max(initialState?.currentTaskIndex || 0, 0), maxIndex)
+      const fallbackIndex = Math.min(Math.max(initialState?.currentTaskIndex || 0, 0), maxIndex)
+      const nextIndex = firstIncomplete >= 0 ? firstIncomplete : fallbackIndex
       setCurrentIndex(nextIndex)
     } else {
       setConfirmedPhotos({})
@@ -526,11 +536,11 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
         {currentIndex < tasks.length - 1 ? (
           <Button
             onClick={() => {
-              // Animate bar to include this task then advance after animation
               if (!currentHasPhoto) return
-              const animateTo = Math.round(((confirmedBeforeCount + 1) / Math.max(tasks.length, 1)) * 100)
-              const bar = document.createElement('div')
-              // No-op: width transition handled by CSS above since we derive from confirmedBeforeCount
+              // Auto-confirm the photo for this task so progress bar updates
+              if (currentTask && !confirmedPhotos[currentTask.id]) {
+                setConfirmedPhotos(prev => ({ ...prev, [currentTask.id]: true }))
+              }
               // Delay page advance slightly to let animation play
               setTimeout(() => setCurrentIndex(currentIndex + 1), 420)
             }}
@@ -563,7 +573,13 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
       </div>
 
       <div className="text-center">
-        <p className="text-xs text-gray-500">Photos are required to continue</p>
+        {completedTasksCount < tasks.length ? (
+          <p className="text-xs text-gray-500">
+            Photos taken: {completedTasksCount}/{tasks.length} — all tasks need a photo to finish
+          </p>
+        ) : (
+          <p className="text-xs text-gray-500">All photos taken — ready to finish!</p>
+        )}
       </div>
     </div>
   )

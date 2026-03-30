@@ -6,13 +6,14 @@ import { authService } from '../services/authService'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Card, CardContent } from '../components/ui/card'
 import { useToast } from '../hooks/use-toast'
-import { setStoredCleanerName } from '../lib/identity'
+import { useAuth } from '../contexts/AuthContext'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 
 export default function Login() {
   const navigate = useNavigate()
+  const { signIn } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
@@ -62,57 +63,34 @@ export default function Login() {
     setLoading(true)
 
     try {
-      const loginData = {
-        mobile_number: activeTab === 'cleaner' || activeTab === 'manager' ? mobile : undefined,
-        username: activeTab === 'admin' || activeTab === 'ops_manager' ? username : undefined,
-        password,
-        user_type: activeTab
+      const identifier =
+        activeTab === 'cleaner' || activeTab === 'manager' ? mobile : username
+
+      // signIn handles Supabase Auth + localStorage sync via AuthContext
+      clearClockState()
+      await signIn(activeTab, identifier, password)
+
+      // Navigate based on user type
+      switch (activeTab) {
+        case 'cleaner':
+          navigate('/clock-in')
+          break
+        case 'manager':
+          navigate('/manager-dashboard')
+          break
+        case 'ops_manager':
+          navigate('/ops-dashboard')
+          break
+        case 'admin':
+          navigate('/admin-dashboard')
+          break
       }
-
-      const result = await authService.loginUser(loginData)
-
-      if (result.success && result.user) {
-        const normalizedName = setStoredCleanerName(result.user.name)
-
-        // Store user session
-        clearClockState()
-        localStorage.setItem('userType', result.user.user_type)
-        localStorage.setItem('userId', result.user.id)
-        if (result.user.mobile_number) {
-          localStorage.setItem('userMobile', result.user.mobile_number)
-        } else {
-          localStorage.removeItem('userMobile')
-        }
-        setStoredCleanerName(normalizedName)
-
-        // Navigate based on user type
-        switch (result.user.user_type) {
-          case 'cleaner':
-            navigate('/clock-in')
-            break
-          case 'manager':
-            navigate('/manager-dashboard')
-            break
-          case 'ops_manager':
-            navigate('/ops-dashboard')
-            break
-          case 'admin':
-            navigate('/admin-dashboard')
-            break
-        }
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Login Failed",
-          description: result.error || "Invalid credentials"
-        })
-      }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Login error:', err)
       toast({
         variant: "destructive",
-        title: "Login Error",
-        description: "Login failed. Please try again."
+        title: "Login Failed",
+        description: err?.message || "Invalid credentials"
       })
     } finally {
       setLoading(false)
@@ -215,80 +193,6 @@ export default function Login() {
     }
     setIsRegisterMode(!isRegisterMode)
     resetForm()
-  }
-
-  const handleDemoLogin = async (userType: string, name: string) => {
-    setLoading(true)
-    try {
-      const loginData = {
-        mobile_number: '+44', // Placeholder, replace with actual demo number
-        username: 'demo', // Placeholder, replace with actual demo username
-        password: 'demo123', // Placeholder, replace with actual demo password
-        user_type: userType
-      }
-
-      const result = await authService.loginUser(loginData)
-
-      if (result.success && result.user) {
-        const normalizedName = setStoredCleanerName(name)
-
-        // Store user session
-        localStorage.setItem('userType', result.user.user_type)
-        localStorage.setItem('userId', result.user.id)
-        if (result.user.mobile_number) {
-          localStorage.setItem('userMobile', result.user.mobile_number)
-        } else {
-          localStorage.removeItem('userMobile')
-        }
-        setStoredCleanerName(normalizedName)
-
-        // Navigate based on user type
-        switch (result.user.user_type) {
-          case 'cleaner':
-            navigate('/clock-in')
-            break
-          case 'manager':
-            navigate('/manager-dashboard')
-            break
-          case 'ops_manager':
-            navigate('/ops-dashboard')
-            break
-          case 'admin':
-            navigate('/admin-dashboard')
-            break
-        }
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Demo Login Failed",
-          description: result.error || "Invalid demo credentials"
-        })
-      }
-    } catch (err) {
-      console.error('Demo Login error:', err)
-      toast({
-        variant: "destructive",
-        title: "Demo Login Error",
-        description: "Demo login failed. Please try again."
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleQuickManagerLogin = (userId: string, name: string) => {
-    setLoading(true)
-    try {
-      const normalizedName = setStoredCleanerName(name)
-      clearClockState()
-      localStorage.setItem('userType', 'manager')
-      localStorage.setItem('userId', userId)
-      localStorage.removeItem('userMobile')
-      setStoredCleanerName(normalizedName)
-      navigate('/manager-dashboard')
-    } finally {
-      setLoading(false)
-    }
   }
 
   return (

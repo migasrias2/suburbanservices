@@ -15,6 +15,7 @@ import {
   Activity,
   CalendarDays
 } from 'lucide-react'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   Sidebar,
   SidebarContent,
@@ -56,6 +57,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
   const navigate = useNavigate()
   const location = useLocation()
   const isMobile = useIsMobile()
+  const { signOut } = useAuth()
 
   type MenuItem = {
     icon: LucideIcon
@@ -68,14 +70,8 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
     items: MenuItem[]
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem('userType')
-    localStorage.removeItem('userId')
-    localStorage.removeItem('userName')
-    localStorage.removeItem('currentClockInData')
-    localStorage.removeItem('currentClockInPhase')
-    localStorage.removeItem('currentSiteName')
-    localStorage.removeItem('recentClockOutAt')
+  const handleLogout = async () => {
+    await signOut()
     navigate('/login')
   }
 
