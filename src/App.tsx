@@ -22,6 +22,9 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import AdminWeeklySchedulePage from "./pages/AdminWeeklySchedulePage";
 import BathroomAssistReportPage from "./pages/BathroomAssistReportPage";
 import OpsCalendarPage from "./pages/OpsCalendarPage";
+import NewCustomerPage from "./pages/NewCustomerPage";
+import PresetsPage from "./pages/PresetsPage";
+import UsersPage from "./pages/UsersPage";
 
 const queryClient = new QueryClient();
 
@@ -52,6 +55,9 @@ const App = () => (
           <Route path="/admin-dashboard" element={<ManagerDashboardPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/admin-weekly-schedule" element={<AdminWeeklySchedulePage />} />
+          <Route path="/admin/new-customer" element={<NewCustomerPage />} />
+          <Route path="/admin/presets" element={<PresetsPage />} />
+          <Route path="/admin/users" element={<UsersPage />} />
           <Route path="/bathroom-assist" element={<BathroomAssistReportPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

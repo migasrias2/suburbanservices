@@ -13,7 +13,9 @@ import {
   Camera,
   Library,
   Activity,
-  CalendarDays
+  CalendarDays,
+  UserPlus,
+  Layers
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import {
@@ -94,10 +96,12 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
   ]
 
   const adminMenuItems: MenuItem[] = [
+    { icon: UserPlus, label: 'New Customer', path: '/admin/new-customer' },
+    { icon: Layers, label: 'Area Presets', path: '/admin/presets' },
     { icon: Library, label: 'QR Library', path: '/qr-library' },
     { icon: QrCode, label: 'QR Generator', path: '/qr-generator' },
     { icon: Building2, label: 'Areas & Tasks', path: '/area-tasks' },
-    { icon: Users, label: 'User Management', path: '/admin-dashboard' },
+    { icon: Users, label: 'Users', path: '/admin/users' },
     { icon: BarChart3, label: 'Analytics', path: '/analytics' },
     { icon: Clock, label: 'Calendar', path: '/admin-weekly-schedule' },
   ]
@@ -148,16 +152,20 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
       case 'admin':
         return [
           {
-            title: 'QR Suite',
+            title: 'Onboarding',
             items: adminMenuItems.slice(0, 2),
           },
           {
-            title: 'Operations',
+            title: 'QR Suite',
             items: adminMenuItems.slice(2, 4),
           },
           {
+            title: 'Operations',
+            items: adminMenuItems.slice(4, 6),
+          },
+          {
             title: 'Insights',
-            items: adminMenuItems.slice(4),
+            items: adminMenuItems.slice(6),
           },
         ]
       default:
@@ -181,6 +189,9 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
       if (location.pathname === '/area-tasks') return 'Areas & Tasks'
       if (location.pathname === '/admin-dashboard') return 'User Management'
       if (location.pathname === '/admin-weekly-schedule') return 'Weekly Calendar'
+      if (location.pathname === '/admin/new-customer') return 'New Customer'
+      if (location.pathname === '/admin/presets') return 'Area Presets'
+      if (location.pathname === '/admin/users') return 'Users'
       return 'Admin'
     }
     if (userType === 'ops_manager') {
@@ -334,7 +345,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
           {/* Main Content with subtle page fade animation */}
           <div className="flex flex-1 flex-col px-4 pb-6 pt-4 sm:p-6 sm:pt-6">
             <div className="w-full max-w-7xl mx-auto py-2 sm:py-4">
-              <div className="page-fade-enter page-fade-enter-active">
+              <div key={location.pathname} className="page-fade">
                 {children}
               </div>
             </div>

@@ -4,6 +4,7 @@ import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../services/supabase'
 import { deriveSyntheticEmail } from '../lib/authHelpers'
 import { setStoredCleanerName } from '../lib/identity'
+import { hydrateManagerScopes, invalidateManagerScopes } from '../lib/managerScope'
 
 export interface AppUser {
   id: string
@@ -73,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const user = buildAppUser(s.user)
         setAppUser(user)
         syncToLocalStorage(user)
+        hydrateManagerScopes()
       }
       setIsLoading(false)
     })
@@ -86,9 +88,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const user = buildAppUser(s.user)
         setAppUser(user)
         syncToLocalStorage(user)
+        invalidateManagerScopes()
+        hydrateManagerScopes()
       } else {
         setAppUser(null)
         clearLocalStorage()
+        invalidateManagerScopes()
       }
     })
 
