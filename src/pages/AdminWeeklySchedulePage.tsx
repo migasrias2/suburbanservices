@@ -1,245 +1,290 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { endOfMonth, format, startOfMonth } from 'date-fns'
+import { addDays, addWeeks, endOfWeek, format, startOfWeek } from 'date-fns'
 import { Sidebar07Layout } from '@/components/layout/Sidebar07Layout'
-import { FullScreenCalendar, type CalendarData, type CalendarEvent } from '@/components/ui/fullscreen-calendar'
-import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { useToast } from '@/hooks/use-toast'
 import { getStoredCleanerName } from '@/lib/identity'
-import { fetchOpsManagerShiftsInRange, type OpsManagerShift } from '@/services/calendarService'
+import {
+  WeeklyScheduleGrid,
+  type WeeklyScheduleBlock,
+} from '@/components/schedule/WeeklyScheduleGrid'
+import { ShiftDialog, type ShiftDialogValue } from '@/components/schedule/ShiftDialog'
+import {
+  createShift,
+  deleteShift,
+  fetchShiftsInRange,
+  updateShift,
+  type CleanerShift,
+} from '@/services/shiftsService'
+import { fetchAllCleaners, type CleanerSummary } from '@/services/managerService'
+import { fetchCustomers } from '@/services/customersService'
+import type { Customer } from '@/services/supabase'
 
-const getInitialRange = () => {
-  const today = new Date()
-  const start = startOfMonth(today)
-  const end = endOfMonth(today)
+const getWeekRange = (anchor: Date) => {
+  const start = startOfWeek(anchor, { weekStartsOn: 1 })
   start.setHours(0, 0, 0, 0)
+  const end = endOfWeek(anchor, { weekStartsOn: 1 })
   end.setHours(23, 59, 59, 999)
   return { start, end }
 }
 
-type OpsManagerCalendarEventMetadata = {
-  opsManagerName: string
-  siteName: string
-  customerName?: string | null
-  clockIn: string
-  clockOut: string | null
+const cleanerLabel = (c: CleanerSummary): string => {
+  const name = `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim()
+  return name || c.email || c.mobile_number || c.id
 }
+
+const customerLabel = (c: Customer): string =>
+  (c.display_name ?? c.name ?? c.customer_name ?? '').trim() || 'Unnamed'
 
 const AdminWeeklySchedulePage: React.FC = () => {
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [userName, setUserName] = useState<string>('')
-  const [calendarRange, setCalendarRange] = useState<{ start: Date; end: Date }>(() => getInitialRange())
-  const [calendarData, setCalendarData] = useState<CalendarData[]>([])
+  const [adminId, setAdminId] = useState<string>('')
+  const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date())
+  const [shifts, setShifts] = useState<CleanerShift[]>([])
+  const [cleaners, setCleaners] = useState<CleanerSummary[]>([])
+  const [customers, setCustomers] = useState<Customer[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
+  const [dialogState, setDialogState] = useState<{
+    open: boolean
+    mode: 'create' | 'edit'
+    day?: Date
+    hour?: number
+    shift?: CleanerShift | null
+  }>({ open: false, mode: 'create' })
 
   useEffect(() => {
-    const storedRole = localStorage.getItem('userType')
-    const storedName = getStoredCleanerName()
-
-    if (storedRole !== 'admin' || !storedName) {
+    const role = localStorage.getItem('userType')
+    const id = localStorage.getItem('userId') ?? ''
+    const name = getStoredCleanerName()
+    if (role !== 'admin' || !name) {
       navigate('/login')
       return
     }
-
-    setUserName(storedName)
+    setUserName(name)
+    setAdminId(id)
   }, [navigate])
 
-  const buildCalendarData = useCallback((shifts: OpsManagerShift[]): CalendarData[] => {
-    const map = new Map<string, CalendarData>()
+  const { start: weekStart, end: weekEnd } = useMemo(() => getWeekRange(weekAnchor), [weekAnchor])
 
-    const ensureEntry = (date: Date) => {
-      const normalized = new Date(date)
-      normalized.setHours(0, 0, 0, 0)
-      const key = format(normalized, 'yyyy-MM-dd')
-      const existing = map.get(key)
-      if (existing) {
-        return existing
-      }
-      const entry: CalendarData = { day: normalized, events: [], logs: [] }
-      map.set(key, entry)
-      return entry
+  const loadShifts = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const rows = await fetchShiftsInRange(weekStart, addDays(weekEnd, 1))
+      setShifts(rows)
+    } catch (err) {
+      console.error(err)
+      toast({ title: 'Could not load shifts', variant: 'destructive' })
+    } finally {
+      setIsLoading(false)
     }
-
-    shifts.forEach((shift) => {
-      const clockInDate = new Date(shift.clockIn)
-      if (Number.isNaN(clockInDate.getTime())) {
-        return
-      }
-
-      const entry = ensureEntry(clockInDate)
-      const clockOutDate = shift.clockOut ? new Date(shift.clockOut) : null
-      const timeLabel = `${format(clockInDate, 'p')}${clockOutDate ? ` – ${format(clockOutDate, 'p')}` : ' (Active)'}`
-      const labelParts = [shift.opsManagerName, shift.siteName].filter((part) => part && part.trim().length > 0)
-      const nameLabel = labelParts.length ? labelParts.join(' • ') : shift.opsManagerName
-
-      entry.events.push({
-        id: shift.id,
-        name: nameLabel,
-        time: timeLabel,
-        datetime: shift.clockIn,
-        metadata: {
-          opsManagerName: shift.opsManagerName,
-          siteName: shift.siteName,
-          customerName: shift.customerName ?? null,
-          clockIn: shift.clockIn,
-          clockOut: shift.clockOut,
-        } satisfies OpsManagerCalendarEventMetadata,
-      })
-    })
-
-    return Array.from(map.values()).sort((a, b) => a.day.getTime() - b.day.getTime())
-  }, [])
+  }, [weekStart, weekEnd, toast])
 
   useEffect(() => {
-    if (!userName) {
-      return
-    }
+    if (!userName) return
+    loadShifts()
+  }, [userName, loadShifts])
 
-    let isSubscribed = true
-
-    const loadCalendar = async () => {
-      setIsLoading(true)
+  useEffect(() => {
+    if (!userName) return
+    let cancelled = false
+    ;(async () => {
       try {
-        const shifts = await fetchOpsManagerShiftsInRange(calendarRange.start, calendarRange.end)
-
-        if (isSubscribed) {
-          setCalendarData(buildCalendarData(shifts))
-        }
-      } catch (error) {
-        if (isSubscribed) {
-          console.error('Failed to load ops manager calendar data', error)
-        }
-      } finally {
-        if (isSubscribed) {
-          setIsLoading(false)
+        const [cleanerRows, customerRows] = await Promise.all([fetchAllCleaners(), fetchCustomers()])
+        if (cancelled) return
+        setCleaners(cleanerRows.filter((c) => c.is_active !== false))
+        setCustomers(customerRows)
+      } catch (err) {
+        console.error(err)
+        if (!cancelled) {
+          toast({ title: 'Could not load cleaners or customers', variant: 'destructive' })
         }
       }
-    }
-
-    loadCalendar()
-
+    })()
     return () => {
-      isSubscribed = false
+      cancelled = true
     }
-  }, [buildCalendarData, calendarRange, userName])
+  }, [userName, toast])
 
-  const handleMonthChange = useCallback((range: { start: Date; end: Date }) => {
-    setCalendarRange((previous) => {
-      const nextStart = new Date(range.start.getTime())
-      const nextEnd = new Date(range.end.getTime())
-
-      if (previous.start.getTime() === nextStart.getTime() && previous.end.getTime() === nextEnd.getTime()) {
-        return previous
-      }
-
-      return { start: nextStart, end: nextEnd }
-    })
-  }, [])
-
-  const renderDayDetails = useCallback(
-    (day: Date, data: CalendarData | null) => {
-      const events = (data?.events ?? []) as Array<CalendarEvent & { metadata?: OpsManagerCalendarEventMetadata }>
-      const sortedEvents = [...events].sort((a, b) => {
-        const aTime = new Date(a.datetime ?? '').getTime()
-        const bTime = new Date(b.datetime ?? '').getTime()
-        if (!Number.isFinite(aTime) && !Number.isFinite(bTime)) return 0
-        if (!Number.isFinite(aTime)) return 1
-        if (!Number.isFinite(bTime)) return -1
-        return aTime - bTime
-      })
-      const hasEvents = sortedEvents.length > 0
-
-      return (
-        <div className="flex flex-col gap-4">
-          <div>
-            <h3 className="text-lg font-semibold text-[#00339B]">{format(day, 'PPP')}</h3>
-            <p className="text-xs font-medium uppercase tracking-wide text-[#00339B]/60">
-              {hasEvents ? 'Ops manager attendance and visits' : 'No ops manager attendance'}
-            </p>
-          </div>
-
-          {hasEvents ? (
-            <div className="grid gap-3">
-              {sortedEvents.map((event) => {
-                const metadata = (event.metadata ?? null) as OpsManagerCalendarEventMetadata | null
-                const managerName = metadata?.opsManagerName ?? event.name
-                const siteName = metadata?.siteName ?? ''
-                const customerName = metadata?.customerName ?? null
-                const clockInTimestamp = metadata?.clockIn ?? event.datetime
-                const clockOutTimestamp = metadata?.clockOut ?? null
-                const clockInLabel = clockInTimestamp ? format(new Date(clockInTimestamp), 'p') : '—'
-                const clockOutLabel = clockOutTimestamp ? format(new Date(clockOutTimestamp), 'p') : null
-                const statusIsComplete = Boolean(clockOutTimestamp)
-                const statusLabel = statusIsComplete ? 'Clocked out' : 'In progress'
-                const badgeClass = statusIsComplete ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'
-
-                return (
-                  <div
-                    key={event.id}
-                    className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4 shadow-sm shadow-blue-100/50 transition"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="space-y-1">
-                        <p className="text-sm font-semibold text-[#00339B]">{managerName}</p>
-                        {siteName ? <p className="text-xs text-[#00339B]/70">{siteName}</p> : null}
-                        {customerName && customerName !== siteName ? (
-                          <p className="text-xs text-[#00339B]/60">{customerName}</p>
-                        ) : null}
-                        {event.time ? (
-                          <p className="text-[11px] font-medium uppercase tracking-wide text-[#00339B]/50">
-                            {event.time}
-                          </p>
-                        ) : null}
-                      </div>
-                      <Badge className={`rounded-full px-3 py-1 text-xs font-semibold ${badgeClass}`}>{statusLabel}</Badge>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-medium text-[#00339B]/70">
-                      <span>{clockInLabel}</span>
-                      <span>–</span>
-                      <span>{clockOutLabel ?? 'Active'}</span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/40 p-6 text-center text-sm font-medium text-[#00339B]/70">
-              {format(day, 'PPP')} has no recorded ops manager attendance.
-            </div>
-          )}
-        </div>
-      )
-    },
-    [],
+  const cleanerOptions = useMemo(
+    () => cleaners.map((c) => ({ id: c.id, name: cleanerLabel(c) })),
+    [cleaners],
+  )
+  const customerOptions = useMemo(
+    () => customers.map((c) => ({ id: c.id, name: customerLabel(c) })),
+    [customers],
   )
 
-  const emptyStateMessage = useMemo(() => 'No ops manager attendance recorded for this day.', [])
+  const blocks = useMemo<WeeklyScheduleBlock[]>(
+    () =>
+      shifts.map((s) => ({
+        id: s.id,
+        startAt: s.startAt,
+        endAt: s.endAt,
+        title: s.cleanerName ?? 'Cleaner',
+        subtitle: s.siteName ?? s.customerName ?? null,
+        tone: 'primary',
+      })),
+    [shifts],
+  )
+
+  const openCreate = (day: Date, hour: number) => {
+    setDialogState({ open: true, mode: 'create', day, hour })
+  }
+
+  const openEdit = (blockId: string) => {
+    const target = shifts.find((s) => s.id === blockId) ?? null
+    if (!target) return
+    setDialogState({ open: true, mode: 'edit', shift: target })
+  }
+
+  const closeDialog = (open: boolean) => {
+    if (!open) {
+      setDialogState({ open: false, mode: 'create' })
+    }
+  }
+
+  const handleSubmit = async (value: ShiftDialogValue) => {
+    setIsSubmitting(true)
+    try {
+      if (dialogState.mode === 'edit' && dialogState.shift) {
+        await updateShift(dialogState.shift.id, {
+          customerId: value.customerId,
+          siteName: value.siteName,
+          startAt: value.startAt,
+          endAt: value.endAt,
+          notes: value.notes,
+        })
+        toast({ title: 'Shift updated' })
+      } else {
+        await createShift({
+          cleanerId: value.cleanerId,
+          customerId: value.customerId,
+          siteName: value.siteName,
+          startAt: value.startAt,
+          endAt: value.endAt,
+          notes: value.notes,
+          createdBy: adminId || null,
+        })
+        toast({ title: 'Shift created' })
+      }
+      setDialogState({ open: false, mode: 'create' })
+      await loadShifts()
+    } catch (err) {
+      console.error(err)
+      toast({ title: 'Could not save shift', variant: 'destructive' })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDelete = async (shiftId: string) => {
+    setIsSubmitting(true)
+    try {
+      await deleteShift(shiftId)
+      toast({ title: 'Shift deleted' })
+      setDialogState({ open: false, mode: 'create' })
+      await loadShifts()
+    } catch (err) {
+      console.error(err)
+      toast({ title: 'Could not delete shift', variant: 'destructive' })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   if (!userName) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-white">
+        <div className="h-9 w-9 animate-spin rounded-full border-2 border-gray-200 border-t-[#007AFF]" />
       </div>
     )
   }
 
   return (
     <Sidebar07Layout userType="admin" userName={userName}>
-      <FullScreenCalendar
-        data={calendarData}
-        isLoading={isLoading}
-        onMonthChange={handleMonthChange}
-        emptyState={emptyStateMessage}
-        renderDetails={renderDayDetails}
+      <div className="min-h-screen bg-[#FAFAFA]">
+        <div className="mx-auto flex max-w-[1400px] flex-col gap-6 px-5 py-8 sm:px-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-gray-400">
+                Schedule
+              </p>
+              <h1 className="mt-1 text-[28px] font-semibold tracking-tight text-gray-900">
+                {format(weekStart, 'MMMM yyyy')}
+              </h1>
+              <p className="mt-0.5 text-[13px] text-gray-500">
+                {format(weekStart, 'MMM d')} – {format(weekEnd, 'MMM d')}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 rounded-full bg-white p-1 ring-1 ring-black/[0.04] shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setWeekAnchor((prev) => addWeeks(prev, -1))}
+                  aria-label="Previous week"
+                  className="h-8 w-8 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setWeekAnchor(new Date())}
+                  className="h-8 rounded-full px-3 text-[12px] font-medium text-gray-700 hover:bg-gray-100"
+                >
+                  Today
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setWeekAnchor((prev) => addWeeks(prev, 1))}
+                  aria-label="Next week"
+                  className="h-8 w-8 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <Button
+                onClick={() => openCreate(new Date(), new Date().getHours())}
+                className="h-10 rounded-full bg-[#007AFF] px-4 text-[13px] font-semibold text-white shadow-none hover:bg-[#0064D2]"
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                New shift
+              </Button>
+            </div>
+          </div>
+
+          <WeeklyScheduleGrid
+            weekStart={weekStart}
+            blocks={blocks}
+            onCreate={openCreate}
+            onSelect={openEdit}
+            isLoading={isLoading}
+          />
+        </div>
+      </div>
+
+      <ShiftDialog
+        open={dialogState.open}
+        mode={dialogState.mode}
+        initialDay={dialogState.day}
+        initialHour={dialogState.hour}
+        shift={dialogState.shift ?? null}
+        cleaners={cleanerOptions}
+        customers={customerOptions}
+        isSubmitting={isSubmitting}
+        onSubmit={handleSubmit}
+        onDelete={handleDelete}
+        onOpenChange={closeDialog}
       />
     </Sidebar07Layout>
   )
 }
 
 export default AdminWeeklySchedulePage
-
-
-
-
-
-

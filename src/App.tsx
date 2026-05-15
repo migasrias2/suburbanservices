@@ -26,6 +26,7 @@ import NewCustomerPage from "./pages/NewCustomerPage";
 import PresetsPage from "./pages/PresetsPage";
 import UsersPage from "./pages/UsersPage";
 import AdminLiveDashboardPage from "./pages/AdminLiveDashboardPage";
+import CleanerSchedulePage from "./pages/CleanerSchedulePage";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/cleaner-dashboard" element={<CleanerDashboardPage />} />
           <Route path="/cleaner-assistance" element={<CleanerDashboardPage />} />
+          <Route path="/my-schedule" element={<CleanerSchedulePage />} />
           <Route path="/clock-in" element={<ClockInPage />} />
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/scanner" element={<ScannerPage />} />

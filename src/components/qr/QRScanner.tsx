@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
-import { Camera, QrCode, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Camera, QrCode, AlertCircle, CheckCircle2, Clock } from 'lucide-react'
 import QrScanner from 'qr-scanner'
 import { QRService, QRCodeData } from '../../services/qrService'
 import { ClockOutValidator } from './ClockOutValidator'
+import { hasOpenClockInToday } from '../../services/attendanceService'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Alert, AlertDescription } from '../ui/alert'
@@ -51,6 +53,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   const [showClockOut, setShowClockOut] = useState(false)
   const [hasHandledSuccess, setHasHandledSuccess] = useState(false)
   const handledSuccessRef = useRef(false)
+  const navigate = useNavigate()
+  const [clockInRequired, setClockInRequired] = useState(false)
 
   const stopScanning = useCallback(() => {
     if (qrScanner) {
@@ -246,6 +250,25 @@ export const QRScanner: React.FC<QRScannerProps> = ({
               }
             }
 
+            // Cleaners must have an open clock-in for today before scanning area/task QRs.
+            // Why: prevents on-site work being invisible to the live dashboard (real incident, May 2026).
+            // How to apply: skip for managers/admin and for non-area scans; check fails open on network errors.
+            const userType = typeof window !== 'undefined' ? localStorage.getItem('userType') : null
+            const requiresClockIn =
+              !previewMode &&
+              userType === 'cleaner' &&
+              (qrData.type === 'AREA' || qrData.type === 'TASK')
+            if (requiresClockIn) {
+              const hasOpen = await hasOpenClockInToday(cleanerId)
+              if (!hasOpen) {
+                setClockInRequired(true)
+                processingRef.current = false
+                setIsProcessing(false)
+                stopScanning()
+                return
+              }
+            }
+
             // Check if this QR code should show task selector
             // Only AREA QR codes show tasks, CLOCK_IN just processes the clock in
             const shouldGoToTasks = qrData.type === 'AREA'
@@ -388,6 +411,42 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   }
 
   // Task UI is handled by parent; this component just scans
+
+  if (clockInRequired) {
+    return (
+      <Card className="w-full max-w-md mx-auto rounded-3xl border-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_20px_50px_-20px_rgba(0,0,0,0.15)]">
+        <CardContent className="space-y-5 p-7 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#FFF5E0] text-[#7A4A00]">
+            <Clock className="h-6 w-6" />
+          </div>
+          <div className="space-y-1.5">
+            <h2 className="text-[20px] font-semibold tracking-tight text-gray-900">
+              Clock in first
+            </h2>
+            <p className="text-[13.5px] leading-snug text-gray-500">
+              You need to clock in before scanning area or task QR codes. Tap the button
+              below to clock in, then come back to scan.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Button
+              onClick={() => navigate('/clock-in')}
+              className="h-11 w-full rounded-full bg-[#007AFF] text-[14px] font-semibold text-white shadow-none hover:bg-[#0064D2]"
+            >
+              Go to Clock In
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setClockInRequired(false)}
+              className="h-10 w-full rounded-full text-[13px] font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+            >
+              Cancel
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   // Show clock-out validator if requested
   if (showClockOut && showClockOutOption) {

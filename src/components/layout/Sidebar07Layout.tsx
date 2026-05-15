@@ -80,6 +80,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
 
   const cleanerMenuItems: MenuItem[] = [
     { icon: Clock, label: 'Clock In', path: '/clock-in' },
+    { icon: CalendarDays, label: 'My Schedule', path: '/my-schedule' },
     { icon: Camera, label: 'Assistance', path: '/cleaner-assistance' },
   ]
 
@@ -154,28 +155,23 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
       case 'admin':
         return [
           {
-            title: 'Overview',
-            items: adminMenuItems.slice(0, 1),
+            title: 'Main',
+            items: [
+              adminMenuItems[0], // Dashboard
+              adminMenuItems[3], // Users
+              adminMenuItems[1], // New Customer
+              adminMenuItems[7], // Calendar
+              adminMenuItems[8], // Analytics
+            ],
           },
           {
-            title: 'Onboarding',
-            items: adminMenuItems.slice(1, 3),
-          },
-          {
-            title: 'People',
-            items: adminMenuItems.slice(3, 4),
-          },
-          {
-            title: 'QR Suite',
-            items: adminMenuItems.slice(4, 6),
-          },
-          {
-            title: 'Operations',
-            items: adminMenuItems.slice(6, 8),
-          },
-          {
-            title: 'Insights',
-            items: adminMenuItems.slice(8),
+            title: 'Tools',
+            items: [
+              adminMenuItems[2], // Area Presets
+              adminMenuItems[6], // Areas & Tasks
+              adminMenuItems[4], // QR Library
+              adminMenuItems[5], // QR Generator
+            ],
           },
         ]
       default:
@@ -234,17 +230,17 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
       <div className="min-h-screen bg-gray-50 flex w-full">
         <Sidebar variant="sidebar" className="bg-white border-0">
           {/* Company Header */}
-          <SidebarHeader className="bg-white border-0 px-4 pt-6 pb-4">
+          <SidebarHeader className="bg-white border-0 px-4 pt-4 pb-2">
             <div className="flex flex-col items-center text-center">
               <img
                 src="/suburban_services_logo-scaled.webp"
                 alt="Suburban Services"
-                className="h-28 w-28 object-contain sm:h-32 sm:w-32"
+                className="h-16 w-16 object-contain sm:h-20 sm:w-20"
               />
             </div>
           </SidebarHeader>
 
-          <SidebarContent className="px-4 py-2 space-y-6">
+          <SidebarContent className="px-4 py-1 space-y-4">
             {/* Navigation Menu */}
             {menuSections.map((section) => (
               <SidebarGroup key={section.title} className="p-0">
@@ -252,7 +248,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
                   {section.title}
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
-                  <SidebarMenu className="mt-3 space-y-2">
+                  <SidebarMenu className="mt-2 space-y-1">
                     {section.items.map((item) => {
                       const Icon = item.icon
                       const active = isActive(item.path)
@@ -260,7 +256,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
                         <SidebarMenuItem key={item.path} className="relative">
                           <SidebarMenuButton
                             asChild
-                            className={`group rounded-2xl transition-all duration-200 h-11 text-sm pl-6 pr-3 ${
+                            className={`group rounded-2xl transition-all duration-200 h-10 text-sm pl-5 pr-3 ${
                               active
                                 ? 'bg-[#00339B]/5 text-[#00339B] font-semibold shadow-sm shadow-[#00339B]/10'
                                 : 'text-gray-600 hover:bg-gray-100 hover:text-[#00339B]'
