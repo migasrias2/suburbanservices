@@ -126,7 +126,7 @@ export const Step2Managers: React.FC<Step2Props> = ({ state, totalSteps, onUpdat
 
   const handleContinue = async () => {
     if (!state.customerId) {
-      toast({ title: 'Missing customer', variant: 'destructive' })
+      toast({ title: 'Missing client', variant: 'destructive' })
       return
     }
     setIsWorking(true)
@@ -153,7 +153,7 @@ export const Step2Managers: React.FC<Step2Props> = ({ state, totalSteps, onUpdat
       step={2}
       totalSteps={totalSteps}
       title="Who's managing this?"
-      subtitle={`Assign managers to ${state.customerName ?? 'this customer'}. You can add new managers too.`}
+      subtitle={`Assign managers to ${state.customerName ?? 'this client'}. You can add new managers too.`}
       onBack={onBack}
       onNext={handleContinue}
       isWorking={isWorking}

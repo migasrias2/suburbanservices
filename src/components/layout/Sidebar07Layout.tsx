@@ -99,7 +99,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
 
   const adminMenuItems: MenuItem[] = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard' },
-    { icon: UserPlus, label: 'New Customer', path: '/admin/new-customer' },
+    { icon: UserPlus, label: 'New Client', path: '/admin/new-customer' },
     { icon: Layers, label: 'Area Presets', path: '/admin/presets' },
     { icon: Users, label: 'Users', path: '/admin/users' },
     { icon: Library, label: 'QR Library', path: '/qr-library' },
@@ -194,7 +194,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
       if (location.pathname === '/qr-generator') return 'QR Generator'
       if (location.pathname === '/area-tasks') return 'Areas & Tasks'
       if (location.pathname === '/admin-weekly-schedule') return 'Weekly Calendar'
-      if (location.pathname === '/admin/new-customer') return 'New Customer'
+      if (location.pathname === '/admin/new-customer') return 'New Client'
       if (location.pathname === '/admin/presets') return 'Area Presets'
       if (location.pathname === '/admin/users') return 'Users'
       if (location.pathname === '/admin/dashboard') return 'Live Dashboard'

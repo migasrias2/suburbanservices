@@ -53,7 +53,7 @@ export const Step5Done: React.FC<Step5Props> = ({ state, totalSteps, onFinish })
             onClick={onFinish}
             className="rounded-full bg-[#00339B] py-5 text-base text-white hover:bg-[#002d7a]"
           >
-            Add another customer
+            Add another client
           </Button>
         </div>
       </div>

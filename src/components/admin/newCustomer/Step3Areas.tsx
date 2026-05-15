@@ -52,7 +52,7 @@ export const Step3Areas: React.FC<Step3Props> = ({ state, totalSteps, onUpdate, 
 
   const handleContinue = async () => {
     if (!state.customerId || !state.customerName) {
-      toast({ title: 'Missing customer', variant: 'destructive' })
+      toast({ title: 'Missing client', variant: 'destructive' })
       return
     }
     setIsWorking(true)

@@ -48,7 +48,7 @@ export const Step1Basics: React.FC<Step1Props> = ({ state, totalSteps, onUpdate,
     } catch (err) {
       console.error(err)
       toast({
-        title: 'Could not create customer',
+        title: 'Could not create client',
         description: describeError(err),
         variant: 'destructive',
       })
@@ -61,7 +61,7 @@ export const Step1Basics: React.FC<Step1Props> = ({ state, totalSteps, onUpdate,
     <WizardShell
       step={1}
       totalSteps={totalSteps}
-      title="New customer"
+      title="New client"
       subtitle="Let's start with the basics."
       onNext={handleContinue}
       nextDisabled={!canContinue}
@@ -70,7 +70,7 @@ export const Step1Basics: React.FC<Step1Props> = ({ state, totalSteps, onUpdate,
     >
       <div className="space-y-6">
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-gray-700">Customer name</Label>
+          <Label className="text-sm font-medium text-gray-700">Client name</Label>
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}

@@ -22,7 +22,7 @@ export const Step4QRs: React.FC<Step4Props> = ({ state, totalSteps, onUpdate, on
 
   const handleGenerate = async () => {
     if (!state.customerId || !state.customerName) {
-      toast({ title: 'Missing customer', variant: 'destructive' })
+      toast({ title: 'Missing client', variant: 'destructive' })
       return
     }
     setIsGenerating(true)
