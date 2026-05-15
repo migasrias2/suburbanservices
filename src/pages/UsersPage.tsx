@@ -1,19 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Sidebar07Layout } from '@/components/layout/Sidebar07Layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
-import { Search, Trash2, Pencil, X, Save } from 'lucide-react'
+import { Search, Trash2, Pencil, X, Save, Plus, Copy, Check } from 'lucide-react'
 import { getStoredCleanerName } from '@/lib/identity'
 import {
   listAllUsers,
   renameUser,
   deactivateUser,
+  createUserAccount,
   describeError,
   type ManagedUser,
   type AppUserRole,
+  type CreatedUser,
 } from '@/services/customerOnboardingService'
 
 const ROLE_LABEL: Record<AppUserRole, string> = {
@@ -39,6 +42,16 @@ export default function UsersPage() {
   const [editFirst, setEditFirst] = useState('')
   const [editLast, setEditLast] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [isAdding, setIsAdding] = useState(false)
+  const [addRole, setAddRole] = useState<AppUserRole>('cleaner')
+  const [addFirst, setAddFirst] = useState('')
+  const [addLast, setAddLast] = useState('')
+  const [addPhone, setAddPhone] = useState('')
+  const [addUsername, setAddUsername] = useState('')
+  const [addEmail, setAddEmail] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
+  const [created, setCreated] = useState<CreatedUser | null>(null)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     const storedType = localStorage.getItem('userType')
@@ -132,6 +145,65 @@ export default function UsersPage() {
     }
   }
 
+  const openAdd = () => {
+    setAddRole('cleaner')
+    setAddFirst('')
+    setAddLast('')
+    setAddPhone('')
+    setAddUsername('')
+    setAddEmail('')
+    setCreated(null)
+    setCopied(false)
+    setIsAdding(true)
+  }
+
+  const submitAdd = async () => {
+    if (!addFirst.trim() || !addLast.trim()) {
+      toast({ title: 'First and last name required', variant: 'destructive' })
+      return
+    }
+    if ((addRole === 'cleaner' || addRole === 'manager') && !addPhone.trim()) {
+      toast({ title: 'Phone number required', variant: 'destructive' })
+      return
+    }
+    if ((addRole === 'ops_manager' || addRole === 'admin') && !addUsername.trim()) {
+      toast({ title: 'Username required', variant: 'destructive' })
+      return
+    }
+    if (addRole === 'admin' && !addEmail.trim()) {
+      toast({ title: 'Email required for admin', variant: 'destructive' })
+      return
+    }
+    setIsCreating(true)
+    try {
+      const result = await createUserAccount({
+        role: addRole,
+        firstName: addFirst,
+        lastName: addLast,
+        phone: addPhone || undefined,
+        username: addUsername || undefined,
+        email: addEmail || undefined,
+      })
+      setCreated(result)
+      await refresh()
+    } catch (err) {
+      toast({ title: 'Could not create user', description: describeError(err), variant: 'destructive' })
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  const copyPassword = async () => {
+    if (!created) return
+    try {
+      await navigator.clipboard.writeText(created.password)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast({ title: 'Copy failed', variant: 'destructive' })
+    }
+  }
+
   const remove = async (u: ManagedUser) => {
     if (!confirm(`Deactivate ${u.first_name} ${u.last_name}?\n\nThey won't be able to log in. Manager assignments will be removed.`)) return
     try {
@@ -154,9 +226,18 @@ export default function UsersPage() {
   return (
     <Sidebar07Layout userType={userType} userName={userName}>
       <div className="mx-auto w-full max-w-5xl py-4 sm:py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl">Users</h1>
-          <p className="mt-2 text-gray-500">Manage cleaners, managers, and admins.</p>
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl">Users</h1>
+            <p className="mt-2 text-gray-500">Manage cleaners, managers, and admins.</p>
+          </div>
+          <Button
+            onClick={openAdd}
+            className="rounded-full bg-[#00339B] px-5 text-white hover:bg-[#002d7a]"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add user
+          </Button>
         </div>
 
         <div className="mb-6 flex flex-wrap items-center gap-3">
@@ -273,9 +354,9 @@ export default function UsersPage() {
           </div>
         )}
 
-        {editing && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl">
+        {editing && createPortal(
+          <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-white/30 p-4 backdrop-blur-sm">
+            <div className="pointer-events-auto w-full max-w-md rounded-3xl border border-gray-200 bg-white p-8 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-black/5">
               <div className="mb-6 flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900">Rename user</h2>
                 <Button
@@ -323,7 +404,167 @@ export default function UsersPage() {
                 </Button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body,
+        )}
+
+        {isAdding && createPortal(
+          <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-white/30 p-4 backdrop-blur-sm">
+            <div className="pointer-events-auto w-full max-w-md rounded-3xl border border-gray-200 bg-white p-8 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-black/5">
+              {created ? (
+                <>
+                  <div className="mb-6 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900">User created</h2>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setIsAdding(false); setCreated(null) }}
+                      className="h-8 w-8 rounded-full p-0 text-gray-500"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="mb-4 text-sm text-gray-500">
+                    Save this password now — it won't be shown again.
+                  </p>
+                  <div className="space-y-4">
+                    <div className="rounded-2xl bg-gray-50 p-4">
+                      <div className="text-xs uppercase tracking-wider text-gray-400">Name</div>
+                      <div className="mt-1 text-base font-medium text-gray-900">
+                        {created.firstName} {created.lastName}
+                      </div>
+                      <div className="mt-3 text-xs uppercase tracking-wider text-gray-400">
+                        {ROLE_LABEL[created.role]} · {created.role === 'cleaner' || created.role === 'manager' ? 'Phone' : 'Username'}
+                      </div>
+                      <div className="mt-1 text-sm text-gray-700">{created.identifier}</div>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">Password</Label>
+                      <div className="mt-2 flex items-center gap-2">
+                        <code className="flex-1 select-all rounded-2xl bg-gray-50 px-4 py-3 font-mono text-base text-gray-900">
+                          {created.password}
+                        </code>
+                        <Button
+                          onClick={copyPassword}
+                          className="rounded-full bg-[#00339B] px-4 text-white hover:bg-[#002d7a]"
+                        >
+                          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-8 flex justify-end">
+                    <Button
+                      onClick={() => { setIsAdding(false); setCreated(null) }}
+                      className="rounded-full bg-[#00339B] px-6 text-white hover:bg-[#002d7a]"
+                    >
+                      Done
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="mb-6 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900">Add user</h2>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsAdding(false)}
+                      className="h-8 w-8 rounded-full p-0 text-gray-500"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-700">Role</Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {ALL_ROLES.map((r) => (
+                          <button
+                            key={r}
+                            type="button"
+                            onClick={() => setAddRole(r)}
+                            className={`rounded-full px-4 py-2 text-xs font-medium transition ${
+                              addRole === r ? 'bg-[#00339B] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            {ROLE_LABEL[r]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-gray-700">First name</Label>
+                        <Input
+                          value={addFirst}
+                          onChange={(e) => setAddFirst(e.target.value)}
+                          className="h-12 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-gray-700">Last name</Label>
+                        <Input
+                          value={addLast}
+                          onChange={(e) => setAddLast(e.target.value)}
+                          className="h-12 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
+                        />
+                      </div>
+                    </div>
+                    {(addRole === 'cleaner' || addRole === 'manager') && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-gray-700">Mobile number</Label>
+                        <Input
+                          value={addPhone}
+                          onChange={(e) => setAddPhone(e.target.value)}
+                          placeholder="+44…"
+                          className="h-12 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
+                        />
+                      </div>
+                    )}
+                    {(addRole === 'ops_manager' || addRole === 'admin') && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-gray-700">Username</Label>
+                        <Input
+                          value={addUsername}
+                          onChange={(e) => setAddUsername(e.target.value)}
+                          className="h-12 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
+                        />
+                      </div>
+                    )}
+                    {addRole === 'admin' && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-gray-700">Email</Label>
+                        <Input
+                          type="email"
+                          value={addEmail}
+                          onChange={(e) => setAddEmail(e.target.value)}
+                          className="h-12 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-8 flex justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => setIsAdding(false)}
+                      className="rounded-full text-gray-600"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={submitAdd}
+                      disabled={isCreating}
+                      className="rounded-full bg-[#00339B] px-6 text-white hover:bg-[#002d7a]"
+                    >
+                      {isCreating ? 'Creating…' : 'Create user'}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>,
+          document.body,
         )}
       </div>
     </Sidebar07Layout>

@@ -4,6 +4,7 @@ import type { CreatedManager } from '@/services/customerOnboardingService'
 export type WizardAreaInput = {
   name: string
   type: AreaType
+  tasks?: string[]
 }
 
 export type WizardQrItem = {

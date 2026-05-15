@@ -15,7 +15,8 @@ import {
   Activity,
   CalendarDays,
   UserPlus,
-  Layers
+  Layers,
+  LayoutDashboard
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import {
@@ -96,14 +97,15 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
   ]
 
   const adminMenuItems: MenuItem[] = [
+    { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard' },
     { icon: UserPlus, label: 'New Customer', path: '/admin/new-customer' },
     { icon: Layers, label: 'Area Presets', path: '/admin/presets' },
+    { icon: Users, label: 'Users', path: '/admin/users' },
     { icon: Library, label: 'QR Library', path: '/qr-library' },
     { icon: QrCode, label: 'QR Generator', path: '/qr-generator' },
     { icon: Building2, label: 'Areas & Tasks', path: '/area-tasks' },
-    { icon: Users, label: 'Users', path: '/admin/users' },
+    { icon: CalendarDays, label: 'Calendar', path: '/admin-weekly-schedule' },
     { icon: BarChart3, label: 'Analytics', path: '/analytics' },
-    { icon: Clock, label: 'Calendar', path: '/admin-weekly-schedule' },
   ]
 
   const getMenuSections = React.useCallback((): MenuSection[] => {
@@ -152,20 +154,28 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
       case 'admin':
         return [
           {
+            title: 'Overview',
+            items: adminMenuItems.slice(0, 1),
+          },
+          {
             title: 'Onboarding',
-            items: adminMenuItems.slice(0, 2),
+            items: adminMenuItems.slice(1, 3),
+          },
+          {
+            title: 'People',
+            items: adminMenuItems.slice(3, 4),
           },
           {
             title: 'QR Suite',
-            items: adminMenuItems.slice(2, 4),
-          },
-          {
-            title: 'Operations',
             items: adminMenuItems.slice(4, 6),
           },
           {
+            title: 'Operations',
+            items: adminMenuItems.slice(6, 8),
+          },
+          {
             title: 'Insights',
-            items: adminMenuItems.slice(6),
+            items: adminMenuItems.slice(8),
           },
         ]
       default:
@@ -187,11 +197,11 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
       if (location.pathname === '/qr-library') return 'QR Library'
       if (location.pathname === '/qr-generator') return 'QR Generator'
       if (location.pathname === '/area-tasks') return 'Areas & Tasks'
-      if (location.pathname === '/admin-dashboard') return 'User Management'
       if (location.pathname === '/admin-weekly-schedule') return 'Weekly Calendar'
       if (location.pathname === '/admin/new-customer') return 'New Customer'
       if (location.pathname === '/admin/presets') return 'Area Presets'
       if (location.pathname === '/admin/users') return 'Users'
+      if (location.pathname === '/admin/dashboard') return 'Live Dashboard'
       return 'Admin'
     }
     if (userType === 'ops_manager') {

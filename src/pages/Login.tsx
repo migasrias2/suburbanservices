@@ -82,7 +82,7 @@ export default function Login() {
           navigate('/ops-dashboard')
           break
         case 'admin':
-          navigate('/admin-dashboard')
+          navigate('/admin/dashboard')
           break
       }
     } catch (err: any) {

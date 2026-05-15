@@ -5,12 +5,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
 import { Plus, Trash2 } from 'lucide-react'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
-import type { AreaType } from '@/services/qrService'
 import { createAreaForCustomer, describeError, listPresets, type AreaPreset } from '@/services/customerOnboardingService'
 import type { WizardAreaInput, WizardState } from './types'
 import { useEffect } from 'react'
@@ -23,21 +17,10 @@ interface Step3Props {
   onNext: () => void
 }
 
-const AREA_TYPES: { value: AreaType; label: string }[] = [
-  { value: 'BATHROOMS_ABLUTIONS', label: 'Bathrooms / Ablutions' },
-  { value: 'KITCHEN_CANTEEN', label: 'Kitchen / Canteen' },
-  { value: 'ADMIN_OFFICE', label: 'Office' },
-  { value: 'RECEPTION_COMMON', label: 'Reception / Common' },
-  { value: 'WAREHOUSE_INDUSTRIAL', label: 'Warehouse / Industrial' },
-  { value: 'GENERAL_AREAS', label: 'General areas' },
-  { value: 'OPS_SITE_INSPECTION', label: 'Ops inspection' },
-]
-
 export const Step3Areas: React.FC<Step3Props> = ({ state, totalSteps, onUpdate, onBack, onNext }) => {
   const { toast } = useToast()
   const [areas, setAreas] = useState<WizardAreaInput[]>(state.areas ?? [])
   const [newName, setNewName] = useState('')
-  const [newType, setNewType] = useState<AreaType>('BATHROOMS_ABLUTIONS')
   const [isWorking, setIsWorking] = useState(false)
   const [presets, setPresets] = useState<AreaPreset[]>([])
 
@@ -49,7 +32,7 @@ export const Step3Areas: React.FC<Step3Props> = ({ state, totalSteps, onUpdate, 
 
   const addArea = () => {
     if (!newName.trim()) return
-    setAreas((prev) => [...prev, { name: newName.trim(), type: newType }])
+    setAreas((prev) => [...prev, { name: newName.trim(), type: 'GENERAL_AREAS' }])
     setNewName('')
   }
 
@@ -58,7 +41,13 @@ export const Step3Areas: React.FC<Step3Props> = ({ state, totalSteps, onUpdate, 
   }
 
   const applyPreset = (preset: AreaPreset) => {
-    setAreas(preset.items)
+    setAreas(
+      preset.items.map((item) => ({
+        name: item.name,
+        type: item.type,
+        tasks: item.tasks,
+      })),
+    )
   }
 
   const handleContinue = async () => {
@@ -88,8 +77,6 @@ export const Step3Areas: React.FC<Step3Props> = ({ state, totalSteps, onUpdate, 
       setIsWorking(false)
     }
   }
-
-  const labelForType = (t: AreaType) => AREA_TYPES.find((x) => x.value === t)?.label ?? t
 
   return (
     <WizardShell
@@ -132,7 +119,11 @@ export const Step3Areas: React.FC<Step3Props> = ({ state, totalSteps, onUpdate, 
               >
                 <div>
                   <div className="text-base font-medium text-gray-900">{area.name}</div>
-                  <div className="text-xs text-gray-500">{labelForType(area.type)}</div>
+                  {area.tasks && area.tasks.length > 0 && (
+                    <div className="text-xs text-gray-500">
+                      {area.tasks.length} task{area.tasks.length === 1 ? '' : 's'}
+                    </div>
+                  )}
                 </div>
                 <Button
                   variant="ghost"
@@ -148,49 +139,20 @@ export const Step3Areas: React.FC<Step3Props> = ({ state, totalSteps, onUpdate, 
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-5 space-y-4">
-          <div className="grid gap-3 sm:grid-cols-[1fr_220px]">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-700">Area name</Label>
-              <Input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="e.g. Main Bathroom"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    addArea()
-                  }
-                }}
-                className="h-11 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-700">Type</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="h-11 w-full justify-between rounded-2xl border-gray-200 bg-gray-50/70 px-4 text-left text-gray-700"
-                  >
-                    {labelForType(newType)}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[260px] rounded-2xl border border-gray-100 p-1.5">
-                  {AREA_TYPES.map((t) => (
-                    <button
-                      key={t.value}
-                      type="button"
-                      onClick={() => setNewType(t.value)}
-                      className={`block w-full rounded-xl px-3 py-2 text-left text-sm ${
-                        newType === t.value ? 'bg-[#00339B] text-white' : 'text-gray-700 hover:bg-blue-50/60'
-                      }`}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </PopoverContent>
-              </Popover>
-            </div>
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">Area name</Label>
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="e.g. Main Bathroom"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addArea()
+                }
+              }}
+              className="h-11 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
+            />
           </div>
           <Button
             onClick={addArea}

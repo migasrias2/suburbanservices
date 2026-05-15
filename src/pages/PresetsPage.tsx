@@ -5,31 +5,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Plus, Trash2, Layers, ChevronLeft, Save, ChevronDown, RotateCcw, X } from 'lucide-react'
+import { Plus, Trash2, Layers, ChevronLeft, Save, ChevronDown, X } from 'lucide-react'
 import { getStoredCleanerName } from '@/lib/identity'
 import {
   listPresets,
   createPreset,
   updatePreset,
   deletePreset,
-  defaultTasksForType,
   describeError,
   type AreaPreset,
 } from '@/services/customerOnboardingService'
 import type { AreaType } from '@/services/qrService'
 
-const AREA_TYPES: { value: AreaType; label: string }[] = [
-  { value: 'BATHROOMS_ABLUTIONS', label: 'Bathrooms / Ablutions' },
-  { value: 'KITCHEN_CANTEEN', label: 'Kitchen / Canteen' },
-  { value: 'ADMIN_OFFICE', label: 'Office' },
-  { value: 'RECEPTION_COMMON', label: 'Reception / Common' },
-  { value: 'WAREHOUSE_INDUSTRIAL', label: 'Warehouse / Industrial' },
-  { value: 'GENERAL_AREAS', label: 'General areas' },
-  { value: 'OPS_SITE_INSPECTION', label: 'Ops inspection' },
-]
-
-const labelForType = (t: AreaType) => AREA_TYPES.find((x) => x.value === t)?.label ?? t
+const DEFAULT_AREA_TYPE: AreaType = 'GENERAL_AREAS'
 
 type DraftItem = { name: string; type: AreaType; tasks: string[] }
 
@@ -43,10 +31,8 @@ const emptyDraft = (): DraftPreset => ({ name: '', items: [] })
 
 const hydrateItem = (raw: { name: string; type: AreaType; tasks?: string[] }): DraftItem => ({
   name: raw.name,
-  type: raw.type,
-  tasks: Array.isArray(raw.tasks) && raw.tasks.length > 0
-    ? [...raw.tasks]
-    : defaultTasksForType(raw.type),
+  type: raw.type ?? DEFAULT_AREA_TYPE,
+  tasks: Array.isArray(raw.tasks) ? [...raw.tasks] : [],
 })
 
 export default function PresetsPage() {
@@ -59,7 +45,6 @@ export default function PresetsPage() {
   const [draft, setDraft] = useState<DraftPreset | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [newRowName, setNewRowName] = useState('')
-  const [newRowType, setNewRowType] = useState<AreaType>('BATHROOMS_ABLUTIONS')
   const [expanded, setExpanded] = useState<number | null>(null)
   const [taskDrafts, setTaskDrafts] = useState<Record<number, string>>({})
 
@@ -110,8 +95,8 @@ export default function PresetsPage() {
     if (!newRowName.trim() || !draft) return
     const newItem: DraftItem = {
       name: newRowName.trim(),
-      type: newRowType,
-      tasks: defaultTasksForType(newRowType),
+      type: DEFAULT_AREA_TYPE,
+      tasks: [],
     }
     setDraft({ ...draft, items: [...draft.items, newItem] })
     setExpanded(draft.items.length) // auto-open the newly-added row
@@ -123,22 +108,6 @@ export default function PresetsPage() {
     setExpanded((cur) => (cur === idx ? null : cur !== null && cur > idx ? cur - 1 : cur))
   }
 
-  const updateItemType = (idx: number, type: AreaType) => {
-    if (!draft) return
-    setDraft({
-      ...draft,
-      items: draft.items.map((it, i) => (i === idx ? { ...it, type } : it)),
-    })
-  }
-  const resetTasksToDefault = (idx: number) => {
-    if (!draft) return
-    setDraft({
-      ...draft,
-      items: draft.items.map((it, i) =>
-        i === idx ? { ...it, tasks: defaultTasksForType(it.type) } : it,
-      ),
-    })
-  }
   const addTaskToItem = (idx: number) => {
     if (!draft) return
     const val = (taskDrafts[idx] ?? '').trim()
@@ -242,7 +211,13 @@ export default function PresetsPage() {
                     <div className="space-y-1">
                       {p.items.slice(0, 5).map((it, i) => (
                         <div key={i} className="text-sm text-gray-500 truncate">
-                          {it.name} <span className="text-gray-300">·</span> {labelForType(it.type)}
+                          {it.name}
+                          {it.tasks && it.tasks.length > 0 && (
+                            <>
+                              {' '}<span className="text-gray-300">·</span>{' '}
+                              {it.tasks.length} task{it.tasks.length === 1 ? '' : 's'}
+                            </>
+                          )}
                         </div>
                       ))}
                       {p.items.length > 5 && (
@@ -309,7 +284,7 @@ export default function PresetsPage() {
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-base font-medium text-gray-900">{it.name}</div>
                             <div className="text-xs text-gray-500">
-                              {labelForType(it.type)} · {it.tasks.length} task{it.tasks.length === 1 ? '' : 's'}
+                              {it.tasks.length} task{it.tasks.length === 1 ? '' : 's'}
                             </div>
                           </div>
                         </div>
@@ -334,19 +309,9 @@ export default function PresetsPage() {
                       {isOpen && (
                         <div className="border-t border-gray-200 bg-white p-4 space-y-4">
                           <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                                Tasks
-                              </Label>
-                              <button
-                                type="button"
-                                onClick={() => resetTasksToDefault(idx)}
-                                className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-[#00339B]"
-                              >
-                                <RotateCcw className="h-3 w-3" />
-                                Reset to default
-                              </button>
-                            </div>
+                            <Label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                              Tasks
+                            </Label>
                             <div className="space-y-1.5">
                               {it.tasks.length === 0 ? (
                                 <div className="rounded-lg bg-gray-50 py-4 text-center text-xs text-gray-400">
@@ -403,44 +368,18 @@ export default function PresetsPage() {
             </div>
 
             <div className="rounded-2xl border border-gray-200 bg-white p-5 space-y-4">
-              <div className="grid gap-3 sm:grid-cols-[1fr_220px]">
-                <Input
-                  value={newRowName}
-                  onChange={(e) => setNewRowName(e.target.value)}
-                  placeholder="Area name"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      addRow()
-                    }
-                  }}
-                  className="h-11 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
-                />
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="h-11 justify-between rounded-2xl border-gray-200 bg-gray-50/70 px-4 text-left"
-                    >
-                      {labelForType(newRowType)}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[260px] rounded-2xl p-1.5">
-                    {AREA_TYPES.map((t) => (
-                      <button
-                        key={t.value}
-                        type="button"
-                        onClick={() => setNewRowType(t.value)}
-                        className={`block w-full rounded-xl px-3 py-2 text-left text-sm ${
-                          newRowType === t.value ? 'bg-[#00339B] text-white' : 'text-gray-700 hover:bg-blue-50/60'
-                        }`}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
-                  </PopoverContent>
-                </Popover>
-              </div>
+              <Input
+                value={newRowName}
+                onChange={(e) => setNewRowName(e.target.value)}
+                placeholder="Area name"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    addRow()
+                  }
+                }}
+                className="h-11 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
+              />
               <Button onClick={addRow} disabled={!newRowName.trim()} className="w-full rounded-full bg-[#00339B] py-5 text-white hover:bg-[#002d7a] disabled:bg-gray-200 disabled:text-gray-400">
                 <Plus className="mr-2 h-4 w-4" />
                 Add area

@@ -51,6 +51,14 @@ function getAdminId(): string {
   return id
 }
 
+export async function customerExists(customerId: string): Promise<boolean> {
+  const adminId = getAdminId()
+  const { data, error } = await supabase.rpc('admin_list_customers', { p_admin_id: adminId })
+  if (error) throw error
+  const rows = (data ?? []) as Array<{ id: string }>
+  return rows.some((row) => row.id === customerId)
+}
+
 export async function createCustomerBasics(input: {
   name: string
   displayName?: string
@@ -277,6 +285,44 @@ export async function renameUser(role: AppUserRole, userId: string, firstName: s
     p_last_name: lastName,
   })
   if (error) throw error
+}
+
+export type CreatedUser = {
+  userId: string
+  password: string
+  role: AppUserRole
+  firstName: string
+  lastName: string
+  identifier: string
+}
+
+export async function createUserAccount(input: {
+  role: AppUserRole
+  firstName: string
+  lastName: string
+  phone?: string
+  username?: string
+  email?: string
+}): Promise<CreatedUser> {
+  const adminId = getAdminId()
+  const payload = {
+    adminId,
+    role: input.role,
+    firstName: input.firstName.trim(),
+    lastName: input.lastName.trim(),
+    phone: input.phone?.trim() || undefined,
+    username: input.username?.trim() || undefined,
+    email: input.email?.trim() || undefined,
+  }
+  const { data, error } = await supabase.functions.invoke('admin-create-user', { body: payload })
+  if (error) {
+    const message = (error as any)?.context?.error || error.message || 'Failed to create user'
+    throw new Error(message)
+  }
+  if (!data?.userId || !data?.password) {
+    throw new Error('User created but no credentials returned')
+  }
+  return data as CreatedUser
 }
 
 export async function deactivateUser(role: AppUserRole, userId: string): Promise<void> {

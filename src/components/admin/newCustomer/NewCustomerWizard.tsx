@@ -12,6 +12,7 @@ import {
   type WizardState,
 } from './types'
 import { invalidateManagerScopes, hydrateManagerScopes } from '@/lib/managerScope'
+import { customerExists } from '@/services/customerOnboardingService'
 
 const TOTAL_STEPS = 5
 
@@ -20,8 +21,33 @@ export const NewCustomerWizard: React.FC = () => {
   const [isHydrated, setIsHydrated] = useState(false)
 
   useEffect(() => {
-    setState(loadWizardState())
-    setIsHydrated(true)
+    let cancelled = false
+    const stored = loadWizardState()
+    if (!stored.customerId) {
+      setState(stored)
+      setIsHydrated(true)
+      return
+    }
+    customerExists(stored.customerId)
+      .then((exists) => {
+        if (cancelled) return
+        if (exists) {
+          setState(stored)
+        } else {
+          clearWizardState()
+          setState(INITIAL_STATE)
+        }
+        setIsHydrated(true)
+      })
+      .catch(() => {
+        if (cancelled) return
+        // network/permission issue — keep stored state so user isn't blocked
+        setState(stored)
+        setIsHydrated(true)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
