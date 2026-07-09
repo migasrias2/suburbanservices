@@ -24,7 +24,9 @@ This is a **React + TypeScript + Vite** field operations management app for Subu
 
 ### User Roles & Auth
 
-Four roles: `cleaner`, `manager`, `ops_manager`, `admin`. Auth is custom (not Supabase Auth) — passwords are hashed with bcryptjs and stored in the database. The `authService` handles login/registration by querying the appropriate DB table directly.
+Four roles: `cleaner`, `manager`, `ops_manager`, `admin`. Auth uses **Supabase Auth** with synthetic emails derived from role + identifier (`deriveSyntheticEmail` in `src/lib/authHelpers.ts`). `authService.registerUser` calls `supabase.auth.signUp` and inserts a matching row (same UUID) into `cleaners` or `managers`; `loginUser` uses `signInWithPassword`. Admin accounts are provisioned manually in the DB (client registration is disabled).
+
+Authorization in the database derives roles from table membership (`admins`, `managers.role`, `cleaners`), checked via the `public.has_app_role(text[])` SQL function used in RLS policies. The `app_role` in JWT `user_metadata` is client-editable and must never be trusted in policies or SECURITY DEFINER functions.
 
 Session state is stored in `localStorage`:
 - `userName` — cleaner/manager name (managed via `src/lib/identity.ts`)

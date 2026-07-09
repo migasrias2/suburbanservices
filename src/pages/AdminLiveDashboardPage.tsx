@@ -205,7 +205,6 @@ export default function AdminLiveDashboardPage() {
   const getPhotoData = (p: TaskPhoto): string | null => p.photoData ?? loadedPhotoData[p.id] ?? null
 
   const loadDayPhotos = async (day: string) => {
-    if (day === todayKey()) return
     if (loadingDay === day) return
     if (data?.photos.some((p) => dayKey(p.photoTimestamp) === day && getPhotoData(p))) return
     setLoadingDay(day)

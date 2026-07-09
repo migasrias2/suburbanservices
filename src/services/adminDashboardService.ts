@@ -103,26 +103,18 @@ export async function loadLiveDashboard(): Promise<LiveDashboardData> {
     .order('photo_timestamp', { ascending: false })
     .limit(2500)
 
-  const photosTodayDataQuery = supabase
-    .from('uk_cleaner_task_photos')
-    .select('id, photo_data')
-    .gte('photo_timestamp', dayStart)
-    .limit(500)
-
   const resolvedSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
   const resolvedPromise = AssistRequestService.listResolved({ limit: 8, resolvedSince }).catch(() => [] as BathroomAssistRequest[])
   const activePromise = AssistRequestService.listRecent({ statuses: ['pending', 'accepted', 'escalated'], limit: 12 }).catch(() => [] as BathroomAssistRequest[])
 
-  const [attendanceRes, photosMetaRes, photosTodayRes, resolvedRaw, activeRaw] = await Promise.all([
+  const [attendanceRes, photosMetaRes, resolvedRaw, activeRaw] = await Promise.all([
     attendanceQuery,
     photosMetaQuery,
-    photosTodayDataQuery,
     resolvedPromise,
     activePromise,
   ])
   if (attendanceRes.error) throw attendanceRes.error
   if (photosMetaRes.error) throw photosMetaRes.error
-  if (photosTodayRes.error) throw photosTodayRes.error
 
   const shifts: AttendanceShift[] = (attendanceRes.data ?? []).map((row: any) => ({
     id: String(row.id),
@@ -156,11 +148,10 @@ export async function loadLiveDashboard(): Promise<LiveDashboardData> {
     if (s.clockOut && new Date(s.clockOut) >= new Date(dayStart)) todayClockOuts += 1
   })
 
-  const todayDataMap = new Map<number, string>()
-  ;(photosTodayRes.data ?? []).forEach((row: any) => {
-    if (row.photo_data) todayDataMap.set(row.id, row.photo_data)
-  })
-
+  // Photo blobs are NOT loaded here — they are large base64 images (~174 KB each) and
+  // eagerly fetching a full day of them on every 30s refresh was timing out the query.
+  // The dashboard now loads only lightweight metadata; blobs are fetched on demand per
+  // day via loadPhotoDataForDay (see the "Tap to load" flow in AdminLiveDashboardPage).
   const photos: TaskPhoto[] = (photosMetaRes.data ?? []).map((row: any) => ({
     id: row.id,
     cleanerId: row.cleaner_id ?? null,
@@ -168,7 +159,7 @@ export async function loadLiveDashboard(): Promise<LiveDashboardData> {
     qrCodeId: row.qr_code_id ?? null,
     taskId: row.task_id ?? null,
     areaType: row.area_type ?? null,
-    photoData: todayDataMap.get(row.id) ?? null,
+    photoData: null,
     photoTimestamp: row.photo_timestamp,
     photoDescription: row.photo_description ?? null,
   }))
