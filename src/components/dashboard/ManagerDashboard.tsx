@@ -767,7 +767,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         : null
 
       const logsQuery = supabase
-        .from('uk_cleaner_logs')
+        .from('cleaner_logs')
         .select('*')
         .or(`cleaner_id.eq.${cleanerId},cleaner_name.eq.${cleanerName}`)
         .order('timestamp', { ascending: false })

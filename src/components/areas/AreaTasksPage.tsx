@@ -326,11 +326,13 @@ export const AreaTasksPage = () => {
 
   const filteredTasks = useMemo(() => {
     const rows = tasksQuery.data ?? []
-    const activeCustomers = new Set(
-      (customersQuery.data ?? [])
-        .map((c) => (c.name || '').trim())
-        .filter(Boolean),
-    )
+    const activeCustomers = new Set<string>()
+    ;(customersQuery.data ?? []).forEach((c) => {
+      ;[c.name, (c as any).display_name, (c as any).customer_name].forEach((v) => {
+        const t = (v || '').trim()
+        if (t) activeCustomers.add(t)
+      })
+    })
     const byActive = rows.filter((t) => {
       const name = (t.customer_name || '').trim()
       return !activeCustomers.size || activeCustomers.has(name)

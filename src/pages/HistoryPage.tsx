@@ -45,7 +45,7 @@ export default function HistoryPage() {
 
   const loadRecentScans = async () => {
     const { data, error } = await supabase
-      .from('uk_cleaner_logs')
+      .from('cleaner_logs')
       .select('*')
       .eq('cleaner_id', userId)
       .order('timestamp', { ascending: false })

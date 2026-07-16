@@ -21,7 +21,7 @@ import {
 
 const ROLE_LABEL: Record<AppUserRole, string> = {
   cleaner: 'Cleaner',
-  manager: 'Manager',
+  manager: 'Client',
   ops_manager: 'Ops Manager',
   admin: 'Admin',
 }

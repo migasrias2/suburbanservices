@@ -80,7 +80,7 @@ export async function fetchCleanerLogsInRange(rangeStart: Date, rangeEnd: Date):
   const { start, end } = clampRange(rangeStart, rangeEnd)
 
   const { data, error } = await supabase
-    .from('uk_cleaner_logs')
+    .from('cleaner_logs')
     .select('id, cleaner_name, action, comments, timestamp, customer_name, site_area')
     .gte('timestamp', start.toISOString())
     .lte('timestamp', end.toISOString())

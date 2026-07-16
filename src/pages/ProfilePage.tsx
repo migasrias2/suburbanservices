@@ -44,9 +44,9 @@ export default function ProfilePage() {
 
   const loadCleanerData = async () => {
     const { data, error } = await supabase
-      .from('uk_cleaners')
+      .from('cleaners')
       .select('*')
-      .eq('cleaner_id', userId)
+      .eq('id', userId)
       .single()
 
     if (!error && data) {

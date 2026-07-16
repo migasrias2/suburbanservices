@@ -48,9 +48,9 @@ export const CleanerDashboard: React.FC<CleanerDashboardProps> = ({
 
   const loadCleanerData = async () => {
     const { data, error } = await supabase
-      .from('uk_cleaners')
+      .from('cleaners')
       .select('*')
-      .eq('cleaner_id', cleanerId)
+      .eq('id', cleanerId)
       .single()
 
     if (!error && data) {
@@ -60,15 +60,22 @@ export const CleanerDashboard: React.FC<CleanerDashboardProps> = ({
 
   const loadCurrentStatus = async () => {
     const { data, error } = await supabase
-      .from('uk_cleaner_live_tracking')
+      .from('time_attendance')
       .select('*')
-      .eq('cleaner_id', cleanerId)
-      .eq('is_active', true)
-      .order('timestamp', { ascending: false })
+      .eq('cleaner_uuid', cleanerId)
+      .is('clock_out', null)
+      .order('clock_in', { ascending: false })
       .limit(1)
 
     if (!error && data && data.length > 0) {
-      setCurrentStatus(data[0])
+      const rec = data[0] as any
+      setCurrentStatus({
+        event_type: 'clock_in',
+        site_area: rec.site_name || rec.customer_name || null,
+        clock_in_time: rec.clock_in,
+        latitude: null,
+        longitude: null,
+      } as any)
     } else {
       setCurrentStatus(null)
     }
@@ -79,7 +86,7 @@ export const CleanerDashboard: React.FC<CleanerDashboardProps> = ({
     const today = new Date().toISOString().split('T')[0]
     
     const { data, error } = await supabase
-      .from('uk_cleaner_logs')
+      .from('cleaner_logs')
       .select('*')
       .eq('cleaner_id', cleanerId)
       .gte('timestamp', `${today}T00:00:00.000Z`)
