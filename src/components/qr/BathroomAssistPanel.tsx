@@ -92,8 +92,13 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
       })
       .subscribe()
 
+    // Realtime is the fast path, but cleaners are on site wifi where websockets are
+    // often blocked. Poll as a fallback so a request can never sit unseen.
+    const interval = setInterval(loadRequests, 30000)
+
     return () => {
       supabase.removeChannel(channel)
+      clearInterval(interval)
     }
   }, [cleanerId])
 
@@ -280,13 +285,24 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
       : 'border-blue-100 bg-white/90 shadow-sm hover:shadow-lg hover:border-blue-200'
 
     return (
-      <button
+      // A <button> here would nest the "Accept job" <button> inside it, which is invalid
+      // HTML: the click lands on the outer element and opens the detail dialog instead of
+      // accepting. That is why no request has ever been accepted from this screen.
+      <div
         key={request.id}
+        role="button"
+        tabIndex={0}
         className={cn(
-          'w-full text-left rounded-3xl border transition p-5 flex flex-col gap-2',
+          'w-full text-left rounded-3xl border transition p-5 flex flex-col gap-2 cursor-pointer',
           containerStyles
         )}
         onClick={() => openDetail(request)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            openDetail(request)
+          }
+        }}
       >
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-1">
@@ -315,7 +331,7 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
             {request.issue_description}
           </p>
         ) : null}
-      </button>
+      </div>
     )
   }
 

@@ -83,22 +83,6 @@ const mergeResolvedHiddenBy = (metadata: Record<string, any>, managerId: string)
   return metadata
 }
 
-const queueNotification = async (recipient: string, content: string, payload?: Record<string, any>) => {
-  try {
-    await supabase.from('messages').insert({
-      recipient,
-      type: 'bathroom_assist',
-      content,
-      schedule: null,
-      cleaner_name: payload?.cleanerName ?? null,
-      cleaner_id: payload?.cleanerId ?? null,
-      customer_name: payload?.customerName ?? null
-    })
-  } catch (error) {
-    console.warn('Failed to queue notification', error)
-  }
-}
-
 export class AssistRequestService {
   static async listPendingForCleaner(cleanerId: string, customerName?: string) {
     const query = supabase
@@ -115,6 +99,22 @@ export class AssistRequestService {
 
     if (error) throw error
     return data
+  }
+
+  static async countOpen(customerName?: string) {
+    const query = supabase
+      .from<BathroomAssistRequest>('bathroom_assist_requests')
+      .select('*', { count: 'exact', head: true })
+      .in('status', ['pending', 'escalated'])
+
+    if (customerName) {
+      query.eq('customer_name', customerName)
+    }
+
+    const { count, error } = await query
+
+    if (error) throw error
+    return count ?? 0
   }
 
   static async listResolved(options: ListResolvedOptions = {}) {
@@ -200,10 +200,6 @@ export class AssistRequestService {
       }
     })
 
-    await queueNotification('cleaners', `New bathroom assist reported at ${input.locationLabel}`, {
-      customerName: input.customerName
-    })
-
     return { id }
   }
 
@@ -227,11 +223,6 @@ export class AssistRequestService {
       actor_role: 'cleaner',
       actor_id: input.cleanerId,
       actor_name: input.cleanerName
-    })
-    await queueNotification('operations', `${input.cleanerName} accepted bathroom assist request`, {
-      cleanerId: input.cleanerId,
-      cleanerName: input.cleanerName,
-      customerName: data.customer_name
     })
     return data
   }
@@ -264,11 +255,6 @@ export class AssistRequestService {
         materialsUsed: input.materialsUsed || null,
         attachments: sanitizeMedia(input.afterMedia)
       }
-    })
-    await queueNotification('customers', `Bathroom issue resolved in ${data.location_label}`, {
-      cleanerId: input.cleanerId,
-      cleanerName: input.cleanerName,
-      customerName: data.customer_name
     })
     return data
   }
@@ -310,12 +296,6 @@ export class AssistRequestService {
       console.warn('Failed to log manager resolution', eventError)
     }
 
-    await queueNotification('customers', `Bathroom issue resolved in ${data.location_label}`, {
-      cleanerId: resolvedById ?? undefined,
-      cleanerName: resolvedByName ?? undefined,
-      customerName: data.customer_name
-    })
-
     return data
   }
 
@@ -353,20 +333,15 @@ export class AssistRequestService {
 
     await Promise.all(
       (data ?? []).map((request) =>
-        Promise.all([
-          this.logEvent({
-            request_id: request.id,
-            event_type: 'escalated',
-            actor_role: 'system',
-            payload: {
-              reason,
-              escalateAfter: request.escalate_after
-            }
-          }),
-          queueNotification('operations', `Bathroom assist escalated at ${request.location_label}`, {
-            customerName: request.customer_name
-          })
-        ])
+        this.logEvent({
+          request_id: request.id,
+          event_type: 'escalated',
+          actor_role: 'system',
+          payload: {
+            reason,
+            escalateAfter: request.escalate_after
+          }
+        })
       )
     )
 

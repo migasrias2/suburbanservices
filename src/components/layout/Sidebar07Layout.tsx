@@ -29,6 +29,7 @@ import {
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
@@ -45,6 +46,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useOpenAssistCount } from '@/hooks/useOpenAssistCount'
+
+const ASSIST_PATH = '/cleaner-assistance'
 
 interface Sidebar07LayoutProps {
   children: React.ReactNode
@@ -61,6 +65,11 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
   const location = useLocation()
   const isMobile = useIsMobile()
   const { signOut } = useAuth()
+
+  // Cleaners had no way of knowing a request had come in without opening the page.
+  // Resolved at render time rather than baked into the menu arrays, because
+  // getMenuSections is memoised on [userType] and would capture a stale count.
+  const openAssistCount = useOpenAssistCount(userType === 'cleaner')
 
   type MenuItem = {
     icon: LucideIcon
@@ -81,7 +90,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
   const cleanerMenuItems: MenuItem[] = [
     { icon: Clock, label: 'Clock In', path: '/clock-in' },
     { icon: CalendarDays, label: 'My Schedule', path: '/my-schedule' },
-    { icon: Camera, label: 'Assistance', path: '/cleaner-assistance' },
+    { icon: Camera, label: 'Assistance', path: ASSIST_PATH },
   ]
 
   const managerMenuItems: MenuItem[] = [
@@ -283,6 +292,15 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
                               </span>
                             </button>
                           </SidebarMenuButton>
+                          {item.path === ASSIST_PATH && openAssistCount > 0 && (
+                            <>
+                              <SidebarMenuBadge className="bg-red-500 text-white">
+                                {openAssistCount > 9 ? '9+' : openAssistCount}
+                              </SidebarMenuBadge>
+                              {/* SidebarMenuBadge hides when the rail collapses to icons */}
+                              <span className="absolute right-2 top-2 hidden h-2 w-2 rounded-full bg-red-500 group-data-[collapsible=icon]:block" />
+                            </>
+                          )}
                         </SidebarMenuItem>
                       )
                     })}
