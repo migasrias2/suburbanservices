@@ -45,7 +45,9 @@ export default function ProfilePage() {
   const loadCleanerData = async () => {
     const { data, error } = await supabase
       .from('cleaners')
-      .select('*')
+      // Explicit column list: password_hash is no longer granted to the
+      // authenticated role, so `select('*')` errors at the database.
+      .select('id, first_name, last_name, mobile_number, email, is_active, created_at, updated_at')
       .eq('id', userId)
       .single()
 

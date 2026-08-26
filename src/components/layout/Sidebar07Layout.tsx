@@ -16,7 +16,9 @@ import {
   CalendarDays,
   UserPlus,
   Layers,
-  LayoutDashboard
+  LayoutDashboard,
+  KeyRound,
+  Home
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import {
@@ -47,6 +49,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useOpenAssistCount } from '@/hooks/useOpenAssistCount'
+import { ClockOutReminderBanner } from './ClockOutReminderBanner'
 
 const ASSIST_PATH = '/cleaner-assistance'
 
@@ -71,6 +74,10 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
   // getMenuSections is memoised on [userType] and would capture a stale count.
   const openAssistCount = useOpenAssistCount(userType === 'cleaner')
 
+  // Reads from storage rather than props: every cleaner page already routes
+  // through this layout, so the banner follows them wherever they are.
+  const cleanerId = typeof window !== 'undefined' ? localStorage.getItem('userId') ?? '' : ''
+
   type MenuItem = {
     icon: LucideIcon
     label: string
@@ -88,6 +95,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
   }
 
   const cleanerMenuItems: MenuItem[] = [
+    { icon: Home, label: 'Today', path: '/cleaner-dashboard' },
     { icon: Clock, label: 'Clock In', path: '/clock-in' },
     { icon: CalendarDays, label: 'My Schedule', path: '/my-schedule' },
     { icon: Camera, label: 'Assistance', path: ASSIST_PATH },
@@ -111,6 +119,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
     { icon: UserPlus, label: 'New Client', path: '/admin/new-customer' },
     { icon: Layers, label: 'Area Presets', path: '/admin/presets' },
     { icon: Users, label: 'Users', path: '/admin/users' },
+    { icon: KeyRound, label: 'Dashboard Access', path: '/admin/dashboard-access' },
     { icon: Library, label: 'QR Library', path: '/qr-library' },
     { icon: QrCode, label: 'QR Generator', path: '/qr-generator' },
     { icon: Building2, label: 'Areas & Tasks', path: '/area-tasks' },
@@ -206,6 +215,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
       if (location.pathname === '/admin/new-customer') return 'New Client'
       if (location.pathname === '/admin/presets') return 'Area Presets'
       if (location.pathname === '/admin/users') return 'Users'
+      if (location.pathname === '/admin/dashboard-access') return 'Dashboard Access'
       if (location.pathname === '/admin/dashboard') return 'Live Dashboard'
       return 'Admin'
     }
@@ -215,7 +225,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
       if (location.pathname === '/analytics') return 'Analytics'
       return 'Ops Manager Dashboard'
     }
-    return userType === 'cleaner' ? 'Cleaner Dashboard' : 'Manager Dashboard'
+    return userType === 'cleaner' ? 'Today' : 'Manager Dashboard'
   }
 
   const formatUserTypeLabel = React.useCallback(() => {
@@ -369,6 +379,7 @@ export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
           {/* Main Content with subtle page fade animation */}
           <div className="flex flex-1 flex-col px-4 pb-6 pt-4 sm:p-6 sm:pt-6">
             <div className="w-full max-w-7xl mx-auto py-2 sm:py-4">
+              <ClockOutReminderBanner cleanerId={cleanerId} enabled={userType === 'cleaner'} />
               <div key={location.pathname} className="page-fade">
                 {children}
               </div>

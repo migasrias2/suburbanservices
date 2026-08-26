@@ -5,6 +5,7 @@ import {
   resolveManagerIdsForCustomer,
 } from '../lib/managerScope'
 import { supabase, type Cleaner } from './supabase'
+import { signTaskPhotoPaths } from './photoStorageService'
 
 type ManagerRole = 'manager' | 'ops_manager' | 'admin'
 
@@ -57,6 +58,18 @@ export async function fetchManagerCleanerIds(managerId: string): Promise<string[
     console.warn('Falling back to manual cleaner mapping', error)
   }
 
+  // DEFERRED — decided 2026-08-26, not yet implemented.
+  // The admin users panel now links cleaners directly to clients via the
+  // cleaner_customers table, and that table is eventually meant to feed this
+  // roster too. It deliberately does not yet; wiring it in is its own change.
+  // When it lands it must UNION all three sources (cleaner_customers,
+  // manager_cleaners, MANAGER_CLEANER_FALLBACKS) rather than take the first
+  // non-empty one. The fallbacks exist precisely for managers with zero
+  // manager_cleaners rows, so a first-non-empty chain lets a single new
+  // cleaner_customers row erase an entire existing roster with no error.
+  // The union must also stay per-manager: two managers can share a client
+  // (see managerScope.ts), so resolving cleaners via manager_customers alone
+  // would show each of them the other's cleaners.
   const fallback = MANAGER_CLEANER_FALLBACKS[managerId]
   return fallback ? [...fallback] : []
 }
@@ -414,7 +427,7 @@ export async function fetchManagerRecentActivity(
   let photosBuilder = supabase
     .from('uk_cleaner_task_photos')
     .select(
-      'id, cleaner_id, cleaner_name, qr_code_id, area_type, task_id, photo_data, photo_timestamp, created_at',
+      'id, cleaner_id, cleaner_name, qr_code_id, area_type, task_id, photo_data, storage_path, photo_timestamp, created_at',
     )
     .order('photo_timestamp', { ascending: false, nullsFirst: true })
     .limit(limit * 2)
@@ -446,6 +459,16 @@ export async function fetchManagerRecentActivity(
   const photoRows = rawPhotos.filter((row) =>
     matchesCleanerScope({ cleaner_id: row.cleaner_id, cleaner_name: row.cleaner_name ?? null }),
   )
+
+  // Photos taken since the Storage migration carry a path instead of inline
+  // base64. Sign them all in one round trip so the row mapping below stays
+  // synchronous, and fall back to the legacy column for older rows.
+  type PhotoSource = { storage_path?: string | null; photo_data?: string | null }
+  const photoSignedUrls = await signTaskPhotoPaths(
+    photoRows.flatMap((row: PhotoSource) => (row.storage_path ? [row.storage_path] : [])),
+  )
+  const resolvePhotoSrc = (row: PhotoSource): string | null =>
+    (row.storage_path ? photoSignedUrls[row.storage_path] : null) ?? row.photo_data ?? null
 
   if (restrictToManagedCleaners && !selectionRows.length && !photoRows.length) {
     console.warn(
@@ -647,7 +670,7 @@ export async function fetchManagerRecentActivity(
       site: siteLabel,
       area: areaLabel,
       comments: null,
-      photo_url: row.photo_data ?? null,
+      photo_url: resolvePhotoSrc(row),
       entry_type: 'photo',
       total_task_count: aggregatePhotoCount,
       completed_task_count: completedForDisplay,

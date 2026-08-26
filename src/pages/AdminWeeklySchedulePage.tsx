@@ -14,6 +14,7 @@ import { ShiftDialog, type ShiftDialogValue } from '@/components/schedule/ShiftD
 import {
   createShift,
   deleteShift,
+  publishShifts,
   fetchShiftsInRange,
   updateShift,
   type CleanerShift,
@@ -182,6 +183,33 @@ const AdminWeeklySchedulePage: React.FC = () => {
     }
   }
 
+  const draftShifts = shifts.filter((s) => !s.publishedAt && !s.cancelledAt)
+
+  const handlePublishWeek = async () => {
+    if (!draftShifts.length) return
+    setIsSubmitting(true)
+    try {
+      const count = await publishShifts(draftShifts.map((s) => s.id))
+      // Shifts starting inside the notice window are the ones that carry
+      // exposure under the October 2026 rules, so call them out by number.
+      const shortNotice = draftShifts.filter(
+        (s) => (new Date(s.startAt).getTime() - Date.now()) / 3600000 < 48,
+      ).length
+      toast({
+        title: `${count} ${count === 1 ? 'shift' : 'shifts'} published`,
+        description: shortNotice
+          ? `${shortNotice} start within 48 hours — logged as short notice.`
+          : 'Cleaners can now see them in their app.',
+      })
+      await loadShifts()
+    } catch (err) {
+      console.error(err)
+      toast({ title: 'Could not publish shifts', variant: 'destructive' })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const handleDelete = async (shiftId: string) => {
     setIsSubmitting(true)
     try {
@@ -223,6 +251,15 @@ const AdminWeeklySchedulePage: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
+              {draftShifts.length > 0 ? (
+                <Button
+                  onClick={handlePublishWeek}
+                  disabled={isSubmitting}
+                  className="h-10 rounded-full bg-[#00339B] px-5 text-[13px] font-semibold text-white hover:bg-[#002a80]"
+                >
+                  Publish {draftShifts.length} draft{draftShifts.length === 1 ? '' : 's'}
+                </Button>
+              ) : null}
               <div className="flex items-center gap-1 rounded-full bg-white p-1 ring-1 ring-black/[0.04] shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                 <Button
                   variant="ghost"

@@ -1,5 +1,6 @@
 import { supabase, type BathroomAssistRequest } from './supabase'
 import { AssistRequestService } from './assistRequestService'
+import { signTaskPhotoPaths } from './photoStorageService'
 
 export type AttendanceShift = {
   id: string
@@ -9,6 +10,14 @@ export type AttendanceShift = {
   siteName: string | null
   clockIn: string | null
   clockOut: string | null
+  needsReview: boolean
+  reviewReason: string | null
+  autoClosedAt: string | null
+}
+
+/** A shift payroll must look at before paying it. */
+export type ReviewShift = AttendanceShift & {
+  durationHours: number | null
 }
 
 export type ActiveCleaner = {
@@ -67,6 +76,7 @@ export type LiveDashboardData = {
   photos: TaskPhoto[]
   resolved: ResolvedAssist[]
   needsAttention: ActiveAssist[]
+  reviewQueue: ReviewShift[]
   todayClockIns: number
   todayClockOuts: number
 }
@@ -89,7 +99,7 @@ export async function loadLiveDashboard(): Promise<LiveDashboardData> {
 
   const attendanceQuery = supabase
     .from('time_attendance')
-    .select('id, cleaner_id, cleaner_uuid, cleaner_name, customer_name, site_name, clock_in, clock_out')
+    .select('id, cleaner_id, cleaner_uuid, cleaner_name, customer_name, site_name, clock_in, clock_out, needs_review, review_reason, auto_closed_at')
     .gte('clock_in', dayStart)
     .lte('clock_in', dayEnd)
     .order('clock_in', { ascending: false })
@@ -103,18 +113,31 @@ export async function loadLiveDashboard(): Promise<LiveDashboardData> {
     .order('photo_timestamp', { ascending: false })
     .limit(2500)
 
+  // Shifts that were auto-closed or ran implausibly long. Payroll needs these
+  // even when they are older than today, so this is a separate window.
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const reviewQuery = supabase
+    .from('time_attendance')
+    .select('id, cleaner_id, cleaner_uuid, cleaner_name, customer_name, site_name, clock_in, clock_out, needs_review, review_reason, auto_closed_at')
+    .eq('needs_review', true)
+    .gte('clock_in', thirtyDaysAgo)
+    .order('clock_in', { ascending: false })
+    .limit(50)
+
   const resolvedSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
   const resolvedPromise = AssistRequestService.listResolved({ limit: 8, resolvedSince }).catch(() => [] as BathroomAssistRequest[])
   const activePromise = AssistRequestService.listRecent({ statuses: ['pending', 'accepted', 'escalated'], limit: 12 }).catch(() => [] as BathroomAssistRequest[])
 
-  const [attendanceRes, photosMetaRes, resolvedRaw, activeRaw] = await Promise.all([
+  const [attendanceRes, photosMetaRes, reviewRes, resolvedRaw, activeRaw] = await Promise.all([
     attendanceQuery,
     photosMetaQuery,
+    reviewQuery,
     resolvedPromise,
     activePromise,
   ])
   if (attendanceRes.error) throw attendanceRes.error
   if (photosMetaRes.error) throw photosMetaRes.error
+  if (reviewRes.error) throw reviewRes.error
 
   const shifts: AttendanceShift[] = (attendanceRes.data ?? []).map((row: any) => ({
     id: String(row.id),
@@ -124,7 +147,32 @@ export async function loadLiveDashboard(): Promise<LiveDashboardData> {
     siteName: row.site_name ?? null,
     clockIn: row.clock_in ?? null,
     clockOut: row.clock_out ?? null,
+    needsReview: row.needs_review === true,
+    reviewReason: row.review_reason ?? null,
+    autoClosedAt: row.auto_closed_at ?? null,
   }))
+
+  const reviewQueue: ReviewShift[] = (reviewRes.data ?? []).map((row: any) => {
+    const clockIn = row.clock_in ?? null
+    const clockOut = row.clock_out ?? null
+    const durationHours =
+      clockIn && clockOut
+        ? Math.round(((new Date(clockOut).getTime() - new Date(clockIn).getTime()) / 3600000) * 10) / 10
+        : null
+    return {
+      id: String(row.id),
+      cleanerId: row.cleaner_uuid ?? row.cleaner_id ?? null,
+      cleanerName: row.cleaner_name ?? null,
+      customerName: row.customer_name ?? null,
+      siteName: row.site_name ?? null,
+      clockIn,
+      clockOut,
+      needsReview: true,
+      reviewReason: row.review_reason ?? null,
+      autoClosedAt: row.auto_closed_at ?? null,
+      durationHours,
+    }
+  })
 
   const now = Date.now()
   const active: ActiveCleaner[] = shifts
@@ -201,6 +249,7 @@ export async function loadLiveDashboard(): Promise<LiveDashboardData> {
     photos,
     resolved,
     needsAttention,
+    reviewQueue,
     todayClockIns,
     todayClockOuts,
   }
@@ -213,14 +262,30 @@ export async function loadPhotoDataForDay(dayKey: string): Promise<Record<number
   const end = new Date(y, m - 1, d, 23, 59, 59, 999).toISOString()
   const { data, error } = await supabase
     .from('uk_cleaner_task_photos')
-    .select('id, photo_data')
+    .select('id, photo_data, storage_path')
     .gte('photo_timestamp', start)
     .lte('photo_timestamp', end)
     .limit(500)
   if (error) throw error
+
+  type PhotoDayRow = { id: number; photo_data: string | null; storage_path: string | null }
+  const rows = (data ?? []) as PhotoDayRow[]
   const map: Record<number, string> = {}
-  ;(data ?? []).forEach((row: any) => {
-    if (row.photo_data) map[row.id] = row.photo_data
+
+  // Photos captured since the Storage migration carry a path; older rows still
+  // hold an inline base64 data URL. Both resolve to something an <img src> can
+  // render, so the callers don't need to care which is which.
+  const signed = await signTaskPhotoPaths(
+    rows.flatMap((row) => (row.storage_path ? [row.storage_path] : [])),
+  )
+
+  rows.forEach((row) => {
+    if (row.storage_path && signed[row.storage_path]) {
+      map[row.id] = signed[row.storage_path]
+    } else if (row.photo_data) {
+      map[row.id] = row.photo_data
+    }
   })
+
   return map
 }

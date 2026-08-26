@@ -250,6 +250,55 @@ export default function AdminLiveDashboardPage() {
           <div className="py-16 text-center text-sm text-gray-400">Loading…</div>
         ) : (
           <div className="space-y-8">
+            {data?.reviewQueue.length ? (
+              <section>
+                <div className="mb-3 flex items-baseline justify-between px-1">
+                  <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-600">
+                    Shifts to check before payroll
+                  </h2>
+                  <span className="text-xs font-medium text-gray-400">{data.reviewQueue.length}</span>
+                </div>
+                <div className="overflow-hidden rounded-3xl border border-amber-200 bg-amber-50/50">
+                  {data.reviewQueue.slice(0, 8).map((s, idx) => (
+                    <div
+                      key={s.id}
+                      className={`flex items-start justify-between gap-4 px-5 py-4 ${idx > 0 ? 'border-t border-amber-100' : ''}`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-base font-medium text-gray-900">{s.cleanerName ?? 'Unknown'}</span>
+                          {s.autoClosedAt ? (
+                            <span className="shrink-0 rounded-full bg-amber-200/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800">
+                              Auto-closed
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="truncate text-xs text-gray-500">
+                          {[s.customerName, s.siteName].filter(Boolean).join(' · ') || 'Site unknown'}
+                          {' · '}
+                          {formatDateTime(s.clockIn)}
+                        </div>
+                        {s.reviewReason ? (
+                          <p className="mt-1 text-xs leading-snug text-amber-800">{s.reviewReason}</p>
+                        ) : null}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="text-base font-semibold tabular-nums text-amber-800">
+                          {s.durationHours != null ? `${s.durationHours}h` : '—'}
+                        </div>
+                        <div className="text-[10px] uppercase tracking-wider text-gray-400">recorded</div>
+                      </div>
+                    </div>
+                  ))}
+                  {data.reviewQueue.length > 8 ? (
+                    <div className="border-t border-amber-100 px-5 py-3 text-xs text-amber-700">
+                      + {data.reviewQueue.length - 8} more in the last 30 days
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
+
             <section>
               <div className="mb-3 flex items-baseline justify-between px-1">
                 <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Active right now</h2>

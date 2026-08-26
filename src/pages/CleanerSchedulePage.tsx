@@ -68,8 +68,8 @@ const CleanerSchedulePage: React.FC = () => {
     setIsLoading(true)
     try {
       const [thisRows, nextRows] = await Promise.all([
-        fetchShiftsInRange(thisWeek.start, addDays(thisWeek.end, 1), { cleanerId }),
-        fetchShiftsInRange(nextWeek.start, addDays(nextWeek.end, 1), { cleanerId }),
+        fetchShiftsInRange(thisWeek.start, addDays(thisWeek.end, 1), { cleanerId, publishedOnly: true }),
+        fetchShiftsInRange(nextWeek.start, addDays(nextWeek.end, 1), { cleanerId, publishedOnly: true }),
       ])
       setThisWeekShifts(thisRows)
       setNextWeekShifts(nextRows)

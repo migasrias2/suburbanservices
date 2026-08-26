@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import { v4 as uuidv4, validate as uuidValidate } from 'uuid'
 import { getStoredCleanerName, normalizeCleanerName, normalizeCleanerNumericId } from '../lib/identity'
 import { autoLinkCleanerToCustomer } from './managerService'
+import { uploadTaskPhoto } from './photoStorageService'
 
 export type AreaType = 
   | 'BATHROOMS_ABLUTIONS'
@@ -724,39 +725,26 @@ export class QRService {
     return customerName || siteLabel
   }
 
+  /**
+   * Persist the in-progress area so a dead phone doesn't cost the cleaner their
+   * work. One atomic upsert, not a read-then-write: the autosave fires on every
+   * photo and confirmation, and the old update-then-insert raced itself into
+   * ~92k duplicate rows.
+   */
   static async saveRemoteDraft(draft: any) {
     try {
-      const cleanerName = getStoredCleanerName()
-      const payload = {
-        cleaner_name: cleanerName,
-        qr_code_id: draft.qrCodeId,
-        area_type: draft.areaType,
-        step: draft.step,
-        current_task_index: draft.currentTaskIndex,
-        state: draft.state,
-        updated_at: new Date().toISOString()
-      }
-
-      // Try to update existing non-finalized draft for this cleaner
-      const { data } = await supabase
-        .from('work_drafts')
-        .update(payload)
-        .eq('cleaner_id', draft.cleanerId)
-        .eq('is_finalized', false)
-        .select('id')
-
-      // If no existing draft, insert a new one
-      if (!data?.length) {
-        await supabase
-          .from('work_drafts')
-          .insert({
-            cleaner_id: draft.cleanerId,
-            ...payload,
-            is_finalized: false
-          })
-      }
+      const { error } = await supabase.rpc('save_work_draft', {
+        p_qr_code_id: draft.qrCodeId ?? null,
+        p_area_type: draft.areaType ?? null,
+        p_step: draft.step ?? null,
+        p_current_task_index: draft.currentTaskIndex ?? 0,
+        p_state: draft.state ?? {},
+        p_cleaner_name: getStoredCleanerName(),
+      })
+      if (error) throw error
     } catch (e) {
-      console.warn('saveRemoteDraft failed (will retry later):', e)
+      // Non-fatal: the local IndexedDB draft is the primary recovery path.
+      console.warn('saveRemoteDraft failed (will retry on next change):', e)
     }
   }
 
@@ -1196,7 +1184,15 @@ export class QRService {
             }
           }
           
-          const clockInResult = await this.logClockEvent(cleanerId, qrData.siteId ?? '', 'clock_in', qrData.id, qrData)
+          const clockInResult = await this.logClockEvent(
+            cleanerId,
+            qrData.siteId ?? '',
+            'clock_in',
+            qrData.id,
+            qrData,
+            null,
+            location,
+          )
           if (!clockInResult.success) {
             return { success: false, message: clockInResult.message }
           }
@@ -1231,6 +1227,7 @@ export class QRService {
             qrData.id,
             qrData,
             clockInReference ?? null,
+            location,
           )
           if (!clockOutResult.success) {
             return { success: false, message: clockOutResult.message }
@@ -1300,12 +1297,17 @@ export class QRService {
    * Log clock in/out events
    */
   private static async logClockEvent(
-    cleanerId: string, 
-    siteId: string, 
+    cleanerId: string,
+    siteId: string,
     eventType: 'clock_in' | 'clock_out',
     qrCodeId: string,
     qrData: QRCodeData,
     clockInReference?: string | null,
+    // A QR code proves nothing about where the phone is — the poster can be
+    // photographed once and rescanned from anywhere. The device position is the
+    // only presence evidence on the attendance row, so it has to be written here
+    // and not just into cleaner_logs.
+    location?: { latitude: number; longitude: number },
   ): Promise<{success: boolean, message?: string}> {
     try {
       if (!this.isSupabaseConfigured()) {
@@ -1333,8 +1335,10 @@ export class QRService {
             site_name: siteLabel,
             clock_in: currentTime,
             clock_in_qr: qrCodeId,
+            clock_in_gps_lat: location?.latitude ?? null,
+            clock_in_gps_lng: location?.longitude ?? null,
             cleaner_mobile: localStorage.getItem('userMobile') || '',
-            notes: 'Clock-in via QR'
+            notes: location ? 'Clock-in via QR' : 'Clock-in via QR (no location)'
           })
 
         if (attendanceError) {
@@ -1357,9 +1361,12 @@ export class QRService {
           return { success: false, message: 'No active clock-in found. Please clock in first.' }
         }
 
+        const clockOutNote = location ? 'Clock-out via QR' : 'Clock-out via QR (no location)'
         const updatePayload: Record<string, any> = {
           clock_out: currentTime,
-          notes: openRecord.notes ? `${openRecord.notes} | Clock-out via QR` : 'Clock-out via QR',
+          clock_out_gps_lat: location?.latitude ?? null,
+          clock_out_gps_lng: location?.longitude ?? null,
+          notes: openRecord.notes ? `${openRecord.notes} | ${clockOutNote}` : clockOutNote,
           customer_name: customerLabel || openRecord.customer_name,
           site_name: siteLabel || openRecord.site_name,
         }
@@ -1797,17 +1804,33 @@ export class QRService {
         return false
       }
 
-      // Save photos if provided
+      // Save photos if provided.
+      // Bytes go to the task-photos bucket and the row keeps only a path.
+      // If an upload fails we fall back to the legacy base64 column rather than
+      // lose evidence the cleaner has already walked across a site to capture.
       if (photos && photos.length > 0) {
-        const photoInserts = photos.map(photo => ({
-          cleaner_id: taskSelection.cleanerId,
-          cleaner_name: getStoredCleanerName(),
-          qr_code_id: taskSelection.qrCodeId,
-          task_id: photo.taskId,
-          area_type: taskSelection.areaType,
-          photo_data: photo.photo,
-          photo_timestamp: photo.timestamp
-        }))
+        const cleanerName = getStoredCleanerName()
+
+        const photoInserts = await Promise.all(
+          photos.map(async photo => {
+            const base = {
+              cleaner_id: taskSelection.cleanerId,
+              cleaner_name: cleanerName,
+              qr_code_id: taskSelection.qrCodeId,
+              task_id: photo.taskId,
+              area_type: taskSelection.areaType,
+              photo_timestamp: photo.timestamp,
+            }
+
+            try {
+              const storagePath = await uploadTaskPhoto(taskSelection.cleanerId, photo.photo)
+              return { ...base, storage_path: storagePath, photo_data: null }
+            } catch (uploadError) {
+              console.error('Photo upload failed, falling back to inline storage:', uploadError)
+              return { ...base, storage_path: null, photo_data: photo.photo }
+            }
+          })
+        )
 
         const { error: photoError } = await supabase
           .from('uk_cleaner_task_photos')

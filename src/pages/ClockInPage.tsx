@@ -8,6 +8,7 @@ import { Clock, QrCode } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/services/supabase'
 import { getStoredCleanerName } from '@/lib/identity'
+import { ShiftSummaryCard } from '@/components/qr/ShiftSummaryCard'
 
 type Phase = 'clock_in' | 'workflow' | 'completed'
 
@@ -69,6 +70,11 @@ export default function ClockInPage() {
           return false
         })
         const hasOpenClockIn = !error && openRecords.length > 0
+
+        // The summary is shown precisely when there is no longer an open
+        // clock-in, so reconciliation must not tear it down underneath the
+        // cleaner before they have read it.
+        if (currentPhase === 'completed') return
 
         if (!hasOpenClockIn) {
           // No active session → reset any stale local state
@@ -136,7 +142,16 @@ export default function ClockInPage() {
     }
     setClockInData(clockInInfo)
     setCurrentPhase('workflow')
-    
+
+    // Ask for notification permission here rather than on page load: this is the
+    // moment the clock-out reminder starts mattering, and browsers penalise
+    // prompts that arrive without a clear user action behind them.
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {
+        // Declining is fine — the in-app banner still works.
+      })
+    }
+
     // Persist to localStorage
     localStorage.setItem('currentClockInData', JSON.stringify(clockInInfo))
     if (clockInInfo.siteName) {
@@ -146,18 +161,21 @@ export default function ClockInPage() {
   }
 
   const handleClockOut = () => {
-    // On successful clock out, reset to clock-in view without logging the user out
+    // On successful clock out, show the shift summary rather than dropping the
+    // cleaner back on a camera with no record of what they just did.
     localStorage.removeItem('currentClockInData')
     localStorage.removeItem('currentSiteName')
-    localStorage.removeItem('currentClockInPhase')
     localStorage.setItem('recentClockOutAt', String(Date.now()))
-    // Explicitly reset local UI
     setClockInData(null)
     setShowScanner(false)
+    setCurrentPhase('completed')
+    localStorage.setItem('currentClockInPhase', 'clock_in')
+  }
+
+  const handleSummaryDone = () => {
     setCurrentPhase('clock_in')
     localStorage.setItem('currentClockInPhase', 'clock_in')
-    // Ensure route is at /clock-in (noop if already there)
-    try { navigate('/clock-in', { replace: true }) } catch {}
+    navigate('/cleaner-dashboard')
   }
 
   const handleBackToClockIn = () => {
@@ -257,22 +275,11 @@ export default function ClockInPage() {
 
         {/* Completion Phase */}
         {currentPhase === 'completed' && (
-          <div className="flex flex-col items-center text-center gap-8">
-            <div className="w-20 h-20 mx-auto bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center shadow-lg animate-pulse">
-              <Clock className="w-10 h-10 text-white" />
-            </div>
-            <div className="space-y-4">
-              <h1 className="text-3xl font-bold text-gray-900">
-                Successfully Clocked Out!
-              </h1>
-              <p className="text-lg text-gray-600">
-                Thank you for your hard work today, {userName}
-              </p>
-              <div className="text-sm text-gray-500">
-                Redirecting to dashboard...
-              </div>
-            </div>
-          </div>
+          <ShiftSummaryCard
+            cleanerId={cleanerId}
+            cleanerName={userName}
+            onDone={handleSummaryDone}
+          />
         )}
       </div>
     </Sidebar07Layout>

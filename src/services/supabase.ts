@@ -17,7 +17,6 @@ export type Cleaner = {
   last_name: string;
   mobile_number: string;
   email?: string;
-  password_hash: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -29,7 +28,6 @@ export type Manager = {
   last_name: string;
   mobile_number: string;
   email?: string;
-  password_hash: string;
   employee_id?: string;
   is_active: boolean;
   created_at: string;
@@ -42,7 +40,6 @@ export type Admin = {
   first_name: string;
   last_name: string;
   email: string;
-  password_hash: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;

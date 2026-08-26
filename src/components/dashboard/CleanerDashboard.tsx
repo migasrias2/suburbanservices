@@ -1,275 +1,255 @@
-import React, { useState, useEffect } from 'react'
-import { Clock, MapPin, CheckCircle2, AlertCircle, QrCode, ClipboardCheck, ListTodo } from 'lucide-react'
-import { supabase, UKCleaner, LiveTracking } from '../../services/supabase'
-import { QRService, TaskSelection, AreaType, AREA_TASKS } from '../../services/qrService'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
-import { Badge } from '../ui/badge'
-import { Alert, AlertDescription } from '../ui/alert'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
-import { BathroomAssistPanel } from '../qr/BathroomAssistPanel'
+import React, { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { format } from 'date-fns'
+import {
+  AlertTriangle,
+  CalendarDays,
+  CheckCircle2,
+  Clock,
+  MapPin,
+  QrCode,
+  Sparkles,
+} from 'lucide-react'
+import { fetchCleanerToday, type CleanerToday } from '../../services/cleanerHomeService'
+import { useOpenAssistCount } from '../../hooks/useOpenAssistCount'
+import { Button } from '../ui/button'
 
 interface CleanerDashboardProps {
   cleanerId: string
   cleanerName: string
 }
 
-export const CleanerDashboard: React.FC<CleanerDashboardProps> = ({
-  cleanerId,
-  cleanerName
-}) => {
-  const [cleaner, setCleaner] = useState<UKCleaner | null>(null)
-  const [currentStatus, setCurrentStatus] = useState<LiveTracking | null>(null)
-  const [todayStats, setTodayStats] = useState({
-    scans: 0,
-    clockIns: 0,
-    areas: 0,
-    duration: 0,
-    tasksSelected: 0,
-    tasksCompleted: 0
-  })
-  const [taskSelections, setTaskSelections] = useState<TaskSelection[]>([])
-  const [loading, setLoading] = useState(true)
+const BRAND = '#00339B'
 
-  useEffect(() => {
-    loadCleanerData()
-    loadCurrentStatus()
-    loadTodayStats()
-    loadTodayTasks()
+const formatElapsed = (minutes: number): string => {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h && m) return `${h}h ${m}m`
+  if (h) return `${h}h`
+  return `${m}m`
+}
 
-    // Set up real-time updates
-    const interval = setInterval(() => {
-      loadCurrentStatus()
-      loadTodayStats()
-      loadTodayTasks()
-    }, 30000) // Update every 30 seconds
+const greeting = (): string => {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
+}
 
-    return () => clearInterval(interval)
+const firstNameOf = (fullName: string): string => fullName.trim().split(/\s+/)[0] || fullName
+
+export const CleanerDashboard: React.FC<CleanerDashboardProps> = ({ cleanerId, cleanerName }) => {
+  const navigate = useNavigate()
+  const [today, setToday] = useState<CleanerToday | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const openAssistCount = useOpenAssistCount(true)
+
+  const load = useCallback(async () => {
+    try {
+      setError(null)
+      setToday(await fetchCleanerToday(cleanerId))
+    } catch (err) {
+      console.error('Could not load the cleaner home screen', err)
+      setError("We couldn't load your shift just now. Pull down to try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }, [cleanerId])
 
-  const loadCleanerData = async () => {
-    const { data, error } = await supabase
-      .from('cleaners')
-      .select('*')
-      .eq('id', cleanerId)
-      .single()
+  useEffect(() => {
+    load()
+    // The elapsed timer is the only thing that moves; a minute is frequent enough.
+    const timer = setInterval(load, 60000)
+    return () => clearInterval(timer)
+  }, [load])
 
-    if (!error && data) {
-      setCleaner(data)
-    }
-  }
-
-  const loadCurrentStatus = async () => {
-    const { data, error } = await supabase
-      .from('time_attendance')
-      .select('*')
-      .eq('cleaner_uuid', cleanerId)
-      .is('clock_out', null)
-      .order('clock_in', { ascending: false })
-      .limit(1)
-
-    if (!error && data && data.length > 0) {
-      const rec = data[0] as any
-      setCurrentStatus({
-        event_type: 'clock_in',
-        site_area: rec.site_name || rec.customer_name || null,
-        clock_in_time: rec.clock_in,
-        latitude: null,
-        longitude: null,
-      } as any)
-    } else {
-      setCurrentStatus(null)
-    }
-  }
-
-
-  const loadTodayStats = async () => {
-    const today = new Date().toISOString().split('T')[0]
-    
-    const { data, error } = await supabase
-      .from('cleaner_logs')
-      .select('*')
-      .eq('cleaner_id', cleanerId)
-      .gte('timestamp', `${today}T00:00:00.000Z`)
-      .lt('timestamp', `${today}T23:59:59.999Z`)
-
-    if (!error && data) {
-      const scans = data.length
-      const clockIns = data.filter(log => log.action === 'Clock In').length
-      const areas = new Set(data.map(log => log.site_area).filter(Boolean)).size
-      
-      // Calculate work duration (simple estimation)
-      const clockInTime = data.find(log => log.action === 'Clock In')?.timestamp
-      const clockOutTime = data.find(log => log.action === 'Clock Out')?.timestamp
-      let duration = 0
-      
-      if (clockInTime && clockOutTime) {
-        duration = Math.round((new Date(clockOutTime).getTime() - new Date(clockInTime).getTime()) / (1000 * 60 * 60))
-      } else if (clockInTime && !clockOutTime) {
-        duration = Math.round((new Date().getTime() - new Date(clockInTime).getTime()) / (1000 * 60 * 60))
-      }
-
-      // Get task stats (will be updated when loadTodayTasks is called)
-      const currentTasks = await QRService.getTaskSelections(cleanerId, today)
-      const tasksSelected = currentTasks.reduce((sum, selection) => sum + selection.selectedTasks.length, 0)
-      const tasksCompleted = currentTasks.reduce((sum, selection) => sum + (selection.completedTasks?.length || 0), 0)
-
-      setTodayStats({ scans, clockIns, areas, duration, tasksSelected, tasksCompleted })
-    }
-    
-    setLoading(false)
-  }
-
-  const loadTodayTasks = async () => {
-    const today = new Date().toISOString().split('T')[0]
-    const selections = await QRService.getTaskSelections(cleanerId, today)
-    setTaskSelections(selections)
-  }
-
-
-  const getStatusColor = (status: string | null) => {
-    switch (status?.toLowerCase()) {
-      case 'clock_in': return 'bg-green-500'
-      case 'clock_out': return 'bg-red-500'
-      case 'area_scan': return 'bg-blue-500'
-      case 'task_started': return 'bg-yellow-500'
-      default: return 'bg-gray-500'
-    }
-  }
-
-  const formatDuration = (hours: number) => {
-    if (hours < 1) return `${Math.round(hours * 60)}m`
-    return `${hours.toFixed(1)}h`
-  }
-
-  if (loading) {
+  if (isLoading && !today) {
     return (
-      <div className="flex justify-center items-center min-h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="h-9 w-9 animate-spin rounded-full border-2 border-gray-200 border-t-[#00339B]" />
       </div>
     )
   }
 
+  const active = today?.activeShift ?? null
+  const shift = today?.todayShift ?? null
+
   return (
-    <div className="space-y-8">
-      <Tabs defaultValue="overview" className="space-y-8">
-        <TabsList className="w-full justify-start space-x-2 bg-white shadow-lg rounded-3xl p-2">
-          <TabsTrigger value="overview" className="rounded-2xl px-6 py-2 text-sm font-semibold">Overview</TabsTrigger>
-          <TabsTrigger value="assist" className="rounded-2xl px-6 py-2 text-sm font-semibold">Bathroom Assist</TabsTrigger>
-        </TabsList>
-        <TabsContent value="overview" className="space-y-8">
-          {/* Header */}
-          <div className="text-center space-y-3">
-            <h1 className="text-3xl lg:text-4xl font-bold" style={{ color: '#00339B' }}>
-              Welcome, {cleanerName}
-            </h1>
-            <p className="text-gray-600 text-lg">Your Cleaning Dashboard</p>
+    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-5">
+      <header className="px-1">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-gray-400">
+          {format(new Date(), 'EEEE d MMMM')}
+        </p>
+        <h1 className="mt-1 text-[28px] font-semibold tracking-tight text-gray-900">
+          {greeting()}, {firstNameOf(cleanerName)}
+        </h1>
+      </header>
+
+      {error ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
+          {error}
+        </div>
+      ) : null}
+
+      {/* ---------- the one thing that matters right now ---------- */}
+      {active ? (
+        <section className="rounded-3xl bg-[#00339B] p-6 text-white shadow-[0_8px_30px_-12px_rgba(0,51,155,0.5)]">
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-white/70">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300" />
+            </span>
+            On the clock
           </div>
 
-          {/* Current Status */}
-          <Card className="card-modern border-0 shadow-xl">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-3 text-xl font-semibold">
-                <div className="p-2 rounded-xl" style={{ backgroundColor: '#e6eefc' }}>
-                  <Clock className="h-6 w-6" style={{ color: '#00339B' }} />
-                </div>
-                Current Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {currentStatus ? (
-                <div className="flex items-center gap-4">
-                  <Badge className={`${getStatusColor(currentStatus.event_type)} text-white px-3 py-1 rounded-full text-sm font-medium`}>
-                    {currentStatus.event_type?.replace('_', ' ').toUpperCase() || 'ACTIVE'}
-                  </Badge>
-                  <div>
-                    <p className="font-medium text-gray-900">{currentStatus.site_area || 'Unknown Location'}</p>
-                    <p className="text-sm text-gray-600">
-                      Since {new Date(currentStatus.clock_in_time || '').toLocaleTimeString()}
-                    </p>
-                  </div>
-                  {currentStatus.latitude && currentStatus.longitude && (
-                    <div className="flex items-center gap-1 text-sm text-green-600">
-                      <MapPin className="h-4 w-4" />
-                      Location Tracked
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <Alert className="border-blue-200 bg-blue-50">
-                  <AlertCircle className="h-4 w-4 text-blue-600" />
-                  <AlertDescription className="text-blue-800">
-                    No active session. Scan a Clock-In QR code to start.
-                  </AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Today's Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 lg:gap-6">
-            <Card className="card-modern border-0 shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer group">
-              <CardContent className="p-4 lg:p-6 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-2xl flex items-center justify-center group-hover:shadow-lg transition-shadow" style={{ backgroundColor: '#00339B' }}>
-                  <QrCode className="h-6 w-6 text-white" />
-                </div>
-                <div className="text-2xl lg:text-3xl font-bold mb-1" style={{ color: '#00339B' }}>{todayStats.scans}</div>
-                <div className="text-xs lg:text-sm text-gray-600 font-medium">QR Scans</div>
-              </CardContent>
-            </Card>
-            <Card className="card-modern border-0 shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer group">
-              <CardContent className="p-4 lg:p-6 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-green-600 flex items-center justify-center group-hover:shadow-lg transition-shadow">
-                  <CheckCircle2 className="h-6 w-6 text-white" />
-                </div>
-                <div className="text-2xl lg:text-3xl font-bold text-green-600 mb-1">{todayStats.clockIns}</div>
-                <div className="text-xs lg:text-sm text-gray-600 font-medium">Clock Ins</div>
-              </CardContent>
-            </Card>
-            <Card className="card-modern border-0 shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer group">
-              <CardContent className="p-4 lg:p-6 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-indigo-600 flex items-center justify-center group-hover:shadow-lg transition-shadow">
-                  <MapPin className="h-6 w-6 text-white" />
-                </div>
-                <div className="text-2xl lg:text-3xl font-bold text-indigo-600 mb-1">{todayStats.areas}</div>
-                <div className="text-xs lg:text-sm text-gray-600 font-medium">Areas</div>
-              </CardContent>
-            </Card>
-            <Card className="card-modern border-0 shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer group">
-              <CardContent className="p-4 lg:p-6 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-orange-600 flex items-center justify-center group-hover:shadow-lg transition-shadow">
-                  <ListTodo className="h-6 w-6 text-white" />
-                </div>
-                <div className="text-2xl lg:text-3xl font-bold text-orange-600 mb-1">{todayStats.tasksSelected}</div>
-                <div className="text-xs lg:text-sm text-gray-600 font-medium">Tasks Selected</div>
-              </CardContent>
-            </Card>
-            <Card className="card-modern border-0 shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer group">
-              <CardContent className="p-4 lg:p-6 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-emerald-600 flex items-center justify-center group-hover:shadow-lg transition-shadow">
-                  <ClipboardCheck className="h-6 w-6 text-white" />
-                </div>
-                <div className="text-2xl lg:text-3xl font-bold text-emerald-600 mb-1">{todayStats.tasksCompleted}</div>
-                <div className="text-xs lg:text-sm text-gray-600 font-medium">Tasks Done</div>
-              </CardContent>
-            </Card>
-            <Card className="card-modern border-0 shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer group">
-              <CardContent className="p-4 lg:p-6 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-slate-600 flex items-center justify-center group-hover:shadow-lg transition-shadow">
-                  <Clock className="h-6 w-6 text-white" />
-                </div>
-                <div className="text-2xl lg:text-3xl font-bold text-slate-600 mb-1">
-                  {formatDuration(todayStats.duration)}
-                </div>
-                <div className="text-xs lg:text-sm text-gray-600 font-medium">Duration</div>
-              </CardContent>
-            </Card>
+          <div className="mt-3 flex items-baseline gap-3">
+            <span className="text-[40px] font-semibold leading-none tracking-tight tabular-nums">
+              {formatElapsed(active.minutesElapsed)}
+            </span>
+            <span className="text-[13px] text-white/70">
+              since {format(new Date(active.clockInAt), 'h:mm a')}
+            </span>
           </div>
 
-        </TabsContent>
-        <TabsContent value="assist">
-          <BathroomAssistPanel cleanerId={cleanerId} cleanerName={cleanerName} />
-        </TabsContent>
-      </Tabs>
+          {active.siteName || active.customerName ? (
+            <div className="mt-3 flex items-center gap-2 text-[13.5px] text-white/85">
+              <MapPin className="h-4 w-4 shrink-0" />
+              <span className="truncate">
+                {[active.customerName, active.siteName].filter(Boolean).join(' · ')}
+              </span>
+            </div>
+          ) : null}
+
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+            <Button
+              onClick={() => navigate('/clock-in')}
+              className="h-12 flex-1 rounded-full bg-white text-[15px] font-semibold text-[#00339B] shadow-none hover:bg-white/90"
+            >
+              <QrCode className="mr-2 h-4 w-4" />
+              Carry on working
+            </Button>
+          </div>
+        </section>
+      ) : (
+        <section className="rounded-3xl bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-20px_rgba(0,0,0,0.15)] ring-1 ring-black/[0.04]">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-400">
+            {shift ? 'Today’s shift' : 'Not clocked in'}
+          </div>
+
+          {shift ? (
+            <>
+              <div className="mt-2 text-[26px] font-semibold tracking-tight text-gray-900">
+                {format(new Date(shift.startAt), 'h:mm')} – {format(new Date(shift.endAt), 'h:mm a')}
+              </div>
+              {shift.siteName || shift.customerName ? (
+                <div className="mt-1.5 flex items-center gap-2 text-[13.5px] text-gray-500">
+                  <MapPin className="h-4 w-4 shrink-0" />
+                  <span className="truncate">
+                    {[shift.customerName, shift.siteName].filter(Boolean).join(' · ')}
+                  </span>
+                </div>
+              ) : null}
+              {shift.notes ? (
+                <p className="mt-3 whitespace-pre-wrap rounded-2xl bg-gray-50 p-3 text-[12.5px] leading-snug text-gray-600">
+                  {shift.notes}
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <p className="mt-2 text-[14px] leading-snug text-gray-500">
+              {today?.nextShift
+                ? `Nothing rostered today. You’re next in on ${format(
+                    new Date(today.nextShift.startAt),
+                    'EEEE d MMM',
+                  )} at ${format(new Date(today.nextShift.startAt), 'h:mm a')}.`
+                : 'Nothing rostered today. You can still clock in if you’ve been asked to cover.'}
+            </p>
+          )}
+
+          <Button
+            onClick={() => navigate('/clock-in')}
+            className="mt-5 h-12 w-full rounded-full text-[15px] font-semibold text-white shadow-none"
+            style={{ backgroundColor: BRAND }}
+          >
+            <Clock className="mr-2 h-4 w-4" />
+            Clock in
+          </Button>
+        </section>
+      )}
+
+      {/* ---------- what they've done today ---------- */}
+      <section className="grid grid-cols-2 gap-3">
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-black/[0.04]">
+          <div className="flex items-center gap-2 text-gray-400">
+            <CheckCircle2 className="h-4 w-4" />
+            <span className="text-[11px] font-medium uppercase tracking-[0.08em]">Areas done</span>
+          </div>
+          <div className="mt-1.5 text-[28px] font-semibold leading-none tabular-nums text-gray-900">
+            {today?.areasCompletedToday ?? 0}
+          </div>
+        </div>
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-black/[0.04]">
+          <div className="flex items-center gap-2 text-gray-400">
+            <Sparkles className="h-4 w-4" />
+            <span className="text-[11px] font-medium uppercase tracking-[0.08em]">Tasks done</span>
+          </div>
+          <div className="mt-1.5 text-[28px] font-semibold leading-none tabular-nums text-gray-900">
+            {today?.tasksCompletedToday ?? 0}
+          </div>
+        </div>
+      </section>
+
+      {/* ---------- things wanting their attention ---------- */}
+      {openAssistCount > 0 ? (
+        <button
+          type="button"
+          onClick={() => navigate('/cleaner-assistance')}
+          className="flex items-center justify-between gap-3 rounded-2xl bg-white p-4 text-left ring-1 ring-black/[0.04] transition-shadow hover:shadow-md"
+        >
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+              <AlertTriangle className="h-4 w-4" />
+            </span>
+            <div>
+              <div className="text-[14.5px] font-semibold text-gray-900">
+                {openAssistCount} bathroom {openAssistCount === 1 ? 'request' : 'requests'} waiting
+              </div>
+              <div className="text-[12.5px] text-gray-500">Tap to accept one</div>
+            </div>
+          </div>
+          <span className="text-gray-300">›</span>
+        </button>
+      ) : null}
+
+      {today && today.flaggedShiftCount > 0 ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <div className="text-[14px] font-semibold text-amber-900">
+            {today.flaggedShiftCount} of your recent {today.flaggedShiftCount === 1 ? 'shift needs' : 'shifts need'} checking
+          </div>
+          <p className="mt-1 text-[12.5px] leading-snug text-amber-800">
+            They were recorded without a clock-out, so the hours may be wrong. Your manager has been
+            sent these to confirm — speak to them if the times don’t look right to you.
+          </p>
+        </div>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={() => navigate('/my-schedule')}
+        className="flex items-center justify-between gap-3 rounded-2xl bg-white p-4 text-left ring-1 ring-black/[0.04] transition-shadow hover:shadow-md"
+      >
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#00339B]/10 text-[#00339B]">
+            <CalendarDays className="h-4 w-4" />
+          </span>
+          <div>
+            <div className="text-[14.5px] font-semibold text-gray-900">My schedule</div>
+            <div className="text-[12.5px] text-gray-500">This week and next</div>
+          </div>
+        </div>
+        <span className="text-gray-300">›</span>
+      </button>
     </div>
   )
 }

@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '../ui/hover-card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
+import { signTaskPhotoPaths } from '@/services/photoStorageService'
 import {
   fetchAllCleaners,
   fetchCleanersByIds,
@@ -861,12 +862,24 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         }
       })
 
+      // Photos captured since the Storage migration carry a path rather than an
+      // inline base64 blob; sign them in one batch so photo_data stays a
+      // directly renderable <img src> for both old and new rows.
+      const photoSignedUrls = await signTaskPhotoPaths(
+        rawPhotoRows.flatMap((row) => {
+          const path = (row as { storage_path?: string | null }).storage_path
+          return path ? [path] : []
+        }),
+      )
+
       const photosWithMetadata: TaskPhotoRow[] = rawPhotoRows.map((row) => {
         const meta = row.qr_code_id ? qrMetadata.get(row.qr_code_id) : undefined
         const areaLabel = resolveAreaDisplayLabel(meta?.area, row.area_name, row.qr_code_id, row.area_type)
         const customerLabel = resolveCustomerDisplayLabel(meta?.customer, row.customer_name)
+        const storagePath = (row as { storage_path?: string | null }).storage_path
         return {
           ...row,
+          photo_data: (storagePath ? photoSignedUrls[storagePath] : null) ?? row.photo_data,
           area_name: areaLabel,
           customer_name: customerLabel,
         }

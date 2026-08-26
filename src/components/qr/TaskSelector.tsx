@@ -4,6 +4,7 @@ import { QRCodeData, AreaType, QRService, TaskSelection, TaskDefinition } from '
 import { Button } from '../ui/button'
 import { Alert, AlertDescription } from '../ui/alert'
 import { saveDraft as saveLocalDraft, clearDraft } from '../../lib/offlineStore'
+import { compressPhoto } from '../../lib/imageCompression'
 
 export interface TaskSubmissionSummary {
   taskCount?: number
@@ -158,7 +159,9 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
 
   const handlePhotoCapture = async (taskId: string, file: File) => {
     try {
-      const base64 = await convertFileToBase64(file)
+      // Downscale before anything else touches it: this data URL is what goes
+      // into component state, the offline draft, and eventually the upload.
+      const { dataUrl: base64 } = await compressPhoto(file)
       const photo: TaskPhoto = {
         taskId,
         photo: base64,
@@ -189,15 +192,6 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
       ))
     )
     setConfirmedPhotos(prev => ({ ...prev, [taskId]: false }))
-  }
-
-  const convertFileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as string)
-      reader.onerror = reject
-      reader.readAsDataURL(file)
-    })
   }
 
   const startCamera = async (taskId: string) => {

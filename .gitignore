@@ -32,3 +32,6 @@ dist-ssr
 # Local recovery snapshot from the Sienna Leitch duplicate merge
 .sienna-merge-archive.json
 
+
+# Supabase CLI scratch
+supabase/.temp/

@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import Login from "./pages/Login";
 import CleanerDashboardPage from "./pages/CleanerDashboardPage";
+import CleanerHomePage from "./pages/CleanerHomePage";
 import ClockInPage from "./pages/ClockInPage";
 import ChatPage from "./pages/ChatPage";
 import ManagerDashboardPage from "./pages/ManagerDashboardPage";
@@ -25,6 +26,7 @@ import OpsCalendarPage from "./pages/OpsCalendarPage";
 import NewCustomerPage from "./pages/NewCustomerPage";
 import PresetsPage from "./pages/PresetsPage";
 import UsersPage from "./pages/UsersPage";
+import DashboardAccessPage from "./pages/DashboardAccessPage";
 import AdminLiveDashboardPage from "./pages/AdminLiveDashboardPage";
 import CleanerSchedulePage from "./pages/CleanerSchedulePage";
 
@@ -40,7 +42,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/cleaner-dashboard" element={<CleanerDashboardPage />} />
+          <Route path="/cleaner-dashboard" element={<CleanerHomePage />} />
           <Route path="/cleaner-assistance" element={<CleanerDashboardPage />} />
           <Route path="/my-schedule" element={<CleanerSchedulePage />} />
           <Route path="/clock-in" element={<ClockInPage />} />
@@ -61,6 +63,7 @@ const App = () => (
           <Route path="/admin/new-customer" element={<NewCustomerPage />} />
           <Route path="/admin/presets" element={<PresetsPage />} />
           <Route path="/admin/users" element={<UsersPage />} />
+          <Route path="/admin/dashboard-access" element={<DashboardAccessPage />} />
           <Route path="/admin/dashboard" element={<AdminLiveDashboardPage />} />
           <Route path="/bathroom-assist" element={<BathroomAssistReportPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
