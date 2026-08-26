@@ -114,7 +114,9 @@ export async function compressPhoto(
 export function dataUrlToBlob(dataUrl: string): Blob {
   const [header, encoded] = dataUrl.split(',')
   if (!encoded) throw new Error('Malformed data URL')
-  const mime = /:(.*?);/.exec(header)?.[1] ?? 'image/jpeg'
+  // `||` not `??`: a header like "data:;base64" captures an empty string, which
+  // ?? would happily pass through as the blob's content type.
+  const mime = /:(.*?);/.exec(header)?.[1] || 'image/jpeg'
   const binary = atob(encoded)
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i += 1) {

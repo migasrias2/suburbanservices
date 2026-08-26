@@ -35,3 +35,6 @@ dist-ssr
 
 # Supabase CLI scratch
 supabase/.temp/
+
+# Test coverage output
+coverage/
