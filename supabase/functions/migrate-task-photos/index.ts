@@ -2,10 +2,12 @@
 // Resumable: call repeatedly until `remaining` is zero. Nothing is deleted
 // until that row's upload has succeeded.
 //
-// Memory note: an earlier version selected photo_data for the whole batch at
-// once. With rows up to ~9 MB of base64 that reached ~900 MB and the worker was
-// killed with WORKER_RESOURCE_LIMIT. It now fetches ids first and pulls each
-// photo individually, so peak memory is one photo regardless of batch size.
+// Two lessons are baked in:
+//  - Peak memory is one photo. Selecting photo_data for a whole batch reached
+//    ~900 MB on 9 MB rows and the worker was killed (WORKER_RESOURCE_LIMIT).
+//  - A row that always fails is parked after 3 attempts. Otherwise the few
+//    oversized originals sit at the head of the id-ordered queue and are
+//    retried forever, starving everything behind them.
 //
 //   POST /functions/v1/migrate-task-photos
 //   { "batchSize": 50, "dryRun": false }
@@ -15,6 +17,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const BUCKET = 'task-photos'
 const DEFAULT_BATCH = 50
 const MAX_BATCH = 300
+const MAX_ATTEMPTS = 3
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -66,6 +69,7 @@ Deno.serve(async (req) => {
       .select('id, cleaner_id')
       .is('storage_path', null)
       .not('photo_data', 'is', null)
+      .lt('migration_attempts', MAX_ATTEMPTS)
       .order('id', { ascending: true })
       .limit(batchSize)
 
@@ -126,7 +130,10 @@ Deno.serve(async (req) => {
         bytesMoved += bytes.byteLength
       } catch (err) {
         skipped += 1
-        failures.push({ id: row.id, reason: err instanceof Error ? err.message : String(err) })
+        const reason = err instanceof Error ? err.message : String(err)
+        failures.push({ id: row.id, reason })
+        // park it after MAX_ATTEMPTS so it stops blocking the queue
+        await supabase.rpc('record_photo_migration_failure', { p_id: row.id, p_error: reason })
       }
     }
 
@@ -135,6 +142,14 @@ Deno.serve(async (req) => {
       .select('id', { count: 'exact', head: true })
       .is('storage_path', null)
       .not('photo_data', 'is', null)
+      .lt('migration_attempts', MAX_ATTEMPTS)
+
+    const { count: parked } = await supabase
+      .from('uk_cleaner_task_photos')
+      .select('id', { count: 'exact', head: true })
+      .is('storage_path', null)
+      .not('photo_data', 'is', null)
+      .gte('migration_attempts', MAX_ATTEMPTS)
 
     return new Response(
       JSON.stringify({
@@ -142,6 +157,7 @@ Deno.serve(async (req) => {
         skipped,
         megabytesMoved: Math.round((bytesMoved / 1048576) * 100) / 100,
         remaining: remaining ?? null,
+        parked: parked ?? 0,
         failures: failures.slice(0, 5),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
