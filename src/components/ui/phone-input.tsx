@@ -51,7 +51,22 @@ export function PhoneInput({
 
   function handleNationalChange(next: string) {
     // keep digits only for storage, but format for UI
-    const digits = next.replace(/\D/g, "");
+    let digits = next.replace(/\D/g, "");
+
+    // The dial code is fixed at +44, so a trunk code ("0") or country code
+    // ("44") typed into the national field is redundant. Concatenating it
+    // anyway is what produced accounts like "+4407586276920" and
+    // "+440447591322658" — the same person, two different logins.
+    //
+    // Only peel once the field is long enough for the prefix to be
+    // unambiguous (UK national numbers are 10 digits), so we never eat
+    // digits out from under someone who is still typing.
+    for (let i = 0; i < 3; i++) {
+      if (digits.startsWith("44") && digits.length >= 12) digits = digits.slice(2);
+      else if (digits.startsWith("0") && digits.length >= 11) digits = digits.slice(1);
+      else break;
+    }
+
     setNational(digits);
 
     // build E.164 with UK code

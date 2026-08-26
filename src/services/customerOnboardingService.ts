@@ -9,6 +9,40 @@ export function describeError(err: unknown): string {
   return parts.join(' — ') || (err instanceof Error ? err.message : 'Unknown error')
 }
 
+/**
+ * supabase-js wraps a non-2xx Edge Function response in a FunctionsHttpError
+ * whose `message` is the constant "Edge Function returned a non-2xx status
+ * code". The reason the function actually gave us sits unread in `context`,
+ * which is a Response — not a parsed body — so `context.error` is always
+ * undefined. Read the body instead, or the operator sees nothing useful.
+ */
+async function describeFunctionError(error: unknown, fallback: string): Promise<string> {
+  const context = (error as { context?: unknown })?.context
+
+  if (context instanceof Response) {
+    let raw = ''
+    try {
+      raw = await context.clone().text()
+    } catch {
+      // Body already consumed elsewhere; fall through to the status line.
+    }
+
+    if (raw) {
+      try {
+        const body = JSON.parse(raw)
+        const message = body?.error ?? body?.message
+        if (message) return String(message)
+      } catch {
+        return raw.trim()
+      }
+    }
+
+    return `${fallback} (HTTP ${context.status})`
+  }
+
+  return (error as { message?: string })?.message || fallback
+}
+
 export type ManagerRole = 'manager' | 'ops_manager'
 
 export type ManagerSummary = {
@@ -139,8 +173,7 @@ export async function createManagerAccount(input: {
   }
   const { data, error } = await supabase.functions.invoke('admin-create-manager', { body: payload })
   if (error) {
-    const message = (error as any)?.context?.error || error.message || 'Failed to create manager'
-    throw new Error(message)
+    throw new Error(await describeFunctionError(error, 'Failed to create manager'))
   }
   if (!data?.managerId || !data?.password) {
     throw new Error('Manager created but no credentials returned')
@@ -316,8 +349,7 @@ export async function createUserAccount(input: {
   }
   const { data, error } = await supabase.functions.invoke('admin-create-user', { body: payload })
   if (error) {
-    const message = (error as any)?.context?.error || error.message || 'Failed to create user'
-    throw new Error(message)
+    throw new Error(await describeFunctionError(error, 'Failed to create user'))
   }
   if (!data?.userId || !data?.password) {
     throw new Error('User created but no credentials returned')
@@ -333,6 +365,81 @@ export async function deactivateUser(role: AppUserRole, userId: string): Promise
     p_user_id: userId,
   })
   if (error) throw error
+}
+
+/** A single person -> client/site link, for either a cleaner or a manager. */
+export type UserCustomerLink = {
+  role: AppUserRole
+  userId: string
+  customerId: string
+  customerLabel: string
+}
+
+/**
+ * Every site link for every cleaner and manager in one call, so the users list
+ * can show who is unassigned without a query per row.
+ */
+export async function listUserCustomerLinks(): Promise<UserCustomerLink[]> {
+  type LinkRow = {
+    role: AppUserRole
+    user_id: string
+    customer_id: string
+    customer_label: string | null
+  }
+  const adminId = getAdminId()
+  const { data, error } = await supabase.rpc('admin_list_user_customer_links', { p_admin_id: adminId })
+  if (error) throw error
+  return ((data ?? []) as LinkRow[]).map((row) => ({
+    role: row.role,
+    userId: row.user_id,
+    customerId: row.customer_id,
+    customerLabel: row.customer_label ?? 'Unnamed client',
+  }))
+}
+
+export async function assignCleanerToCustomer(cleanerId: string, customerId: string): Promise<void> {
+  const adminId = getAdminId()
+  const { error } = await supabase.rpc('admin_assign_cleaner_to_customer', {
+    p_admin_id: adminId,
+    p_cleaner_id: cleanerId,
+    p_customer_id: customerId,
+  })
+  if (error) throw error
+}
+
+export async function unassignCleanerFromCustomer(cleanerId: string, customerId: string): Promise<void> {
+  const adminId = getAdminId()
+  const { error } = await supabase.rpc('admin_unassign_cleaner_from_customer', {
+    p_admin_id: adminId,
+    p_cleaner_id: cleanerId,
+    p_customer_id: customerId,
+  })
+  if (error) throw error
+}
+
+/**
+ * Cleaners and managers live in different mapping tables, so callers linking a
+ * user to a site dispatch through here rather than branching on role themselves.
+ * Admins are unscoped — they already see every site — so there is nothing to link.
+ */
+export async function assignUserToCustomer(
+  role: AppUserRole,
+  userId: string,
+  customerId: string,
+): Promise<void> {
+  if (role === 'admin') throw new Error('Admins already have access to every site')
+  if (role === 'cleaner') return assignCleanerToCustomer(userId, customerId)
+  return assignManagerToCustomer(userId, customerId)
+}
+
+export async function unassignUserFromCustomer(
+  role: AppUserRole,
+  userId: string,
+  customerId: string,
+): Promise<void> {
+  if (role === 'admin') throw new Error('Admins already have access to every site')
+  if (role === 'cleaner') return unassignCleanerFromCustomer(userId, customerId)
+  return unassignManagerFromCustomer(userId, customerId)
 }
 
 export async function generateCustomerQrPack(input: {

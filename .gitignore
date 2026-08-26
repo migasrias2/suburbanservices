@@ -28,3 +28,7 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Local recovery snapshot from the Sienna Leitch duplicate merge
+.sienna-merge-archive.json
+
