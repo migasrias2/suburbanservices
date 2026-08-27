@@ -19,6 +19,7 @@ import {
   type UserCustomerLink,
 } from '@/services/customerOnboardingService'
 import type { Customer } from '@/services/supabase'
+import { UserPasswordSection } from './UserPasswordSection'
 import { UserSitesSection } from './UserSitesSection'
 import {
   AVATAR_BG,
@@ -198,6 +199,8 @@ export const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
               </dl>
             )}
           </section>
+
+          <UserPasswordSection user={user} />
 
           {isSiteScopedRole(user.role) ? (
             <UserSitesSection

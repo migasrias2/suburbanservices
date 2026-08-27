@@ -16,7 +16,7 @@ export function describeError(err: unknown): string {
  * which is a Response — not a parsed body — so `context.error` is always
  * undefined. Read the body instead, or the operator sees nothing useful.
  */
-async function describeFunctionError(error: unknown, fallback: string): Promise<string> {
+export async function describeFunctionError(error: unknown, fallback: string): Promise<string> {
   const context = (error as { context?: unknown })?.context
 
   if (context instanceof Response) {
@@ -327,6 +327,12 @@ export type CreatedUser = {
   firstName: string
   lastName: string
   identifier: string
+  /**
+   * False when the account exists and the password works, but it could not be
+   * recorded for later display on the profile. The dialog has to insist the
+   * admin copies it in that case.
+   */
+  recorded: boolean
 }
 
 export async function createUserAccount(input: {

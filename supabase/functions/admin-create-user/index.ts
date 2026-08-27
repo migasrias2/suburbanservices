@@ -37,11 +37,20 @@ function deriveSyntheticEmail(role: Role, identifier: string) {
 const WORDS_A = ['swift','calm','brave','bold','quiet','sunny','bright','clear','still','quick','fresh','warm','cool','crisp','soft','sharp','glad','keen','neat','smart']
 const WORDS_B = ['otter','river','peak','cloud','willow','meadow','forest','harbor','valley','summit','breeze','lantern','copper','silver','golden','marble','ember','horizon','quartz','aspen']
 
+/**
+ * Uniform pick from a CSPRNG. Math.random() is not seeded for secrecy and is
+ * the wrong tool for anything that becomes a credential.
+ */
+function pick<T>(list: T[]): T {
+  const buf = new Uint32Array(1)
+  crypto.getRandomValues(buf)
+  return list[buf[0] % list.length]
+}
+
 function generateReadablePassword(): string {
-  const a = WORDS_A[Math.floor(Math.random() * WORDS_A.length)]
-  const b = WORDS_B[Math.floor(Math.random() * WORDS_B.length)]
-  const n = Math.floor(Math.random() * 90 + 10)
-  return `${a}-${b}-${n}`
+  const buf = new Uint32Array(1)
+  crypto.getRandomValues(buf)
+  return `${pick(WORDS_A)}-${pick(WORDS_B)}-${10 + (buf[0] % 90)}`
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -69,10 +78,20 @@ Deno.serve(async (req: Request) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } })
 
+  // Authorization comes from the caller's own JWT, not from payload.adminId.
+  // A body-supplied UUID is only a claim, and this endpoint mints accounts --
+  // including admin accounts, which can read every recorded staff password.
+  const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
+  if (!token) return jsonResponse({ error: 'Not authenticated' }, 401)
+
+  const { data: callerData, error: callerErr } = await admin.auth.getUser(token)
+  const callerId = callerData?.user?.id
+  if (callerErr || !callerId) return jsonResponse({ error: 'Not authenticated' }, 401)
+
   const { data: adminRow, error: adminErr } = await admin
     .from('admins')
     .select('id, is_active')
-    .eq('id', adminId)
+    .eq('id', callerId)
     .maybeSingle()
   if (adminErr || !adminRow || adminRow.is_active === false) return jsonResponse({ error: 'Not authorized' }, 403)
 
@@ -149,9 +168,18 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: insertErr.message }, 400)
   }
 
+  // Record the plaintext so the profile panel can show it later. Supabase Auth
+  // keeps only a bcrypt hash, so this is the one moment the value exists in
+  // readable form. A failure here leaves a working account whose password is
+  // shown once and then only resettable -- not worth unwinding the user.
+  const { error: recordErr } = await admin
+    .from('user_passwords')
+    .upsert({ user_id: userId, role, password, updated_by: callerId }, { onConflict: 'user_id' })
+
   return jsonResponse({
     userId,
     password,
+    recorded: !recordErr,
     role,
     firstName,
     lastName,

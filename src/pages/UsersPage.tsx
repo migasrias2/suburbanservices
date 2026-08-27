@@ -397,7 +397,9 @@ export default function UsersPage() {
                       </Button>
                     </div>
                     <p className="mb-4 text-sm text-gray-500">
-                      Save this password now — it won't be shown again.
+                      {created.recorded
+                        ? "Share this with them. You can see it again any time on their profile."
+                        : 'Save this password now — it could not be stored, so this profile will not show it.'}
                     </p>
                     <div className="space-y-4">
                       <div className="rounded-2xl bg-gray-50 p-4">
