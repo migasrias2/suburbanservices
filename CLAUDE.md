@@ -10,9 +10,13 @@ npm run build      # Production build
 npm run build:dev  # Development build
 npm run lint       # ESLint
 npm run preview    # Preview production build
+npm test           # Vitest, full suite (test:watch, test:coverage)
 ```
 
-There are no automated tests in this project.
+Tests are Vitest, colocated as `*.test.ts` / `*.test.tsx` beside the code they cover.
+Edge Functions are tested by loading the real Deno source and driving it with a fake
+Supabase client (`src/services/adminCreateUserFunction.test.ts`) — nothing in the suite
+touches the network or the live project.
 
 Environment variables required (in `.env`):
 - `VITE_SUPABASE_URL`
@@ -24,7 +28,7 @@ This is a **React + TypeScript + Vite** field operations management app for Subu
 
 ### User Roles & Auth
 
-Four roles: `cleaner`, `manager`, `ops_manager`, `admin`. Auth uses **Supabase Auth** with synthetic emails derived from role + identifier (`deriveSyntheticEmail` in `src/lib/authHelpers.ts`). `authService.registerUser` calls `supabase.auth.signUp` and inserts a matching row (same UUID) into `cleaners` or `managers`; `loginUser` uses `signInWithPassword`. Admin accounts are provisioned manually in the DB (client registration is disabled).
+Four roles: `cleaner`, `manager`, `ops_manager`, `admin`. Auth uses **Supabase Auth** with synthetic emails derived from role + identifier (`deriveSyntheticEmail` in `src/lib/authHelpers.ts`). `AuthContext.signIn` (`src/contexts/AuthContext.tsx`) is the only login path — it calls `signInWithPassword` and syncs identity into localStorage. Accounts are created by an admin through the `admin-create-user` Edge Function, which mints the auth user and the matching `cleaners` / `managers` / `admins` row under the same UUID. There is no self-registration.
 
 Authorization in the database derives roles from table membership (`admins`, `managers.role`, `cleaners`), checked via the `public.has_app_role(text[])` SQL function used in RLS policies. The `app_role` in JWT `user_metadata` is client-editable and must never be trusted in policies or SECURITY DEFINER functions.
 
@@ -45,7 +49,7 @@ All routes are flat (no nested route groups). Role-based access is enforced at t
 ### Data Layer (`src/services/`)
 
 Each service file is a collection of plain async functions (not classes) that call `supabase` directly:
-- `authService.ts` — login, registration, user lookup
+- `customerOnboardingService.ts` — admin provisioning: customers, areas, users (admin_* RPCs and the `admin-create-user` function)
 - `qrService.ts` — QR code generation, scanning, task logging
 - `areasService.ts`, `areaTasksService.ts` — area/task CRUD
 - `managerService.ts` — manager/cleaner relationships, customer linking

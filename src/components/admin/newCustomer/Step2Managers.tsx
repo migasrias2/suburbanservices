@@ -7,7 +7,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { Check, Copy, Plus, Search, UserPlus, X } from 'lucide-react'
 import {
   assignManagerToCustomer,
-  createManagerAccount,
+  createUserAccount,
   describeError,
   listManagers,
   type ManagerSummary,
@@ -86,15 +86,15 @@ export const Step2Managers: React.FC<Step2Props> = ({ state, totalSteps, onUpdat
     }
     setIsCreating(true)
     try {
-      const created = await createManagerAccount({
+      const created = await createUserAccount({
+        role: newRole,
         firstName: newFirst.trim(),
         lastName: newLast.trim(),
         phone: newPhone.trim() || undefined,
         username: newUsername.trim() || undefined,
-        role: newRole,
       })
       onUpdate({ createdManagers: [...state.createdManagers, created] })
-      setSelected((prev) => [...prev, created.managerId])
+      setSelected((prev) => [...prev, created.userId])
       setShowAddForm(false)
       setNewFirst('')
       setNewLast('')
@@ -168,7 +168,7 @@ export const Step2Managers: React.FC<Step2Props> = ({ state, totalSteps, onUpdat
             <div className="space-y-2">
               {state.createdManagers.map((m) => (
                 <div
-                  key={m.managerId}
+                  key={m.userId}
                   className="flex items-center justify-between rounded-xl bg-white px-4 py-3 text-sm"
                 >
                   <div>

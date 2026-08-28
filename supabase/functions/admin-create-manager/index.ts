@@ -1,13 +1,54 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from 'jsr:@supabase/supabase-js@2'
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-
-const MANAGER_DOMAINS: Record<string, string> = {
-  manager: 'manager.suburbanservices.local',
-  ops_manager: 'ops.suburbanservices.local',
-}
+/**
+ * TOMBSTONE. This endpoint is retired and must never mint an account again.
+ *
+ * The version this replaced authorised off a UUID supplied in the request
+ * BODY and never authenticated the caller at all, so the public anon key --
+ * which ships in the browser bundle -- was enough to create an ops_manager and
+ * receive its plaintext password. Confirmed live against production on
+ * 2026-08-26: the same probe returned 401 from admin-create-user (which checks
+ * the caller's JWT) and 403 from this one, proving it had reached its own
+ * `admins` lookup on the body value with no authentication.
+ *
+ * WHY THIS FILE STILL EXISTS INSTEAD OF BEING DELETED:
+ * deleting the source does NOT undeploy the function. The old bundle keeps
+ * serving until someone acts on the deployment. With the source gone there is
+ * nothing left in the repo to remind anyone of that, so a deleted directory
+ * looks safe while remaining fully exploitable. This stub is deployable, so it
+ * can neutralise the endpoint -- but read the next paragraph before assuming
+ * it already has.
+ *
+ * IF YOU ARE DEPLOYING THIS REPO, DO ALL THREE, IN ORDER:
+ *
+ *   1. supabase functions deploy                  <- ALL functions, no name
+ *   2. supabase functions delete admin-create-manager
+ *   3. probe the endpoint (below)
+ *
+ * Step 1 must be the full deploy. `supabase functions deploy admin-create-user`
+ * -- the natural thing to run when you believe you changed one function -- does
+ * NOT ship this stub, and the vulnerable bundle keeps serving. This tombstone
+ * covers exactly one deploy style; step 2 covers the rest. It is a fail-safe,
+ * never a reason to skip step 2.
+ *
+ * PROBE, and how to read it:
+ *   404 -> deleted.            SAFE.
+ *   410 -> this stub is live.  SAFE.
+ *   400 or 403 -> THE OLD VULNERABLE BUNDLE IS STILL SERVING. Only that version
+ *                 has a body-shape validator ("Missing required fields") and an
+ *                 `admins` lookup ("Not authorized") to reach. Treat as live.
+ *
+ * Note for whoever probes this later: because this file stays in the repo, the
+ * delete in step 2 is not permanent. The next FULL deploy recreates the
+ * endpoint as this 410 stub. Seeing 410 where you once saw 404 is expected and
+ * is NOT the vulnerability returning -- 400/403 is.
+ *
+ * Deliberately imports no Supabase client and holds no service-role key: even
+ * if it is invoked, it has no capability to create anything.
+ *
+ * Callers moved to admin-create-user, which authenticates the caller from
+ * their JWT and checks membership of `admins` server-side.
+ */
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -15,111 +56,11 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-function normalizePhoneToDigits(phone: string): string {
-  let d = phone.replace(/\D/g, '')
-  if (d.startsWith('440') && d.length > 11) d = '44' + d.slice(3)
-  if (d.startsWith('0')) d = '44' + d.slice(1)
-  return d
-}
-
-function deriveSyntheticEmail(role: 'manager' | 'ops_manager', identifier: string) {
-  const domain = MANAGER_DOMAINS[role]
-  if (role === 'ops_manager') return `${identifier.trim().toLowerCase()}@${domain}`
-  return `${normalizePhoneToDigits(identifier)}@${domain}`
-}
-
-const WORDS_A = ['swift','calm','brave','bold','quiet','sunny','bright','clear','still','quick','fresh','warm','cool','crisp','soft','sharp','glad','keen','neat','smart']
-const WORDS_B = ['otter','river','peak','cloud','willow','meadow','forest','harbor','valley','summit','breeze','lantern','copper','silver','golden','marble','ember','horizon','quartz','aspen']
-
-function generateReadablePassword(): string {
-  const a = WORDS_A[Math.floor(Math.random() * WORDS_A.length)]
-  const b = WORDS_B[Math.floor(Math.random() * WORDS_B.length)]
-  const n = Math.floor(Math.random() * 90 + 10)
-  return `${a}-${b}-${n}`
-}
-
-Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: CORS_HEADERS })
-  }
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } })
-  }
-
-  let payload: any
-  try { payload = await req.json() } catch { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }) }
-
-  const { adminId, firstName, lastName, phone, role, username } = payload ?? {}
-  if (!adminId || !firstName || !lastName || !role) {
-    return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } })
-  }
-  if (role !== 'manager' && role !== 'ops_manager') {
-    return new Response(JSON.stringify({ error: 'Invalid role' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } })
-  }
-
-  const identifier = role === 'ops_manager' ? username : phone
-  if (!identifier || String(identifier).trim() === '') {
-    return new Response(JSON.stringify({ error: role === 'ops_manager' ? 'Username required' : 'Phone required' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } })
-  }
-
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } })
-
-  const { data: adminRow, error: adminErr } = await admin
-    .from('admins')
-    .select('id, is_active')
-    .eq('id', adminId)
-    .maybeSingle()
-  if (adminErr || !adminRow || adminRow.is_active === false) {
-    return new Response(JSON.stringify({ error: 'Not authorized' }), { status: 403, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } })
-  }
-
-  const password = generateReadablePassword()
-  const email = deriveSyntheticEmail(role, identifier)
-  const phoneDigits = role === 'manager' ? normalizePhoneToDigits(String(phone)) : null
-
-  const { data: authUser, error: authErr } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: {
-      app_role: role,
-      first_name: firstName,
-      last_name: lastName,
-      mobile_number: phoneDigits,
-      username: role === 'ops_manager' ? String(username).trim().toLowerCase() : null,
-    },
-  })
-
-  if (authErr || !authUser?.user) {
-    return new Response(JSON.stringify({ error: authErr?.message || 'Failed to create auth user' }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } })
-  }
-
-  const managerId = authUser.user.id
-  const employeeId = `${role === 'ops_manager' ? 'OPS' : 'MGR'}_${Date.now()}`
-
-  const { error: insertErr } = await admin.from('managers').insert({
-    id: managerId,
-    first_name: firstName,
-    last_name: lastName,
-    // NULL, never '': ops managers identify by username and have no phone.
-    // The '' sentinel used to collide with the unique index on the second
-    // such account and surfaced as "Could not create manager".
-    mobile_number: phoneDigits,
-    password_hash: 'managed_by_supabase_auth',
-    employee_id: employeeId,
-    is_active: true,
-    role,
-    username: role === 'ops_manager' ? String(username).trim().toLowerCase() : null,
-  })
-
-  if (insertErr) {
-    // Roll back the auth user if the managers row failed
-    await admin.auth.admin.deleteUser(managerId)
-    return new Response(JSON.stringify({ error: insertErr.message }), { status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } })
-  }
+Deno.serve((req: Request) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS })
 
   return new Response(
-    JSON.stringify({ managerId, password, role, firstName, lastName, identifier }),
-    { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+    JSON.stringify({ error: 'This endpoint has been retired. Use admin-create-user.' }),
+    { status: 410, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
   )
 })

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Users, UserCheck, Shield } from 'lucide-react'
 import { PhoneInput } from '../components/ui/phone-input'
 import { Button } from '../components/ui/button'
@@ -12,7 +12,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 
 export default function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { signIn } = useAuth()
+  // Why they were sent here, when whoever sent them knew. RequireAuth uses it
+  // to explain a deactivated account, which otherwise looks like a login that
+  // succeeds and then silently refuses to go anywhere.
+  const notice = (location.state as { notice?: string } | null)?.notice ?? ''
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
@@ -51,8 +56,15 @@ export default function Login() {
         activeTab === 'cleaner' || activeTab === 'manager' ? mobile : username
 
       // signIn handles Supabase Auth + localStorage sync via AuthContext
-      clearClockState()
       await signIn(activeTab, identifier, password)
+
+      // Only after the sign-in has actually succeeded. Clearing first meant a
+      // mistyped password wiped the in-progress clock-in of whoever was using
+      // the phone: a rejected attempt changes nothing about who is signed in,
+      // so it must not change what they were doing. The reason for clearing at
+      // all is unchanged -- a different person is now signed in on this device
+      // and must not inherit the previous session's open shift.
+      clearClockState()
 
       // Navigate based on user type
       switch (activeTab) {
@@ -108,6 +120,14 @@ export default function Login() {
         </div>
 
         {/* Alerts */}
+        {notice && (
+          <div
+            role="status"
+            className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm font-medium text-amber-900"
+          >
+            {notice}
+          </div>
+        )}
 
         {/* Auth Card */}
         <Card className="rounded-3xl border border-white/30 bg-white/90 backdrop-blur-xl shadow-2xl shadow-blue-950/30">

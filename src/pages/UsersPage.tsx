@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
 import { Sidebar07Layout } from '@/components/layout/Sidebar07Layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/use-toast'
-import { Search, X, Plus, Copy, Check, ChevronRight } from 'lucide-react'
-import { getStoredCleanerName } from '@/lib/identity'
+import { AlertCircle, Search, X, Plus, Copy, Check, ChevronRight } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
 import { UserDetailPanel } from '@/components/admin/users/UserDetailPanel'
 import {
   ALL_ROLES,
@@ -23,8 +22,10 @@ import {
   listUserCustomerLinks,
   createUserAccount,
   describeError,
+  DuplicateIdentityError,
   type ManagedUser,
   type AppUserRole,
+  type CollidingUser,
   type CreatedUser,
   type UserCustomerLink,
 } from '@/services/customerOnboardingService'
@@ -33,10 +34,12 @@ import type { Customer } from '@/services/supabase'
 type UserRef = { role: AppUserRole; userId: string }
 
 export default function UsersPage() {
-  const navigate = useNavigate()
   const { toast } = useToast()
-  const [userType, setUserType] = useState<'admin' | null>(null)
-  const [userName, setUserName] = useState('')
+  // Identity comes from the auth context, not localStorage. RequireAuth has
+  // already established that this is a verified admin with a live session; a
+  // mount-only localStorage read could not react when that stopped being true.
+  const { appUser } = useAuth()
+  const userName = appUser?.name ?? ''
   const [users, setUsers] = useState<ManagedUser[]>([])
   const [links, setLinks] = useState<UserCustomerLink[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -55,19 +58,9 @@ export default function UsersPage() {
   const [addEmail, setAddEmail] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [created, setCreated] = useState<CreatedUser | null>(null)
+  const [collision, setCollision] = useState<CollidingUser | null>(null)
   const [copied, setCopied] = useState(false)
 
-  useEffect(() => {
-    const storedType = localStorage.getItem('userType')
-    const storedId = localStorage.getItem('userId')
-    const storedName = getStoredCleanerName()
-    if (storedType !== 'admin' || !storedId || !storedName) {
-      navigate('/login')
-      return
-    }
-    setUserType('admin')
-    setUserName(storedName)
-  }, [navigate])
 
   // Connecting two sites in quick succession fires two refreshes; without this
   // the slower one lands last and paints stale links over the newer answer.
@@ -100,8 +93,8 @@ export default function UsersPage() {
   }
 
   useEffect(() => {
-    if (userType === 'admin') refresh()
-  }, [userType])
+    refresh()
+  }, [])
 
   // Keyed by user id alone. Cleaners and managers are both keyed by their auth
   // UUID, so the id is already unique across the two tables — and listAllUsers
@@ -169,6 +162,7 @@ export default function UsersPage() {
     setAddUsername('')
     setAddEmail('')
     setCreated(null)
+    setCollision(null)
     setCopied(false)
     setIsAdding(true)
   }
@@ -191,6 +185,7 @@ export default function UsersPage() {
       return
     }
     setIsCreating(true)
+    setCollision(null)
     try {
       const result = await createUserAccount({
         role: addRole,
@@ -203,6 +198,13 @@ export default function UsersPage() {
       setCreated(result)
       await refresh()
     } catch (err) {
+      // A taken identity is not a failure the admin can retry their way out of,
+      // and the toast is gone in seconds. When the function names the holder,
+      // keep it in the dialog with a way to reach them instead.
+      if (err instanceof DuplicateIdentityError && err.existing) {
+        setCollision(err.existing)
+        return
+      }
       toast({
         title: 'Could not create user',
         description: describeError(err),
@@ -211,6 +213,18 @@ export default function UsersPage() {
     } finally {
       setIsCreating(false)
     }
+  }
+
+  // The holder is very often deactivated -- that is exactly why the admin
+  // could not find them and tried to create a second account -- so reveal the
+  // hidden rows before opening the panel, or they close it onto a list that
+  // still does not contain the person they were just shown.
+  const openCollidingUser = () => {
+    if (!collision) return
+    if (!collision.isActive) setShowInactive(true)
+    setIsAdding(false)
+    setCollision(null)
+    setDetail({ role: collision.role, userId: collision.userId })
   }
 
   const copyPassword = async () => {
@@ -224,7 +238,7 @@ export default function UsersPage() {
     }
   }
 
-  if (!userType || !userName) {
+  if (!userName) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
@@ -233,7 +247,7 @@ export default function UsersPage() {
   }
 
   return (
-    <Sidebar07Layout userType={userType} userName={userName}>
+    <Sidebar07Layout userType="admin" userName={userName}>
       <div className="mx-auto w-full max-w-5xl py-4 sm:py-8">
         <div className="mb-8 flex items-start justify-between gap-4">
           <div>
@@ -455,6 +469,28 @@ export default function UsersPage() {
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
+                    {collision && (
+                      <div className="mb-6 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-amber-900">
+                            {describeCollision(collision)}
+                          </p>
+                          <p className="mt-1 text-xs text-amber-800">
+                            {collision.isActive
+                              ? 'Open their profile instead of adding a second account.'
+                              : 'Deactivated people are hidden from this list until you switch the Show inactive filter on.'}
+                          </p>
+                          <Button
+                            variant="ghost"
+                            onClick={openCollidingUser}
+                            className="mt-2 h-8 rounded-full px-3 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                          >
+                            View profile
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     <div className="space-y-4">
                       <div className="space-y-2">
                         <Label className="text-sm font-medium text-gray-700">Role</Label>
@@ -551,6 +587,19 @@ export default function UsersPage() {
       </div>
     </Sidebar07Layout>
   )
+}
+
+/**
+ * What the admin is told when the identity they typed already belongs to
+ * someone. Names the person, because the whole failure is that they could not
+ * see them -- and says outright when the account is deactivated, which is the
+ * usual reason it looked absent.
+ */
+const describeCollision = (existing: CollidingUser): string => {
+  const who = existing.name || `Another ${ROLE_LABEL[existing.role].toLowerCase()}`
+  return existing.isActive
+    ? `${who} already has an account.`
+    : `${who} already has an account (deactivated).`
 }
 
 const SiteBadge: React.FC<{ user: ManagedUser; links: UserCustomerLink[] }> = ({ user, links }) => {

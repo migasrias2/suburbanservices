@@ -1,4 +1,5 @@
 import { supabase, type Customer } from './supabase'
+import { requireSessionUserId } from '../lib/sessionIdentity'
 import { QRService, AREA_TASKS, type AreaType, type ManualQRCodeResult } from './qrService'
 
 export function describeError(err: unknown): string {
@@ -20,6 +21,13 @@ export async function describeFunctionError(error: unknown, fallback: string): P
   const context = (error as { context?: unknown })?.context
 
   if (context instanceof Response) {
+    // 401 means the function never saw a caller: supabase-js falls back to the
+    // anon key when there is no session, so the request arrives unauthenticated.
+    // "Not authenticated" is true but tells the operator nothing they can act on.
+    if (context.status === 401) {
+      return 'Your session has expired. Please sign in again.'
+    }
+
     let raw = ''
     try {
       raw = await context.clone().text()
@@ -54,15 +62,6 @@ export type ManagerSummary = {
   username: string | null
 }
 
-export type CreatedManager = {
-  managerId: string
-  password: string
-  role: ManagerRole
-  firstName: string
-  lastName: string
-  identifier: string
-}
-
 export type AreaInput = {
   name: string
   type: AreaType
@@ -79,14 +78,26 @@ export type QrPackItem = {
   result: ManualQRCodeResult
 }
 
-function getAdminId(): string {
-  const id = localStorage.getItem('userId')
-  if (!id) throw new Error('Missing admin session')
-  return id
+/**
+ * The calling admin's id, from the LIVE session rather than localStorage.
+ *
+ * This value is passed as p_admin_id to every admin_* RPC. localStorage.userId
+ * has no expiry, so reading it there meant a browser whose session had ended
+ * kept addressing those RPCs by the previous admin's id. This removes that
+ * staleness and nothing else.
+ *
+ * It is NOT what makes those RPCs safe. p_admin_id is an argument the server
+ * takes on trust: none of the admin_* SECURITY DEFINER functions compares it
+ * to auth.uid(), and they are executable by `authenticated`. Anyone who can
+ * sign in at all can call them with any id. Do not treat a call site that
+ * sources p_admin_id from the session as an authorised one.
+ */
+async function getAdminId(): Promise<string> {
+  return requireSessionUserId()
 }
 
 export async function customerExists(customerId: string): Promise<boolean> {
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const { data, error } = await supabase.rpc('admin_list_customers', { p_admin_id: adminId })
   if (error) throw error
   const rows = (data ?? []) as Array<{ id: string }>
@@ -100,7 +111,7 @@ export async function createCustomerBasics(input: {
   contactEmail?: string
   contactPhone?: string
 }): Promise<Customer> {
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const trimmedName = input.name.trim()
   if (!trimmedName) throw new Error('Customer name is required')
 
@@ -132,14 +143,14 @@ export async function createCustomerBasics(input: {
 }
 
 export async function listManagers(): Promise<ManagerSummary[]> {
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const { data, error } = await supabase.rpc('admin_list_managers', { p_admin_id: adminId })
   if (error) throw error
   return (data ?? []) as ManagerSummary[]
 }
 
 export async function listAssignedManagers(customerId: string): Promise<ManagerSummary[]> {
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const { data, error } = await supabase.rpc('admin_list_customer_managers', {
     p_admin_id: adminId,
     p_customer_id: customerId,
@@ -155,34 +166,8 @@ export async function listAssignedManagers(customerId: string): Promise<ManagerS
   }))
 }
 
-export async function createManagerAccount(input: {
-  firstName: string
-  lastName: string
-  phone?: string
-  username?: string
-  role: ManagerRole
-}): Promise<CreatedManager> {
-  const adminId = getAdminId()
-  const payload = {
-    adminId,
-    firstName: input.firstName.trim(),
-    lastName: input.lastName.trim(),
-    phone: input.phone?.trim() || undefined,
-    username: input.username?.trim() || undefined,
-    role: input.role,
-  }
-  const { data, error } = await supabase.functions.invoke('admin-create-manager', { body: payload })
-  if (error) {
-    throw new Error(await describeFunctionError(error, 'Failed to create manager'))
-  }
-  if (!data?.managerId || !data?.password) {
-    throw new Error('Manager created but no credentials returned')
-  }
-  return data as CreatedManager
-}
-
 export async function assignManagerToCustomer(managerId: string, customerId: string): Promise<void> {
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const { error } = await supabase.rpc('admin_assign_manager_to_customer', {
     p_admin_id: adminId,
     p_manager_id: managerId,
@@ -192,7 +177,7 @@ export async function assignManagerToCustomer(managerId: string, customerId: str
 }
 
 export async function unassignManagerFromCustomer(managerId: string, customerId: string): Promise<void> {
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const { error } = await supabase.rpc('admin_unassign_manager_from_customer', {
     p_admin_id: adminId,
     p_manager_id: managerId,
@@ -206,7 +191,7 @@ export async function createAreaForCustomer(input: {
   customerName: string
   area: AreaInput
 }): Promise<void> {
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const { error } = await supabase.rpc('admin_create_area', {
     p_admin_id: adminId,
     p_customer_id: input.customerId,
@@ -244,7 +229,7 @@ export type AreaPreset = {
 }
 
 export async function listPresets(): Promise<AreaPreset[]> {
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const { data, error } = await supabase.rpc('admin_list_presets', { p_admin_id: adminId })
   if (error) throw error
   return ((data ?? []) as any[]).map((row) => ({
@@ -257,7 +242,7 @@ export async function listPresets(): Promise<AreaPreset[]> {
 }
 
 export async function createPreset(name: string, items: AreaInput[]): Promise<AreaPreset> {
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const { data, error } = await supabase.rpc('admin_create_preset', {
     p_admin_id: adminId,
     p_name: name,
@@ -268,7 +253,7 @@ export async function createPreset(name: string, items: AreaInput[]): Promise<Ar
 }
 
 export async function updatePreset(id: string, name: string, items: AreaInput[]): Promise<AreaPreset> {
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const { data, error } = await supabase.rpc('admin_update_preset', {
     p_admin_id: adminId,
     p_preset_id: id,
@@ -280,7 +265,7 @@ export async function updatePreset(id: string, name: string, items: AreaInput[])
 }
 
 export async function deletePreset(id: string): Promise<void> {
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const { error } = await supabase.rpc('admin_delete_preset', {
     p_admin_id: adminId,
     p_preset_id: id,
@@ -302,14 +287,14 @@ export type ManagedUser = {
 }
 
 export async function listAllUsers(): Promise<ManagedUser[]> {
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const { data, error } = await supabase.rpc('admin_list_all_users', { p_admin_id: adminId })
   if (error) throw error
   return (data ?? []) as ManagedUser[]
 }
 
 export async function renameUser(role: AppUserRole, userId: string, firstName: string, lastName: string): Promise<void> {
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const { error } = await supabase.rpc('admin_rename_user', {
     p_admin_id: adminId,
     p_role: role,
@@ -335,6 +320,66 @@ export type CreatedUser = {
   recorded: boolean
 }
 
+const APP_USER_ROLES: readonly AppUserRole[] = ['cleaner', 'manager', 'ops_manager', 'admin']
+
+function isAppUserRole(value: unknown): value is AppUserRole {
+  return typeof value === 'string' && (APP_USER_ROLES as readonly string[]).includes(value)
+}
+
+/** The account a refused creation collided with. Nothing beyond these four fields. */
+export type CollidingUser = {
+  userId: string
+  name: string
+  role: AppUserRole
+  isActive: boolean
+}
+
+/**
+ * A creation refused because the identity is already taken (HTTP 409).
+ *
+ * Carries the holder when admin-create-user could name one. "That number
+ * already has an account." is a dead end by itself: the users list hides
+ * deactivated people behind a filter, so the admin cannot find the holder and
+ * concludes the account does not exist.
+ */
+export class DuplicateIdentityError extends Error {
+  readonly existing: CollidingUser | null
+
+  constructor(message: string, existing: CollidingUser | null) {
+    super(message)
+    this.name = 'DuplicateIdentityError'
+    this.existing = existing
+  }
+}
+
+/**
+ * The colliding account named in a 409 body, or null.
+ *
+ * Null is a normal answer, not a failure: the function omits these fields when
+ * the identity is held by an auth user with no role row, or when its lookup
+ * came back empty. The caller falls back to the plain message.
+ */
+async function readCollidingUser(error: unknown): Promise<CollidingUser | null> {
+  const context = (error as { context?: unknown })?.context
+  if (!(context instanceof Response) || context.status !== 409) return null
+
+  try {
+    const body = JSON.parse(await context.clone().text()) as Record<string, unknown>
+    const userId = body.existingUserId
+    if (typeof userId !== 'string' || !userId) return null
+    if (!isAppUserRole(body.existingRole)) return null
+
+    return {
+      userId,
+      name: typeof body.existingName === 'string' ? body.existingName.trim() : '',
+      role: body.existingRole,
+      isActive: body.existingIsActive !== false,
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function createUserAccount(input: {
   role: AppUserRole
   firstName: string
@@ -343,7 +388,7 @@ export async function createUserAccount(input: {
   username?: string
   email?: string
 }): Promise<CreatedUser> {
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const payload = {
     adminId,
     role: input.role,
@@ -355,7 +400,12 @@ export async function createUserAccount(input: {
   }
   const { data, error } = await supabase.functions.invoke('admin-create-user', { body: payload })
   if (error) {
-    throw new Error(await describeFunctionError(error, 'Failed to create user'))
+    const message = await describeFunctionError(error, 'Failed to create user')
+    const context = (error as { context?: unknown })?.context
+    if (context instanceof Response && context.status === 409) {
+      throw new DuplicateIdentityError(message, await readCollidingUser(error))
+    }
+    throw new Error(message)
   }
   if (!data?.userId || !data?.password) {
     throw new Error('User created but no credentials returned')
@@ -364,7 +414,7 @@ export async function createUserAccount(input: {
 }
 
 export async function deactivateUser(role: AppUserRole, userId: string): Promise<void> {
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const { error } = await supabase.rpc('admin_deactivate_user', {
     p_admin_id: adminId,
     p_role: role,
@@ -392,7 +442,7 @@ export async function listUserCustomerLinks(): Promise<UserCustomerLink[]> {
     customer_id: string
     customer_label: string | null
   }
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const { data, error } = await supabase.rpc('admin_list_user_customer_links', { p_admin_id: adminId })
   if (error) throw error
   return ((data ?? []) as LinkRow[]).map((row) => ({
@@ -404,7 +454,7 @@ export async function listUserCustomerLinks(): Promise<UserCustomerLink[]> {
 }
 
 export async function assignCleanerToCustomer(cleanerId: string, customerId: string): Promise<void> {
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const { error } = await supabase.rpc('admin_assign_cleaner_to_customer', {
     p_admin_id: adminId,
     p_cleaner_id: cleanerId,
@@ -414,7 +464,7 @@ export async function assignCleanerToCustomer(cleanerId: string, customerId: str
 }
 
 export async function unassignCleanerFromCustomer(cleanerId: string, customerId: string): Promise<void> {
-  const adminId = getAdminId()
+  const adminId = await getAdminId()
   const { error } = await supabase.rpc('admin_unassign_cleaner_from_customer', {
     p_admin_id: adminId,
     p_cleaner_id: cleanerId,

@@ -64,12 +64,23 @@ export default function ClockInPage() {
           .order('id', { ascending: false })
           .limit(5)
 
+        // A failed query is not an answer. PostgREST RESOLVES with
+        // { data: null, error } rather than throwing, so the catch below never
+        // saw this: an offline or refused read used to read as "no open
+        // clock-in" and delete the draft, and the cleaner re-scanned into a
+        // second open attendance row. Wrong timesheet, wrong pay. Keep whatever
+        // local state we have and try again on the next focus.
+        if (error) {
+          console.warn('Clock state reconciliation query failed:', error)
+          return
+        }
+
         const openRecords = (data ?? []).filter((row) => {
           if (row.clock_out === null || row.clock_out === undefined) return true
           if (typeof row.clock_out === 'string' && row.clock_out.trim() === '') return true
           return false
         })
-        const hasOpenClockIn = !error && openRecords.length > 0
+        const hasOpenClockIn = openRecords.length > 0
 
         // The summary is shown precisely when there is no longer an open
         // clock-in, so reconciliation must not tear it down underneath the

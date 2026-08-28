@@ -1,7 +1,8 @@
 import { supabase, type Customer } from "./supabase";
+import { getSessionUserId, requireSessionUserId } from "../lib/sessionIdentity";
 
 export async function fetchCustomers(): Promise<Customer[]> {
-  const adminId = localStorage.getItem('userId');
+  const adminId = await getSessionUserId();
   const query = supabase
     .from('uk_customers')
     .select('*')
@@ -33,10 +34,7 @@ export async function createCustomer(name: string): Promise<Customer> {
     throw new Error("Customer name is required");
   }
 
-  const adminId = localStorage.getItem('userId');
-  if (!adminId) {
-    throw new Error('Missing admin session');
-  }
+  const adminId = await requireSessionUserId();
 
   const { data, error } = await supabase.rpc('admin_create_customer', {
     p_admin_id: adminId,
@@ -52,8 +50,7 @@ export async function createCustomer(name: string): Promise<Customer> {
 }
 
 export async function softDeleteCustomer(customerId: string): Promise<Customer> {
-  const adminId = localStorage.getItem('userId');
-  if (!adminId) throw new Error('Missing admin session');
+  const adminId = await requireSessionUserId();
   const { data, error } = await supabase.rpc('admin_soft_delete_customer', {
     p_admin_id: adminId,
     p_customer_id: customerId,

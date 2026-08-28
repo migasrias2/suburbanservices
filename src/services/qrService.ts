@@ -309,6 +309,14 @@ export class QRService {
       const storedDataRaw = localStorage.getItem('currentClockInData')
       if (!storedDataRaw) return false
 
+      // Deliberately localStorage, not the session. This is not a privileged
+      // call -- it asks "does this persisted clock-in draft belong to whoever
+      // is here now", and the draft it is compared against
+      // (currentClockInData, read three lines up) is itself localStorage work
+      // state that outlives a session on purpose. Reading the session here
+      // would make a sync ownership check async and could orphan a cleaner's
+      // in-progress shift, which is the failure this codebase most wants to
+      // avoid. Privileged identity lives in lib/sessionIdentity.ts.
       const storedCleanerId = localStorage.getItem('userId')
       if (cleanerId && storedCleanerId && storedCleanerId.trim() && cleanerId.trim()) {
         if (storedCleanerId.trim().toLowerCase() !== cleanerId.trim().toLowerCase()) {

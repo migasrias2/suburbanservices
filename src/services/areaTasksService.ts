@@ -1,4 +1,5 @@
 import { supabase, type AreaTask } from './supabase'
+import { getSessionUserId } from '../lib/sessionIdentity'
 import { QRService } from './qrService'
 
 export type CreateAreaTaskInput = {
@@ -22,7 +23,7 @@ export type UpdateAreaTaskInput = {
 }
 
 export async function fetchAreaTasks(): Promise<AreaTask[]> {
-  const adminId = localStorage.getItem('userId')
+  const adminId = await getSessionUserId()
   if (adminId) {
     const { data, error } = await supabase.rpc('admin_list_area_tasks', { p_admin_id: adminId })
     if (error) {

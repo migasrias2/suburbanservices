@@ -23,10 +23,12 @@ const ROLE_TABLE: Record<Role, string> = {
 const MIN_PASSWORD_LENGTH = 8
 const MAX_PASSWORD_LENGTH = 72 // bcrypt truncates beyond 72 bytes
 
-// Duplicated from admin-create-user on purpose: each edge function deploys as
-// its own bundle, so the two cannot import a shared module without a
-// cross-function path that does not survive deployment. Keep the two lists in
-// step if either changes.
+// Duplicated from admin-create-user. The claim that once stood here -- that a
+// shared module "does not survive deployment" -- is DISPROVEN: admin-create-user
+// version 5 deploys with supabase/functions/_shared/phone.ts and the fetched
+// bundle contains both modules. A shared word list is therefore possible; it is
+// simply not worth its own module yet. Keep the two lists in step if either
+// changes, or lift them into _shared/ alongside phone.ts.
 const WORDS_A = ['swift','calm','brave','bold','quiet','sunny','bright','clear','still','quick','fresh','warm','cool','crisp','soft','sharp','glad','keen','neat','smart']
 const WORDS_B = ['otter','river','peak','cloud','willow','meadow','forest','harbor','valley','summit','breeze','lantern','copper','silver','golden','marble','ember','horizon','quartz','aspen']
 

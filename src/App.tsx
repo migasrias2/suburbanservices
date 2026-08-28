@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { RequireAuth } from "./components/auth/RequireAuth";
 import Login from "./pages/Login";
 import CleanerDashboardPage from "./pages/CleanerDashboardPage";
 import CleanerHomePage from "./pages/CleanerHomePage";
@@ -42,29 +43,39 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/cleaner-dashboard" element={<CleanerHomePage />} />
-          <Route path="/cleaner-assistance" element={<CleanerDashboardPage />} />
-          <Route path="/my-schedule" element={<CleanerSchedulePage />} />
-          <Route path="/clock-in" element={<ClockInPage />} />
-          <Route path="/chat" element={<ChatPage />} />
-          <Route path="/scanner" element={<ScannerPage />} />
-          <Route path="/history" element={<HistoryPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/qr-library" element={<QRLibraryPage />} />
-          <Route path="/qr-generator" element={<QRGeneratorPage />} />
-          <Route path="/area-tasks" element={<AreaTasksPage />} />
-          <Route path="/manager-dashboard" element={<ManagerDashboardPage />} />
-          <Route path="/ops-dashboard" element={<ManagerDashboardPage />} />
-          <Route path="/ops-calendar" element={<OpsCalendarPage />} />
-          <Route path="/manager-activity" element={<ManagerActivityPage />} />
+          <Route path="/cleaner-dashboard" element={<RequireAuth roles={["cleaner"]}><CleanerHomePage /></RequireAuth>} />
+          <Route path="/cleaner-assistance" element={<RequireAuth roles={["cleaner"]}><CleanerDashboardPage /></RequireAuth>} />
+          <Route path="/my-schedule" element={<RequireAuth roles={["cleaner"]}><CleanerSchedulePage /></RequireAuth>} />
+          <Route path="/clock-in" element={<RequireAuth roles={["cleaner"]}><ClockInPage /></RequireAuth>} />
+          <Route path="/chat" element={<RequireAuth><ChatPage /></RequireAuth>} />
+          <Route path="/scanner" element={<RequireAuth roles={["cleaner"]}><ScannerPage /></RequireAuth>} />
+          <Route path="/history" element={<RequireAuth><HistoryPage /></RequireAuth>} />
+          <Route path="/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
+          <Route path="/qr-library" element={<RequireAuth roles={["manager", "ops_manager", "admin"]}><QRLibraryPage /></RequireAuth>} />
+          <Route path="/qr-generator" element={<RequireAuth roles={["manager", "ops_manager", "admin"]}><QRGeneratorPage /></RequireAuth>} />
+          <Route path="/area-tasks" element={<RequireAuth roles={["manager", "ops_manager", "admin"]}><AreaTasksPage /></RequireAuth>} />
+          <Route path="/manager-dashboard" element={<RequireAuth roles={["manager", "ops_manager", "admin"]}><ManagerDashboardPage /></RequireAuth>} />
+          <Route path="/ops-dashboard" element={<RequireAuth roles={["ops_manager", "admin"]}><ManagerDashboardPage /></RequireAuth>} />
+          <Route path="/ops-calendar" element={<RequireAuth roles={["ops_manager", "admin"]}><OpsCalendarPage /></RequireAuth>} />
+          <Route path="/manager-activity" element={<RequireAuth roles={["manager", "ops_manager", "admin"]}><ManagerActivityPage /></RequireAuth>} />
           <Route path="/admin-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
-          <Route path="/analytics" element={<AnalyticsPage />} />
-          <Route path="/admin-weekly-schedule" element={<AdminWeeklySchedulePage />} />
-          <Route path="/admin/new-customer" element={<NewCustomerPage />} />
-          <Route path="/admin/presets" element={<PresetsPage />} />
-          <Route path="/admin/users" element={<UsersPage />} />
-          <Route path="/admin/dashboard-access" element={<DashboardAccessPage />} />
-          <Route path="/admin/dashboard" element={<AdminLiveDashboardPage />} />
+          <Route path="/analytics" element={<RequireAuth roles={["manager", "ops_manager", "admin"]}><AnalyticsPage /></RequireAuth>} />
+          <Route path="/admin-weekly-schedule" element={<RequireAuth roles={["manager", "ops_manager", "admin"]}><AdminWeeklySchedulePage /></RequireAuth>} />
+          <Route path="/admin/new-customer" element={<RequireAuth roles={["admin"]}><NewCustomerPage /></RequireAuth>} />
+          <Route path="/admin/presets" element={<RequireAuth roles={["admin"]}><PresetsPage /></RequireAuth>} />
+          <Route path="/admin/users" element={<RequireAuth roles={["admin"]}><UsersPage /></RequireAuth>} />
+          <Route path="/admin/dashboard-access" element={<RequireAuth roles={["admin"]}><DashboardAccessPage /></RequireAuth>} />
+          <Route path="/admin/dashboard" element={<RequireAuth roles={["admin"]}><AdminLiveDashboardPage /></RequireAuth>} />
+          {/* PUBLIC ON PURPOSE -- DO NOT WRAP IN RequireAuth.
+              The URL for this route is printed into the QR codes mounted on
+              client bathroom walls (QRGenerator.tsx:22-23 builds it from
+              VITE_PUBLIC_APP_URL and bakes it into payload.rawValue at :117).
+              Members of the public scan those codes to report a problem; they
+              have no account. The page takes all its context from query params,
+              its reporter name and contact fields are optional, and
+              assistRequestService submits with no auth at all. Gating it sends
+              a member of the public to a staff login screen, and the codes are
+              already physically deployed so it cannot be fixed by reprinting. */}
           <Route path="/bathroom-assist" element={<BathroomAssistReportPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

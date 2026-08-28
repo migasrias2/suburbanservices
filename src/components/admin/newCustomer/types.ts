@@ -1,5 +1,5 @@
 import type { AreaType, ManualQRCodeResult } from '@/services/qrService'
-import type { CreatedManager } from '@/services/customerOnboardingService'
+import type { CreatedUser } from '@/services/customerOnboardingService'
 
 export type WizardAreaInput = {
   name: string
@@ -24,7 +24,7 @@ export type WizardState = {
   contactEmail?: string
   contactPhone?: string
   selectedManagerIds: string[]
-  createdManagers: CreatedManager[]
+  createdManagers: CreatedUser[]
   areas: WizardAreaInput[]
   qrPack: WizardQrItem[]
 }
