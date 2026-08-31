@@ -59,6 +59,10 @@ export default function UsersPage() {
   const [isCreating, setIsCreating] = useState(false)
   const [created, setCreated] = useState<CreatedUser | null>(null)
   const [collision, setCollision] = useState<CollidingUser | null>(null)
+  // An identity held by a login with nobody behind it. Kept in the dialog rather
+  // than a toast: there is no profile to open, so this message IS the whole
+  // answer, and a message that disappears in seconds is the dead end again.
+  const [orphanNotice, setOrphanNotice] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
 
@@ -163,6 +167,7 @@ export default function UsersPage() {
     setAddEmail('')
     setCreated(null)
     setCollision(null)
+    setOrphanNotice(null)
     setCopied(false)
     setIsAdding(true)
   }
@@ -186,6 +191,7 @@ export default function UsersPage() {
     }
     setIsCreating(true)
     setCollision(null)
+    setOrphanNotice(null)
     try {
       const result = await createUserAccount({
         role: addRole,
@@ -203,6 +209,12 @@ export default function UsersPage() {
       // keep it in the dialog with a way to reach them instead.
       if (err instanceof DuplicateIdentityError && err.existing) {
         setCollision(err.existing)
+        return
+      }
+      // No holder to open, but the function established there IS one holding the
+      // identity. Keep the explanation on screen; a toast would be the dead end.
+      if (err instanceof DuplicateIdentityError && err.orphanedLogin) {
+        setOrphanNotice(err.message)
         return
       }
       toast({
@@ -469,6 +481,18 @@ export default function UsersPage() {
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
+                    {orphanNotice && (
+                      <div className="mb-6 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-amber-900">{orphanNotice}</p>
+                          <p className="mt-1 text-xs text-amber-800">
+                            There is no profile to open — the login exists without a staff record
+                            behind it, so it will not appear in this list.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     {collision && (
                       <div className="mb-6 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
                         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
@@ -481,6 +505,14 @@ export default function UsersPage() {
                               ? 'Open their profile instead of adding a second account.'
                               : 'Deactivated people are hidden from this list until you switch the Show inactive filter on.'}
                           </p>
+                          {(collision.matchCount ?? 1) > 1 && (
+                            // Saying "a record exists" when several do would send the
+                            // admin to fix one of them and hit the same refusal again.
+                            <p className="mt-1 text-xs font-medium text-amber-900">
+                              {collision.matchCount} records share this number. Opening one will not
+                              clear the conflict on its own.
+                            </p>
+                          )}
                           <Button
                             variant="ghost"
                             onClick={openCollidingUser}

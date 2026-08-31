@@ -1,5 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { authorizeAdminCaller } from '../_shared/adminGate.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -64,21 +65,12 @@ Deno.serve(async (req: Request) => {
   // Authorization comes from the caller's own JWT, never from the request
   // body. A body-supplied adminId is just a UUID the caller typed, and this
   // endpoint can rewrite any staff credential.
-  const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim()
-  if (!token) return jsonResponse({ error: 'Not authenticated' }, 401)
-
-  const { data: callerData, error: callerErr } = await admin.auth.getUser(token)
-  const callerId = callerData?.user?.id
-  if (callerErr || !callerId) return jsonResponse({ error: 'Not authenticated' }, 401)
-
-  const { data: adminRow, error: adminErr } = await admin
-    .from('admins')
-    .select('id, is_active')
-    .eq('id', callerId)
-    .maybeSingle()
-  if (adminErr || !adminRow || adminRow.is_active === false) {
-    return jsonResponse({ error: 'Not authorized' }, 403)
-  }
+  // Shared with admin-create-user via _shared/adminGate.ts so the two endpoints
+  // cannot drift on who may call them, and so a correction to one is a
+  // correction to both. Membership is unchanged.
+  const gate = await authorizeAdminCaller(admin, req)
+  if (!gate.ok) return jsonResponse({ error: gate.denial.error }, gate.denial.status)
+  const callerId = gate.callerId
 
   let payload: Record<string, unknown>
   try {
@@ -110,7 +102,18 @@ Deno.serve(async (req: Request) => {
     .select('id')
     .eq('id', userId)
     .maybeSingle()
-  if (targetErr || !targetRow) return jsonResponse({ error: 'User not found' }, 404)
+
+  // A failed read is not an absent row. Reporting one as the other sends the
+  // admin hunting for a staff member who is sitting in the list in front of
+  // them. Same separation as the admin gate above, one gate later.
+  if (targetErr) {
+    console.error(`Could not read ${ROLE_TABLE[role]} while setting a password:`, userId, targetErr)
+    return jsonResponse(
+      { error: 'Could not look up that user just now. Please try again in a moment.' },
+      503,
+    )
+  }
+  if (!targetRow) return jsonResponse({ error: 'User not found' }, 404)
 
   const { error: updateErr } = await admin.auth.admin.updateUserById(userId, { password })
   if (updateErr) return jsonResponse({ error: updateErr.message || 'Failed to set password' }, 400)

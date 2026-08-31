@@ -332,6 +332,12 @@ export type CollidingUser = {
   name: string
   role: AppUserRole
   isActive: boolean
+  /**
+   * How many staff rows hold this identity, when the function could count them.
+   * More than one means a duplicate group: sending the admin to the first record
+   * alone would leave the same refusal in place.
+   */
+  matchCount?: number
 }
 
 /**
@@ -345,10 +351,20 @@ export type CollidingUser = {
 export class DuplicateIdentityError extends Error {
   readonly existing: CollidingUser | null
 
-  constructor(message: string, existing: CollidingUser | null) {
+  /**
+   * True when the identity is held by a LOGIN with no staff record behind it.
+   *
+   * Distinct from `existing === null`, which only means the holder could not be
+   * named. Here the function positively established there is nobody to go and
+   * look at, so the dialog must say that rather than offering a record to open.
+   */
+  readonly orphanedLogin: boolean
+
+  constructor(message: string, existing: CollidingUser | null, orphanedLogin = false) {
     super(message)
     this.name = 'DuplicateIdentityError'
     this.existing = existing
+    this.orphanedLogin = orphanedLogin
   }
 }
 
@@ -359,24 +375,41 @@ export class DuplicateIdentityError extends Error {
  * the identity is held by an auth user with no role row, or when its lookup
  * came back empty. The caller falls back to the plain message.
  */
-async function readCollidingUser(error: unknown): Promise<CollidingUser | null> {
+type DuplicateDetail = {
+  existing: CollidingUser | null
+  orphanedLogin: boolean
+}
+
+async function readDuplicateDetail(error: unknown): Promise<DuplicateDetail> {
+  const none: DuplicateDetail = { existing: null, orphanedLogin: false }
   const context = (error as { context?: unknown })?.context
-  if (!(context instanceof Response) || context.status !== 409) return null
+  if (!(context instanceof Response) || context.status !== 409) return none
 
   try {
     const body = JSON.parse(await context.clone().text()) as Record<string, unknown>
+    // Read before the holder fields: an orphaned login is precisely the case
+    // where there is no holder to read, so it must not depend on finding one.
+    const orphanedLogin = body.orphanedLogin === true
+
     const userId = body.existingUserId
-    if (typeof userId !== 'string' || !userId) return null
-    if (!isAppUserRole(body.existingRole)) return null
+    if (typeof userId !== 'string' || !userId) return { existing: null, orphanedLogin }
+    if (!isAppUserRole(body.existingRole)) return { existing: null, orphanedLogin }
 
     return {
-      userId,
-      name: typeof body.existingName === 'string' ? body.existingName.trim() : '',
-      role: body.existingRole,
-      isActive: body.existingIsActive !== false,
+      existing: {
+        userId,
+        name: typeof body.existingName === 'string' ? body.existingName.trim() : '',
+        role: body.existingRole,
+        isActive: body.existingIsActive !== false,
+        matchCount:
+          typeof body.existingMatchCount === 'number' && body.existingMatchCount > 0
+            ? body.existingMatchCount
+            : undefined,
+      },
+      orphanedLogin,
     }
   } catch {
-    return null
+    return none
   }
 }
 
@@ -403,7 +436,8 @@ export async function createUserAccount(input: {
     const message = await describeFunctionError(error, 'Failed to create user')
     const context = (error as { context?: unknown })?.context
     if (context instanceof Response && context.status === 409) {
-      throw new DuplicateIdentityError(message, await readCollidingUser(error))
+      const detail = await readDuplicateDetail(error)
+      throw new DuplicateIdentityError(message, detail.existing, detail.orphanedLogin)
     }
     throw new Error(message)
   }

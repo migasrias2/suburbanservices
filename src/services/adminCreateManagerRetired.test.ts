@@ -175,19 +175,73 @@ describe('nothing in the app can reach the retired endpoint', () => {
   })
 })
 
-describe('admin-create-user is the one way an account is made', () => {
-  const createUser = () =>
-    readFileSync(path.join(ROOT, 'supabase/functions/admin-create-user/index.ts'), 'utf8')
+describe('every account-minting endpoint authenticates the CALLER, not the body', () => {
+  /**
+   * REGRESSION GUARD for the privilege-escalation hole that retired
+   * admin-create-manager: that version authorized off a UUID in the request
+   * BODY and never authenticated anyone, so the anon key -- which ships in the
+   * browser bundle -- was enough to mint an ops_manager and read back its
+   * plaintext password.
+   *
+   * RETARGETED 2026-08-31, NOT RELAXED. The check moved because the code moved:
+   * both endpoints now delegate to _shared/adminGate.ts, so a single-file
+   * assertion against admin-create-user could no longer see the guarantee. The
+   * chain is two links and BOTH must hold -- delegation without a gate, or a
+   * gate nobody delegates to, each reopens the hole.
+   *
+   * This is a STRENGTHENING, not a restore: the guard now covers
+   * admin-set-password too, which can rewrite any staff credential and
+   * previously had no guard at all.
+   *
+   * The behavioural proof of the same property -- a valid non-admin token plus a
+   * body-supplied admin id is still refused -- lives with the harnesses, in
+   * adminCreateUserCollisionLookup.test.ts and adminSetPasswordFunction.test.ts.
+   * These structural checks exist so the guarantee cannot be deleted quietly.
+   */
+  const MINTING_ENDPOINTS = [
+    'supabase/functions/admin-create-user/index.ts',
+    'supabase/functions/admin-set-password/index.ts',
+  ] as const
 
-  it('still exists', () => {
-    expect(existsSync(path.join(ROOT, 'supabase/functions/admin-create-user/index.ts'))).toBe(true)
+  const GATE = 'supabase/functions/_shared/adminGate.ts'
+
+  const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
+
+  it.each(MINTING_ENDPOINTS)('%s still exists', (rel) => {
+    expect(existsSync(path.join(ROOT, rel))).toBe(true)
   })
 
-  it('identifies the caller from their token', () => {
-    expect(createUser()).toContain('auth.getUser(token)')
+  it('the shared gate still exists', () => {
+    expect(existsSync(path.join(ROOT, GATE))).toBe(true)
   })
 
-  it('never authorises off a body-supplied id', () => {
-    expect(createUser()).not.toMatch(/\.eq\(\s*'id'\s*,\s*adminId\s*\)/)
+  it.each(MINTING_ENDPOINTS)('%s delegates authorization to the shared gate', (rel) => {
+    expect(read(rel)).toContain('authorizeAdminCaller')
+  })
+
+  it('the shared gate identifies the caller from their own token', () => {
+    expect(read(GATE)).toContain('auth.getUser(token)')
+  })
+
+  it('the shared gate resolves the admin row from the token-derived id', () => {
+    // .eq('id', callerId) -- never an id taken from the request body.
+    expect(read(GATE)).toMatch(/\.eq\(\s*'id'\s*,\s*callerId\s*\)/)
+  })
+
+  it.each(MINTING_ENDPOINTS)('%s never authorises off a body-supplied id', (rel) => {
+    expect(read(rel)).not.toMatch(/\.eq\(\s*'id'\s*,\s*adminId\s*\)/)
+  })
+
+  it('the shared gate never authorises off a body-supplied id', () => {
+    expect(read(GATE)).not.toMatch(/\.eq\(\s*'id'\s*,\s*adminId\s*\)/)
+  })
+
+  it('no minting endpoint reads adminId out of the request body for authorization', () => {
+    // The retired endpoint's actual shape was `const { adminId } = await req.json()`
+    // followed by an admins lookup on it. adminId may still be ACCEPTED in the
+    // payload (it is logged and ignored); it must never reach the gate.
+    for (const rel of MINTING_ENDPOINTS) {
+      expect(read(rel)).not.toMatch(/authorizeAdminCaller\([^)]*adminId/)
+    }
   })
 })
