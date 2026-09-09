@@ -153,7 +153,10 @@ export const ShiftDialog: React.FC<ShiftDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[440px] rounded-3xl border-0 bg-white p-7 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.25)]">
+      {/* max-h + scroll: DialogContent is centred with no height cap of its own,
+          so on a phone with the keyboard up this form is clipped at both ends
+          and the Save button becomes unreachable. */}
+      <DialogContent className="max-h-[90dvh] max-w-[440px] overflow-y-auto rounded-3xl border-0 bg-white p-5 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.25)] sm:p-7">
         <DialogHeader className="space-y-1.5">
           <DialogTitle className="text-[22px] font-semibold tracking-tight text-gray-900">
             {mode === 'edit' ? 'Edit shift' : 'New shift'}

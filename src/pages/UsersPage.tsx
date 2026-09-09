@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Sidebar07Layout } from '@/components/layout/Sidebar07Layout'
+import { PageHeader, FilterStrip } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -260,81 +261,51 @@ export default function UsersPage() {
 
   return (
     <Sidebar07Layout userType="admin" userName={userName}>
-      <div className="mx-auto w-full max-w-5xl py-4 sm:py-8">
-        <div className="mb-8 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl">
-              Users
-            </h1>
-            <p className="mt-2 text-gray-500">
-              Manage cleaners, managers, and admins — and the sites they're linked to.
-            </p>
-          </div>
-          <Button
-            onClick={openAdd}
-            className="rounded-full bg-[#00339B] px-5 text-white hover:bg-[#002d7a]"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add user
-          </Button>
+      <div className="mx-auto w-full max-w-5xl py-1 sm:py-8">
+        <PageHeader
+          title="Users"
+          description="Manage cleaners, managers, and admins — and the sites they're linked to."
+          actions={
+            <Button
+              onClick={openAdd}
+              className="h-11 rounded-full bg-[#00339B] px-5 text-white hover:bg-[#002d7a]"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add user
+            </Button>
+          }
+        />
+
+        <div className="relative mb-3">
+          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or identifier"
+            className="h-12 rounded-2xl border-gray-200 bg-white pl-11"
+          />
         </div>
 
-        <div className="mb-6 flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[240px]">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name or identifier"
-              className="h-12 rounded-2xl border-gray-200 bg-white pl-11"
-            />
-          </div>
-          <div className="flex gap-1.5">
-            <button
-              type="button"
-              onClick={() => setRoleFilter('all')}
-              className={`rounded-full px-4 py-2 text-xs font-medium transition ${
-                roleFilter === 'all'
-                  ? 'bg-[#00339B] text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              All
-            </button>
-            {ALL_ROLES.map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRoleFilter(r)}
-                className={`rounded-full px-4 py-2 text-xs font-medium transition ${
-                  roleFilter === r
-                    ? 'bg-[#00339B] text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                {ROLE_LABEL[r]}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
+        <FilterStrip>
+          <FilterPill active={roleFilter === 'all'} onClick={() => setRoleFilter('all')}>
+            All
+          </FilterPill>
+          {ALL_ROLES.map((r) => (
+            <FilterPill key={r} active={roleFilter === r} onClick={() => setRoleFilter(r)}>
+              {ROLE_LABEL[r]}
+            </FilterPill>
+          ))}
+          <FilterPill
+            active={unlinkedOnly}
+            activeClass="bg-amber-600 text-white"
             onClick={() => setUnlinkedOnly((v) => !v)}
-            className={`rounded-full px-4 py-2 text-xs font-medium transition ${
-              unlinkedOnly ? 'bg-amber-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'
-            }`}
           >
             No site
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowInactive((v) => !v)}
-            className={`rounded-full px-4 py-2 text-xs font-medium transition ${
-              showInactive ? 'bg-[#00339B] text-white' : 'bg-white text-gray-600 hover:bg-gray-100'
-            }`}
-          >
+          </FilterPill>
+          <FilterPill active={showInactive} onClick={() => setShowInactive((v) => !v)}>
             {showInactive ? 'Hide inactive' : 'Show inactive'}
-          </button>
-        </div>
+          </FilterPill>
+        </FilterStrip>
 
         {isLoading ? (
           <div className="py-16 text-center text-sm text-gray-400">Loading…</div>
@@ -404,8 +375,11 @@ export default function UsersPage() {
 
         {isAdding &&
           createPortal(
-            <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-white/30 p-4 backdrop-blur-sm">
-              <div className="pointer-events-auto w-full max-w-md rounded-3xl border border-gray-200 bg-white p-8 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-black/5">
+            // Bottom sheet on phones, centred card from sm up. max-h + scroll
+            // matters most with the keyboard open, where the admin/email variant
+            // of this form is taller than the visible viewport.
+            <div className="pointer-events-none fixed inset-0 z-[100] flex items-end justify-center bg-white/30 backdrop-blur-sm sm:items-center sm:p-4">
+              <div className="pointer-events-auto max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-gray-200 bg-white p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-black/5 sm:rounded-3xl sm:p-8 sm:pb-8">
                 {created ? (
                   <>
                     <div className="mb-6 flex items-center justify-between">
@@ -633,6 +607,23 @@ const describeCollision = (existing: CollidingUser): string => {
     ? `${who} already has an account.`
     : `${who} already has an account (deactivated).`
 }
+
+const FilterPill: React.FC<{
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+  activeClass?: string
+}> = ({ active, onClick, children, activeClass = 'bg-[#00339B] text-white' }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2.5 text-xs font-medium transition ${
+      active ? activeClass : 'bg-white text-gray-600 hover:bg-gray-100'
+    }`}
+  >
+    {children}
+  </button>
+)
 
 const SiteBadge: React.FC<{ user: ManagedUser; links: UserCustomerLink[] }> = ({ user, links }) => {
   if (!isSiteScopedRole(user.role)) return null

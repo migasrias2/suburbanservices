@@ -392,7 +392,7 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
       </Card>
 
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-2xl rounded-3xl border-0 shadow-2xl">
+        <DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto rounded-3xl border-0 shadow-2xl">
           {selectedRequest ? (
             <div className="space-y-5">
               <DialogHeader className="space-y-2">

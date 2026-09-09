@@ -581,7 +581,7 @@ export const AreaTasksPage = () => {
       )}
 
       <Dialog open={addCustomerOpen} onOpenChange={handleCustomerDialogChange}>
-        <DialogContent className="rounded-[28px] sm:rounded-[32px] border-0 bg-white/95 p-8 shadow-[0_24px_60px_rgba(0,23,71,0.12)] backdrop-blur">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-[28px] border-0 bg-white/95 p-6 shadow-[0_24px_60px_rgba(0,23,71,0.12)] backdrop-blur sm:rounded-[32px] sm:p-8">
           <DialogHeader className="space-y-4">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#00339B]/10">
@@ -650,7 +650,7 @@ export const AreaTasksPage = () => {
       </Dialog>
 
       <Dialog open={!!addAreaOpen} onOpenChange={(open) => { if (!open) { setAddAreaOpen(null); setNewAreaName('') }}}>
-        <DialogContent className="rounded-[28px] sm:rounded-[32px] border-0 bg-white/95 p-8 shadow-[0_24px_60px_rgba(0,23,71,0.12)] backdrop-blur">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-[28px] border-0 bg-white/95 p-6 shadow-[0_24px_60px_rgba(0,23,71,0.12)] backdrop-blur sm:rounded-[32px] sm:p-8">
           <DialogHeader className="space-y-4">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#00339B]/10">
@@ -685,7 +685,7 @@ export const AreaTasksPage = () => {
 
       {/* Add Task Dialog - minimal, rounded, same style as Add Area */}
       <Dialog open={!!addTaskOpen} onOpenChange={(open) => { if (!open) { setAddTaskOpen(null); setNewTaskDescription('') }}}>
-        <DialogContent className="rounded-[28px] sm:rounded-[32px] border-0 bg-white/95 p-8 shadow-[0_24px_60px_rgba(0,23,71,0.12)] backdrop-blur">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-[28px] border-0 bg-white/95 p-6 shadow-[0_24px_60px_rgba(0,23,71,0.12)] backdrop-blur sm:rounded-[32px] sm:p-8">
           <DialogHeader className="space-y-4">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#00339B]/10">

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
 import { addDays, format, isSameDay, startOfWeek } from 'date-fns'
 import { cn } from '@/lib/utils'
+import { MobileDaySchedule } from './MobileDaySchedule'
 
 export interface WeeklyScheduleBlock {
   id: string
@@ -78,7 +79,17 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
   }
 
   return (
-    <div className="overflow-x-auto rounded-3xl bg-white ring-1 ring-black/[0.04] shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.08)]">
+    <>
+      <MobileDaySchedule
+        weekStart={weekStart}
+        blocks={blocks}
+        onCreate={onCreate}
+        onSelect={onSelect}
+        isLoading={isLoading}
+      />
+
+      {/* The seven-column time grid needs 860px to be legible, so it starts at md. */}
+      <div className="hidden overflow-x-auto rounded-3xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.08)] ring-1 ring-black/[0.04] md:block">
       <div className="grid min-w-[860px] grid-cols-[64px_repeat(7,minmax(140px,1fr))]">
         <div className="px-3 py-4 text-[10px] font-medium uppercase tracking-[0.08em] text-gray-400">
           Time
@@ -177,6 +188,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
           Loading…
         </div>
       ) : null}
-    </div>
+      </div>
+    </>
   )
 }

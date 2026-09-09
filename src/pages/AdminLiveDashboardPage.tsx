@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Sidebar07Layout } from '@/components/layout/Sidebar07Layout'
+import { PageHeader, FilterStrip } from '@/components/layout/PageHeader'
 import { useToast } from '@/components/ui/use-toast'
 import { Activity, Clock, Camera, LogIn, LogOut, X, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -233,13 +234,13 @@ export default function AdminLiveDashboardPage() {
 
   return (
     <Sidebar07Layout userType={userType} userName={userName}>
-      <div className="mx-auto w-full max-w-6xl py-4 sm:py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl">Live Dashboard</h1>
-          <p className="mt-2 text-gray-500">Who's on site right now, today's clock events, and the latest task photos.</p>
-        </div>
+      <div className="mx-auto w-full max-w-6xl py-1 sm:py-8">
+        <PageHeader
+          title="Live Dashboard"
+          description="Who's on site right now, today's clock events, and the latest task photos."
+        />
 
-        <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="mb-6 grid grid-cols-2 gap-2.5 sm:mb-8 sm:gap-4 lg:grid-cols-4">
           <StatCard icon={<Activity className="h-5 w-5" />} label="Active now" value={stats.active} accent="bg-[#00339B]/10 text-[#00339B]" />
           <StatCard icon={<LogIn className="h-5 w-5" />} label="Clock-ins today" value={stats.clockIns} accent="bg-[#00339B]/10 text-[#00339B]" />
           <StatCard icon={<LogOut className="h-5 w-5" />} label="Clock-outs today" value={stats.clockOuts} accent="bg-red-100 text-red-600" />
@@ -262,7 +263,7 @@ export default function AdminLiveDashboardPage() {
                   {data.reviewQueue.slice(0, 8).map((s, idx) => (
                     <div
                       key={s.id}
-                      className={`flex items-start justify-between gap-4 px-5 py-4 ${idx > 0 ? 'border-t border-amber-100' : ''}`}
+                      className={`flex items-start justify-between gap-3 px-4 py-4 sm:gap-4 sm:px-5 ${idx > 0 ? 'border-t border-amber-100' : ''}`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
@@ -311,8 +312,8 @@ export default function AdminLiveDashboardPage() {
               ) : (
                 <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white">
                   {data.active.map((c, idx) => (
-                    <div key={`${c.cleanerId}-${idx}`} className={`flex items-center justify-between gap-4 px-5 py-4 ${idx > 0 ? 'border-t border-gray-50' : ''}`}>
-                      <div className="flex items-center gap-4 min-w-0 flex-1">
+                    <div key={`${c.cleanerId}-${idx}`} className={`flex items-center justify-between gap-3 px-4 py-4 sm:gap-4 sm:px-5 ${idx > 0 ? 'border-t border-gray-50' : ''}`}>
+                      <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#00339B]/10 text-sm font-semibold text-[#00339B]">
                           {initials(c.cleanerName)}
                         </div>
@@ -351,8 +352,10 @@ export default function AdminLiveDashboardPage() {
               ) : (
                 <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white">
                   {data.recent.map((s, idx) => (
-                    <div key={s.id} className={`flex items-center justify-between gap-4 px-5 py-4 ${idx > 0 ? 'border-t border-gray-50' : ''}`}>
-                      <div className="flex items-center gap-4 min-w-0 flex-1">
+                    // Stacked on phones: the name and the two time pills cannot
+                    // share 360px without the site line collapsing to an ellipsis.
+                    <div key={s.id} className={`flex flex-col gap-2.5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5 ${idx > 0 ? 'border-t border-gray-50' : ''}`}>
+                      <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#00339B]/10 text-sm font-semibold text-[#00339B]">
                           {initials(s.cleanerName)}
                         </div>
@@ -363,7 +366,7 @@ export default function AdminLiveDashboardPage() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 text-sm">
+                      <div className="flex shrink-0 items-center gap-2 pl-[3.25rem] text-sm sm:gap-3 sm:pl-0">
                         <span className="inline-flex items-center gap-1 rounded-full bg-[#00339B]/10 px-3 py-1 text-[#00339B]">
                           <LogIn className="h-3 w-3" />
                           {formatTime(s.clockIn)}
@@ -542,11 +545,11 @@ export default function AdminLiveDashboardPage() {
                 <span className="text-xs font-medium text-gray-400">{visiblePhotos.length} of {data?.photos.length ?? 0}</span>
               </div>
 
-              <div className="mb-4 flex flex-wrap gap-2">
+              <FilterStrip>
                 <button
                   type="button"
                   onClick={() => setPhotoDayFilter('all')}
-                  className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                  className={`shrink-0 whitespace-nowrap rounded-full border px-3.5 py-2 text-xs font-medium transition ${
                     photoDayFilter === 'all'
                       ? 'border-[#00339B] bg-[#00339B] text-white'
                       : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
@@ -564,7 +567,7 @@ export default function AdminLiveDashboardPage() {
                       type="button"
                       onClick={() => handleDayFilter(d.key)}
                       disabled={count === 0 || isLoading}
-                      className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                      className={`shrink-0 whitespace-nowrap rounded-full border px-3.5 py-2 text-xs font-medium transition ${
                         active
                           ? 'border-[#00339B] bg-[#00339B] text-white'
                           : count === 0
@@ -576,7 +579,7 @@ export default function AdminLiveDashboardPage() {
                     </button>
                   )
                 })}
-              </div>
+              </FilterStrip>
 
               {!fixtureGroups.length ? (
                 <div className="rounded-3xl border border-dashed border-gray-200 bg-white/60 py-12 text-center text-sm text-gray-400">
@@ -661,7 +664,7 @@ export default function AdminLiveDashboardPage() {
             onClick={() => setOpenPhoto(null)}
           >
             <div
-              className="w-full max-w-lg overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-black/5"
+              className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-3xl border border-gray-200 bg-white shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-black/5"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="relative">
@@ -675,7 +678,7 @@ export default function AdminLiveDashboardPage() {
                 <img
                   src={openPhoto.photoData ?? ''}
                   alt={openPhoto.photoDescription ?? 'Task photo'}
-                  className="block w-full max-h-[60vh] object-cover"
+                  className="block max-h-[55dvh] w-full object-cover"
                 />
               </div>
               <div className="space-y-1 px-6 py-4">
@@ -706,12 +709,12 @@ interface StatCardProps {
 
 function StatCard({ icon, label, value, accent }: StatCardProps) {
   return (
-    <div className="rounded-3xl border border-gray-100 bg-white p-5">
-      <div className={`mb-3 inline-flex h-9 w-9 items-center justify-center rounded-full ${accent}`}>
+    <div className="rounded-2xl border border-gray-100 bg-white p-4 sm:rounded-3xl sm:p-5">
+      <div className={`mb-2 inline-flex h-8 w-8 items-center justify-center rounded-full sm:mb-3 sm:h-9 sm:w-9 ${accent}`}>
         {icon}
       </div>
-      <div className="text-2xl font-semibold text-gray-900">{value}</div>
-      <div className="mt-1 text-xs uppercase tracking-wider text-gray-400">{label}</div>
+      <div className="text-[26px] font-semibold leading-none text-gray-900 sm:text-2xl">{value}</div>
+      <div className="mt-1.5 text-[10px] uppercase tracking-wider text-gray-400 sm:text-xs">{label}</div>
     </div>
   )
 }

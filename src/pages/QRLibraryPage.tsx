@@ -307,14 +307,15 @@ export default function QRLibraryPage() {
 
   return (
     <Sidebar07Layout userType={(userType || 'admin') as 'cleaner' | 'manager' | 'ops_manager' | 'admin'} userName={userName}>
-      <div className="space-y-6 max-w-5xl mx-auto">
+      <div className="mx-auto max-w-5xl space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl lg:text-4xl font-semibold text-gray-900 tracking-tight">QR Library</h1>
-            <p className="text-gray-500 mt-1">{qrCodes.length} codes across {groupedByCustomer.length} customers</p>
+            {/* Hidden on phones — the mobile top bar already names the page. */}
+            <h1 className="hidden text-3xl font-semibold tracking-tight text-gray-900 md:block lg:text-4xl">QR Library</h1>
+            <p className="text-sm text-gray-500 md:mt-1 md:text-base">{qrCodes.length} codes · {groupedByCustomer.length} customers</p>
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex items-center gap-2 [&>*]:h-11 [&>*]:flex-1 sm:[&>*]:h-10 sm:[&>*]:flex-none">
             {isSelecting && selectedIds.length > 0 && (
               <Button
                 disabled={downloadingSelected}
