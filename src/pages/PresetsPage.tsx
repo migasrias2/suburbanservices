@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sidebar07Layout } from '@/components/layout/Sidebar07Layout'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -174,19 +175,22 @@ export default function PresetsPage() {
 
   return (
     <Sidebar07Layout userType={userType} userName={userName}>
-      <div className="mx-auto w-full max-w-4xl py-4 sm:py-8">
+      <div className="mx-auto w-full max-w-4xl py-1 sm:py-8">
         {!draft ? (
           <>
-            <div className="mb-8 flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl">Area presets</h1>
-                <p className="mt-2 text-gray-500">Reusable area lists for new customer onboarding.</p>
-              </div>
-              <Button onClick={openNew} className="rounded-full bg-[#00339B] px-6 py-5 text-white hover:bg-[#002d7a]">
-                <Plus className="mr-2 h-4 w-4" />
-                New preset
-              </Button>
-            </div>
+            <PageHeader
+              title="Area presets"
+              description="Reusable area lists for new customer onboarding."
+              actions={
+                <Button
+                  onClick={openNew}
+                  className="h-11 rounded-full bg-[#00339B] px-6 text-white hover:bg-[#002d7a]"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  New preset
+                </Button>
+              }
+            />
 
             {isLoading ? (
               <div className="py-16 text-center text-sm text-gray-400">Loading…</div>

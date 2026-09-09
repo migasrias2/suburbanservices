@@ -236,18 +236,51 @@ const AdminWeeklySchedulePage: React.FC = () => {
   return (
     <Sidebar07Layout userType="admin" userName={userName}>
       <div className="min-h-screen bg-[#FAFAFA]">
-        <div className="mx-auto flex max-w-[1400px] flex-col gap-6 px-5 py-8 sm:px-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-gray-400">
-                Schedule
-              </p>
-              <h1 className="mt-1 text-[28px] font-semibold tracking-tight text-gray-900">
-                {format(weekStart, 'MMMM yyyy')}
-              </h1>
-              <p className="mt-0.5 text-[13px] text-gray-500">
-                {format(weekStart, 'MMM d')} – {format(weekEnd, 'MMM d')}
-              </p>
+        <div className="mx-auto flex max-w-[1400px] flex-col gap-4 py-1 sm:gap-6 sm:px-8 sm:py-8">
+          {/* Two rows on a phone: the month with the week stepper, then the
+              actions. As one row they add up to ~380px and overflow a 360px
+              screen, pushing "New shift" off the edge. */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+            <div className="flex items-end justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-gray-400">
+                  Schedule
+                </p>
+                <h1 className="mt-1 truncate text-[24px] font-semibold tracking-tight text-gray-900 sm:text-[28px]">
+                  {format(weekStart, 'MMMM yyyy')}
+                </h1>
+                <p className="mt-0.5 text-[13px] text-gray-500">
+                  {format(weekStart, 'MMM d')} – {format(weekEnd, 'MMM d')}
+                </p>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-1 rounded-full bg-white p-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ring-1 ring-black/[0.04] sm:hidden">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setWeekAnchor((prev) => addWeeks(prev, -1))}
+                  aria-label="Previous week"
+                  className="h-9 w-9 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setWeekAnchor(new Date())}
+                  className="h-9 rounded-full px-3 text-[12px] font-medium text-gray-700 hover:bg-gray-100"
+                >
+                  Today
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setWeekAnchor((prev) => addWeeks(prev, 1))}
+                  aria-label="Next week"
+                  className="h-9 w-9 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
@@ -255,12 +288,12 @@ const AdminWeeklySchedulePage: React.FC = () => {
                 <Button
                   onClick={handlePublishWeek}
                   disabled={isSubmitting}
-                  className="h-10 rounded-full bg-[#00339B] px-5 text-[13px] font-semibold text-white hover:bg-[#002a80]"
+                  className="h-11 flex-1 rounded-full bg-[#00339B] px-5 text-[13px] font-semibold text-white hover:bg-[#002a80] sm:h-10 sm:flex-none"
                 >
                   Publish {draftShifts.length} draft{draftShifts.length === 1 ? '' : 's'}
                 </Button>
               ) : null}
-              <div className="flex items-center gap-1 rounded-full bg-white p-1 ring-1 ring-black/[0.04] shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+              <div className="hidden items-center gap-1 rounded-full bg-white p-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ring-1 ring-black/[0.04] sm:flex">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -289,7 +322,7 @@ const AdminWeeklySchedulePage: React.FC = () => {
               </div>
               <Button
                 onClick={() => openCreate(new Date(), new Date().getHours())}
-                className="h-10 rounded-full bg-[#007AFF] px-4 text-[13px] font-semibold text-white shadow-none hover:bg-[#0064D2]"
+                className="h-11 flex-1 rounded-full bg-[#007AFF] px-4 text-[13px] font-semibold text-white shadow-none hover:bg-[#0064D2] sm:h-10 sm:flex-none"
               >
                 <Plus className="mr-1 h-4 w-4" />
                 New shift

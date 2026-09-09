@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sidebar07Layout } from '@/components/layout/Sidebar07Layout'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/use-toast'
 import { Search, Plus, X, Building2, Check } from 'lucide-react'
@@ -158,17 +159,17 @@ export default function DashboardAccessPage() {
 
   return (
     <Sidebar07Layout userType={userType} userName={userName}>
-      <div className="mx-auto w-full max-w-6xl py-4 sm:py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl">Dashboard Access</h1>
-          <p className="mt-2 text-gray-500">
-            Choose a client, then decide which accounts can see its dashboard.
-          </p>
+      <div className="mx-auto w-full max-w-6xl py-1 sm:py-8">
+        <PageHeader
+          title="Dashboard Access"
+          description="Choose a client, then decide which accounts can see its dashboard."
+        />
+        <div className="mb-6 sm:mb-8">
           {/* Scope resolution fails open: buildCustomerScopeMatcher() matches
               everything when an account has no assignments at all. Removing an
               account's last assignment therefore widens its view rather than
               narrowing it, which is the opposite of what "Remove" implies. */}
-          <p className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
             An account with no assignments at all currently sees every client. Removing
             someone&rsquo;s last assignment widens their view instead of narrowing it.
           </p>

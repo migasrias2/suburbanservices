@@ -1914,7 +1914,8 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         <section className="rounded-[36px] border border-white/60 bg-white/80 p-6 shadow-[0_34px_90px_rgba(0,51,155,0.12)] backdrop-blur-md md:p-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex w-full items-start gap-4">
-              <SidebarTrigger className="mt-1 h-10 w-10 shrink-0 rounded-2xl bg-white/80 text-gray-600 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-gray-900 sm:h-11 sm:w-11" />
+              {/* Hidden on phones: the layout's mobile top bar already carries a menu button, and two on one screen read as two different menus. */}
+              <SidebarTrigger className="mt-1 hidden h-10 w-10 shrink-0 rounded-2xl bg-white/80 text-gray-600 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-gray-900 md:flex md:h-11 md:w-11" />
               <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#8aa5ff]">Good {greetingPeriod}</p>
                 <h1 className="text-3xl font-semibold text-[#00339B] sm:text-4xl">Welcome back, {managerName}</h1>

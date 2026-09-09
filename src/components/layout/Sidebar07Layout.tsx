@@ -1,25 +1,6 @@
 import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import type { LucideIcon } from 'lucide-react'
-import {
-  Clock,
-  LogOut,
-  ChevronDown,
-  Building2,
-  User,
-  BarChart3,
-  Users,
-  QrCode,
-  Camera,
-  Library,
-  Activity,
-  CalendarDays,
-  UserPlus,
-  Layers,
-  LayoutDashboard,
-  KeyRound,
-  Home
-} from 'lucide-react'
+import { ChevronDown, LogOut, User } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   Sidebar,
@@ -36,7 +17,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarRail,
-  SidebarTrigger,
+  useSidebar,
 } from '@/components/ui/sidebar'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -46,347 +27,215 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Button } from '@/components/ui/button'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useOpenAssistCount } from '@/hooks/useOpenAssistCount'
 import { ClockOutReminderBanner } from './ClockOutReminderBanner'
-
-const ASSIST_PATH = '/cleaner-assistance'
+import { MobileTopBar } from './MobileTopBar'
+import { MobileTabBar } from './MobileTabBar'
+import { ASSIST_PATH, formatUserTypeLabel, getNavigation, type UserType } from './navigation'
+import { resolvePageTitle } from './pageTitle'
 
 interface Sidebar07LayoutProps {
   children: React.ReactNode
-  userType: 'cleaner' | 'manager' | 'ops_manager' | 'admin'
+  userType: UserType
   userName: string
 }
 
 export const Sidebar07Layout: React.FC<Sidebar07LayoutProps> = ({
   children,
   userType,
-  userName
+  userName,
 }) => {
+  const isMobile = useIsMobile()
+
+  return (
+    <SidebarProvider defaultOpen={!isMobile}>
+      <LayoutShell userType={userType} userName={userName}>
+        {children}
+      </LayoutShell>
+    </SidebarProvider>
+  )
+}
+
+/**
+ * Split from the exported component only so the mobile chrome can call
+ * useSidebar() — the hook throws outside SidebarProvider.
+ */
+const LayoutShell: React.FC<Sidebar07LayoutProps> = ({ children, userType, userName }) => {
   const navigate = useNavigate()
   const location = useLocation()
-  const isMobile = useIsMobile()
   const { signOut } = useAuth()
+  const { setOpenMobile } = useSidebar()
 
-  // Cleaners had no way of knowing a request had come in without opening the page.
-  // Resolved at render time rather than baked into the menu arrays, because
-  // getMenuSections is memoised on [userType] and would capture a stale count.
+  // Cleaners had no way of knowing a request had come in without opening the
+  // page. Resolved at render time rather than baked into the menu config,
+  // which is memoised and would capture a stale count.
   const openAssistCount = useOpenAssistCount(userType === 'cleaner')
 
   // Reads from storage rather than props: every cleaner page already routes
   // through this layout, so the banner follows them wherever they are.
   const cleanerId = typeof window !== 'undefined' ? localStorage.getItem('userId') ?? '' : ''
 
-  type MenuItem = {
-    icon: LucideIcon
-    label: string
-    path: string
-  }
+  const navigation = React.useMemo(() => getNavigation(userType, userName), [userType, userName])
+  const userTypeLabel = formatUserTypeLabel(userType)
+  const pageTitle = resolvePageTitle(location.pathname, userType)
 
-  type MenuSection = {
-    title: string
-    items: MenuItem[]
-  }
-
-  const handleLogout = async () => {
+  const handleLogout = React.useCallback(async () => {
     await signOut()
     navigate('/login')
-  }
+  }, [navigate, signOut])
 
-  const cleanerMenuItems: MenuItem[] = [
-    { icon: Home, label: 'Today', path: '/cleaner-dashboard' },
-    { icon: Clock, label: 'Clock In', path: '/clock-in' },
-    { icon: CalendarDays, label: 'My Schedule', path: '/my-schedule' },
-    { icon: Camera, label: 'Assistance', path: ASSIST_PATH },
-  ]
-
-  const managerMenuItems: MenuItem[] = [
-    { icon: BarChart3, label: 'Dashboard', path: '/manager-dashboard' },
-    { icon: Clock, label: 'Recent Activity', path: '/manager-activity' },
-    { icon: BarChart3, label: 'Analytics', path: '/analytics' },
-  ]
-
-  const opsManagerMenuItems: MenuItem[] = [
-    { icon: BarChart3, label: 'Dashboard', path: '/ops-dashboard' },
-    { icon: Clock, label: 'Clock In', path: '/clock-in' },
-    { icon: CalendarDays, label: 'Calendar', path: '/ops-calendar' },
-    { icon: BarChart3, label: 'Analytics', path: '/analytics' },
-  ]
-
-  const adminMenuItems: MenuItem[] = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard' },
-    { icon: UserPlus, label: 'New Client', path: '/admin/new-customer' },
-    { icon: Layers, label: 'Area Presets', path: '/admin/presets' },
-    { icon: Users, label: 'Users', path: '/admin/users' },
-    { icon: KeyRound, label: 'Dashboard Access', path: '/admin/dashboard-access' },
-    { icon: Library, label: 'QR Library', path: '/qr-library' },
-    { icon: QrCode, label: 'QR Generator', path: '/qr-generator' },
-    { icon: Building2, label: 'Areas & Tasks', path: '/area-tasks' },
-    { icon: CalendarDays, label: 'Calendar', path: '/admin-weekly-schedule' },
-    { icon: BarChart3, label: 'Analytics', path: '/analytics' },
-  ]
-
-  const getMenuSections = React.useCallback((): MenuSection[] => {
-    switch (userType) {
-      case 'cleaner':
-        return [
-          {
-            title: 'Daily Tools',
-            items: cleanerMenuItems,
-          },
-        ]
-      case 'manager':
-        // Filter out Analytics for James (checking both formats of name)
-        const filteredManagerItems = managerMenuItems.filter(item => {
-          if (item.label === 'Analytics' && (userName === 'James Manager' || userName === 'James' || userName === 'James Spenceley')) {
-            return false;
-          }
-          return true;
-        });
-
-        return [
-          {
-            title: 'Overview',
-            items: [filteredManagerItems[0]],
-          },
-          {
-            title: 'Performance',
-            items: filteredManagerItems.slice(1),
-          },
-        ]
-      case 'ops_manager':
-        return [
-          {
-            title: 'Overview',
-            items: [opsManagerMenuItems[0]],
-          },
-          {
-            title: 'Site Visits',
-            items: opsManagerMenuItems.slice(1, 3),
-          },
-          {
-            title: 'Insights',
-            items: opsManagerMenuItems.slice(3),
-          },
-        ]
-      case 'admin':
-        return [
-          {
-            title: 'Main',
-            items: [
-              adminMenuItems[0], // Dashboard
-              adminMenuItems[3], // Users
-              adminMenuItems[1], // New Customer
-              adminMenuItems[7], // Calendar
-              adminMenuItems[8], // Analytics
-            ],
-          },
-          {
-            title: 'Tools',
-            items: [
-              adminMenuItems[2], // Area Presets
-              adminMenuItems[6], // Areas & Tasks
-              adminMenuItems[4], // QR Library
-              adminMenuItems[5], // QR Generator
-            ],
-          },
-        ]
-      default:
-        return [
-          {
-            title: 'Daily Tools',
-            items: cleanerMenuItems,
-          },
-        ]
-    }
-  }, [userType])
-
-  const menuSections = React.useMemo(() => getMenuSections(), [getMenuSections])
+  const go = React.useCallback(
+    (path: string) => {
+      // The drawer is a Sheet, and Sheets do not close themselves when the
+      // route under them changes — without this it stays over the new page.
+      setOpenMobile(false)
+      if (location.pathname !== path) navigate(path)
+    },
+    [location.pathname, navigate, setOpenMobile],
+  )
 
   const isActive = (path: string) => location.pathname === path
 
-  const getHeaderTitle = () => {
-    if (userType === 'admin') {
-      if (location.pathname === '/qr-library') return 'QR Library'
-      if (location.pathname === '/qr-generator') return 'QR Generator'
-      if (location.pathname === '/area-tasks') return 'Areas & Tasks'
-      if (location.pathname === '/admin-weekly-schedule') return 'Weekly Calendar'
-      if (location.pathname === '/admin/new-customer') return 'New Client'
-      if (location.pathname === '/admin/presets') return 'Area Presets'
-      if (location.pathname === '/admin/users') return 'Users'
-      if (location.pathname === '/admin/dashboard-access') return 'Dashboard Access'
-      if (location.pathname === '/admin/dashboard') return 'Live Dashboard'
-      return 'Admin'
-    }
-    if (userType === 'ops_manager') {
-      if (location.pathname === '/clock-in') return 'Ops Manager Clock In'
-      if (location.pathname === '/manager-activity') return 'Site Activity'
-      if (location.pathname === '/analytics') return 'Analytics'
-      return 'Ops Manager Dashboard'
-    }
-    return userType === 'cleaner' ? 'Today' : 'Manager Dashboard'
-  }
-
-  const formatUserTypeLabel = React.useCallback(() => {
-    switch (userType) {
-      case 'ops_manager':
-        return 'Ops Manager'
-      case 'admin':
-        return 'Admin'
-      case 'manager':
-        return 'Manager'
-      case 'cleaner':
-      default:
-        return 'Cleaner'
-    }
-  }, [userType])
-
-  const userTypeLabel = formatUserTypeLabel()
-
   return (
-    <SidebarProvider defaultOpen={!isMobile}>
-      <div className="min-h-screen bg-gray-50 flex w-full">
-        <Sidebar variant="sidebar" className="bg-white border-0">
-          {/* Company Header */}
-          <SidebarHeader className="bg-white border-0 px-4 pt-4 pb-2">
-            <div className="flex flex-col items-center text-center">
-              <img
-                src="/suburban_services_logo-scaled.webp"
-                alt="Suburban Services"
-                className="h-16 w-16 object-contain sm:h-20 sm:w-20"
-              />
-            </div>
-          </SidebarHeader>
+    <div className="flex min-h-screen w-full bg-gray-50">
+      <Sidebar variant="sidebar" className="bg-white border-0">
+        <SidebarHeader className="bg-white border-0 px-4 pt-4 pb-2">
+          <div className="flex flex-col items-center text-center">
+            <img
+              src="/suburban_services_logo-scaled.webp"
+              alt="Suburban Services"
+              className="h-16 w-16 object-contain sm:h-20 sm:w-20"
+            />
+          </div>
+        </SidebarHeader>
 
-          <SidebarContent className="px-4 py-1 space-y-4">
-            {/* Navigation Menu */}
-            {menuSections.map((section) => (
-              <SidebarGroup key={section.title} className="p-0">
-                <SidebarGroupLabel className="px-3 text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-gray-400">
-                  {section.title}
-                </SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu className="mt-2 space-y-1">
-                    {section.items.map((item) => {
-                      const Icon = item.icon
-                      const active = isActive(item.path)
-                      return (
-                        <SidebarMenuItem key={item.path} className="relative">
-                          <SidebarMenuButton
-                            asChild
-                            className={`group rounded-2xl transition-all duration-200 h-10 text-sm pl-5 pr-3 ${
-                              active
-                                ? 'bg-[#00339B]/5 text-[#00339B] font-semibold shadow-sm shadow-[#00339B]/10'
-                                : 'text-gray-600 hover:bg-gray-100 hover:text-[#00339B]'
-                            }`}
+        <SidebarContent className="px-4 py-1 space-y-4">
+          {navigation.sections.map((section) => (
+            <SidebarGroup key={section.title} className="p-0">
+              <SidebarGroupLabel className="px-3 text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-gray-400">
+                {section.title}
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="mt-2 space-y-1">
+                  {section.items.map((item) => {
+                    const Icon = item.icon
+                    const active = isActive(item.path)
+                    return (
+                      <SidebarMenuItem key={item.path} className="relative">
+                        <SidebarMenuButton
+                          asChild
+                          className={`group rounded-2xl transition-all duration-200 h-11 text-sm pl-5 pr-3 ${
+                            active
+                              ? 'bg-[#00339B]/5 text-[#00339B] font-semibold shadow-sm shadow-[#00339B]/10'
+                              : 'text-gray-600 hover:bg-gray-100 hover:text-[#00339B]'
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => go(item.path)}
+                            className="flex w-full items-center gap-3 py-2"
                           >
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (location.pathname !== item.path) {
-                                  navigate(item.path)
-                                }
-                              }}
-                              className="flex items-center gap-3 w-full py-2"
-                            >
-                              <Icon
-                                className={`h-5 w-5 transition-colors duration-200 ${
-                                  active
-                                    ? 'text-[#00339B]'
-                                    : 'text-gray-400 group-hover:text-[#00339B]'
-                                }`}
-                              />
-                              <span className="font-medium tracking-tight">
-                                {item.label}
-                              </span>
-                            </button>
-                          </SidebarMenuButton>
-                          {item.path === ASSIST_PATH && openAssistCount > 0 && (
-                            <>
-                              <SidebarMenuBadge className="bg-red-500 text-white">
-                                {openAssistCount > 9 ? '9+' : openAssistCount}
-                              </SidebarMenuBadge>
-                              {/* SidebarMenuBadge hides when the rail collapses to icons */}
-                              <span className="absolute right-2 top-2 hidden h-2 w-2 rounded-full bg-red-500 group-data-[collapsible=icon]:block" />
-                            </>
-                          )}
-                        </SidebarMenuItem>
-                      )
-                    })}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            ))}
-          </SidebarContent>
+                            <Icon
+                              className={`h-5 w-5 transition-colors duration-200 ${
+                                active ? 'text-[#00339B]' : 'text-gray-400 group-hover:text-[#00339B]'
+                              }`}
+                            />
+                            <span className="font-medium tracking-tight">{item.label}</span>
+                          </button>
+                        </SidebarMenuButton>
+                        {item.path === ASSIST_PATH && openAssistCount > 0 && (
+                          <>
+                            <SidebarMenuBadge className="bg-red-500 text-white">
+                              {openAssistCount > 9 ? '9+' : openAssistCount}
+                            </SidebarMenuBadge>
+                            {/* SidebarMenuBadge hides when the rail collapses to icons */}
+                            <span className="absolute right-2 top-2 hidden h-2 w-2 rounded-full bg-red-500 group-data-[collapsible=icon]:block" />
+                          </>
+                        )}
+                      </SidebarMenuItem>
+                    )
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))}
+        </SidebarContent>
 
-          {/* User Profile Footer */}
-          <SidebarFooter className="bg-white p-2 border-0">
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <SidebarMenuButton
-                      size="lg"
-                      className="rounded-full text-gray-700 hover:bg-gray-100 data-[state=open]:bg-gray-100 h-12"
-                    >
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold">
-                          {userName.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="grid flex-1 text-left text-sm leading-tight">
-                        <span className="truncate font-semibold text-gray-900">
-                          {userName}
-                        </span>
-                        <span className="truncate text-xs text-gray-500">
-                          {userTypeLabel}
-                        </span>
-                      </div>
-                      <ChevronDown className="ml-auto h-4 w-4 text-gray-400" />
-                    </SidebarMenuButton>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-3xl border-0 shadow-xl"
-                    side="bottom"
-                    align="end"
-                    sideOffset={4}
+        <SidebarFooter className="bg-white p-2 border-0">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuButton
+                    size="lg"
+                    className="rounded-full text-gray-700 hover:bg-gray-100 data-[state=open]:bg-gray-100 h-12"
                   >
-                    <DropdownMenuItem
-                      onClick={() => navigate('/profile')}
-                      className="gap-2 cursor-pointer rounded-full mx-2 my-1"
-                    >
-                      <User className="h-4 w-4" />
-                      Profile
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator className="mx-4 my-2" />
-                    <DropdownMenuItem
-                      onClick={handleLogout}
-                      className="gap-2 cursor-pointer text-red-600 focus:text-red-600 rounded-full mx-2 my-1"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Log out
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarFooter>
-          <SidebarRail />
-        </Sidebar>
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className="bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold">
+                        {userName.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="grid flex-1 text-left text-sm leading-tight">
+                      <span className="truncate font-semibold text-gray-900">{userName}</span>
+                      <span className="truncate text-xs text-gray-500">{userTypeLabel}</span>
+                    </div>
+                    <ChevronDown className="ml-auto h-4 w-4 text-gray-400" />
+                  </SidebarMenuButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-3xl border-0 shadow-xl"
+                  side="bottom"
+                  align="end"
+                  sideOffset={4}
+                >
+                  <DropdownMenuItem
+                    onClick={() => go('/profile')}
+                    className="gap-2 cursor-pointer rounded-full mx-2 my-1"
+                  >
+                    <User className="h-4 w-4" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="mx-4 my-2" />
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="gap-2 cursor-pointer text-red-600 focus:text-red-600 rounded-full mx-2 my-1"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
+        <SidebarRail />
+      </Sidebar>
 
-        <SidebarInset className="flex-1 bg-gray-50">
-          {/* Main Content with subtle page fade animation */}
-          <div className="flex flex-1 flex-col px-4 pb-6 pt-4 sm:p-6 sm:pt-6">
-            <div className="w-full max-w-7xl mx-auto py-2 sm:py-4">
-              <ClockOutReminderBanner cleanerId={cleanerId} enabled={userType === 'cleaner'} />
-              <div key={location.pathname} className="page-fade">
-                {children}
-              </div>
+      <SidebarInset className="min-w-0 flex-1 bg-gray-50">
+        <MobileTopBar
+          title={pageTitle}
+          userName={userName}
+          userTypeLabel={userTypeLabel}
+          onSignOut={handleLogout}
+        />
+
+        {/* pb-24 clears the fixed tab bar; sm:pb-6 drops it back on desktop. */}
+        <div className="flex flex-1 flex-col px-4 pb-24 pt-4 sm:p-6 sm:pt-6 md:pb-6">
+          <div className="mx-auto w-full max-w-7xl py-2 sm:py-4">
+            <ClockOutReminderBanner cleanerId={cleanerId} enabled={userType === 'cleaner'} />
+            <div key={location.pathname} className="page-fade">
+              {children}
             </div>
           </div>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+        </div>
+
+        <MobileTabBar
+          tabs={navigation.tabs}
+          badgeCount={userType === 'cleaner' ? openAssistCount : 0}
+          badgePath={ASSIST_PATH}
+        />
+      </SidebarInset>
+    </div>
   )
 }

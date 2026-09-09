@@ -33,7 +33,7 @@ export const WizardShell: React.FC<WizardShellProps> = ({
 }) => {
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <div className="mb-10 flex items-center justify-center gap-2">
+      <div className="mb-6 flex items-center justify-center gap-2 sm:mb-10">
         {Array.from({ length: totalSteps }).map((_, i) => {
           const idx = i + 1
           const filled = idx <= step
@@ -48,20 +48,20 @@ export const WizardShell: React.FC<WizardShellProps> = ({
         })}
       </div>
 
-      <div className="rounded-3xl bg-white/80 p-8 shadow-sm backdrop-blur sm:p-12">
+      <div className="rounded-3xl bg-white/80 p-5 shadow-sm backdrop-blur sm:p-8 md:p-12">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 sm:text-3xl md:text-4xl">
             {title}
           </h1>
           {subtitle && (
-            <p className="mt-3 text-base text-gray-500 sm:text-lg">{subtitle}</p>
+            <p className="mt-2 text-sm text-gray-500 sm:mt-3 sm:text-base md:text-lg">{subtitle}</p>
           )}
         </div>
 
         <div key={step} className="page-fade">{children}</div>
 
         {(!hideBack || !hideNext) && (
-          <div className="mt-12 flex items-center justify-between">
+          <div className="mt-8 flex items-center justify-between gap-3 sm:mt-12">
             {!hideBack && onBack ? (
               <Button
                 variant="ghost"
@@ -78,7 +78,7 @@ export const WizardShell: React.FC<WizardShellProps> = ({
               <Button
                 onClick={onNext}
                 disabled={nextDisabled || isWorking}
-                className="rounded-full bg-[#00339B] px-7 py-5 text-base font-medium text-white shadow-sm transition hover:bg-[#002d7a] disabled:bg-gray-200 disabled:text-gray-400"
+                className="h-12 rounded-full bg-[#00339B] px-6 text-base font-medium text-white shadow-sm transition hover:bg-[#002d7a] disabled:bg-gray-200 disabled:text-gray-400 sm:px-7"
               >
                 {isWorking ? 'Working…' : nextLabel}
                 {!isWorking && <ChevronRight className="ml-1 h-4 w-4" />}
