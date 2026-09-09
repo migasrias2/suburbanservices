@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Users, UserCheck, Shield } from 'lucide-react'
+import { Eye, EyeOff, Users, UserCheck, Shield, type LucideIcon } from 'lucide-react'
 import { PhoneInput } from '../components/ui/phone-input'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -9,6 +9,15 @@ import { Card, CardContent } from '../components/ui/card'
 import { useToast } from '../hooks/use-toast'
 import { useAuth } from '../contexts/AuthContext'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
+
+type AuthTab = 'cleaner' | 'manager' | 'ops_manager' | 'admin'
+
+const AUTH_TABS: { value: AuthTab; label: string; Icon: LucideIcon | null }[] = [
+  { value: 'cleaner', label: 'Cleaner', Icon: Users },
+  { value: 'manager', label: 'Manager', Icon: UserCheck },
+  { value: 'ops_manager', label: 'Ops', Icon: null },
+  { value: 'admin', label: 'Admin', Icon: Shield },
+]
 
 export default function Login() {
   const navigate = useNavigate()
@@ -21,9 +30,9 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
-  type AuthTab = 'cleaner' | 'manager' | 'ops_manager' | 'admin'
 
   const [activeTab, setActiveTab] = useState<AuthTab>('cleaner')
+  const activeIndex = AUTH_TABS.findIndex((t) => t.value === activeTab)
   
   // Login state
   const [mobile, setMobile] = useState<string>('+44')
@@ -141,34 +150,30 @@ export default function Login() {
               }}
               className="w-full"
             >
-              <TabsList className="grid w-full grid-cols-4 rounded-2xl p-1 mb-6 bg-muted/80 backdrop-blur border border-border">
-                <TabsTrigger 
-                  value="cleaner" 
-                  className="min-h-[44px] rounded-xl text-subheadline font-medium py-2.5 px-3 text-muted-foreground transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
-                >
-                  <Users className="h-4 w-4 mr-1.5" />
-                  Cleaner
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="manager" 
-                  className="min-h-[44px] rounded-xl text-subheadline font-medium py-2.5 px-3 text-muted-foreground transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
-                >
-                  <UserCheck className="h-4 w-4 mr-1.5" />
-                  Manager
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="ops_manager" 
-                  className="min-h-[44px] rounded-xl text-subheadline font-medium py-2.5 px-3 text-muted-foreground transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
-                >
-                  Ops
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="admin" 
-                  className="min-h-[44px] rounded-xl text-subheadline font-medium py-2.5 px-3 text-muted-foreground transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
-                >
-                  <Shield className="h-4 w-4 mr-1.5" />
-                  Admin
-                </TabsTrigger>
+              <TabsList className="relative grid w-full grid-cols-4 rounded-2xl p-1 mb-6 bg-muted/80 backdrop-blur border border-border">
+                {/* One pill that slides between segments, the way a platform
+                    segmented control behaves. Each segment is an equal grid
+                    column, so it can step by exactly its own width and never
+                    needs to measure the DOM. The global reduced-motion rule
+                    collapses the transition for anyone who asks for that. */}
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-1 left-1 rounded-xl bg-primary shadow-sm transition-transform duration-300 ease-apple"
+                  style={{
+                    width: 'calc((100% - 0.5rem) / 4)',
+                    transform: `translateX(${activeIndex * 100}%)`,
+                  }}
+                />
+                {AUTH_TABS.map(({ value, label, Icon }) => (
+                  <TabsTrigger
+                    key={value}
+                    value={value}
+                    className="relative z-10 min-h-[44px] rounded-xl text-subheadline font-medium py-2.5 px-3 text-muted-foreground transition-colors duration-200 data-[state=active]:bg-transparent data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
+                  >
+                    {Icon ? <Icon className="h-4 w-4 mr-1.5" /> : null}
+                    {label}
+                  </TabsTrigger>
+                ))}
               </TabsList>
 
               {/* Login/Register Forms */}
