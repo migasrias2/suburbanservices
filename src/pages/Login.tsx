@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Users, UserCheck, Shield, type LucideIcon } from 'lucide-react'
 import { PhoneInput } from '../components/ui/phone-input'
@@ -33,7 +33,27 @@ export default function Login() {
 
   const [activeTab, setActiveTab] = useState<AuthTab>('cleaner')
   const activeIndex = AUTH_TABS.findIndex((t) => t.value === activeTab)
-  
+
+  // Each tab's form is a different height -- cleaner has no footnote, ops and
+  // admin swap the phone field for a username -- so switching tabs made the
+  // card jump. Measuring the active panel lets the container transition to the
+  // new height instead. A ResizeObserver rather than a one-shot read, so the
+  // card also follows content that grows in place, like a validation message.
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [panelHeight, setPanelHeight] = useState<number>()
+
+  useLayoutEffect(() => {
+    const el = panelRef.current
+    if (!el) return
+    const measure = () => setPanelHeight(el.getBoundingClientRect().height)
+    measure()
+    // jsdom has no ResizeObserver; the measurement above is enough for tests.
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [activeTab])
+
   // Login state
   const [mobile, setMobile] = useState<string>('+44')
   const [username, setUsername] = useState('')
@@ -176,190 +196,200 @@ export default function Login() {
                 ))}
               </TabsList>
 
-              {/* Login/Register Forms */}
-              <TabsContent value="cleaner" className="mt-0">
-                  <form onSubmit={handleLogin} className="space-y-5">
-                    <PhoneInput
-                      id="mobile"
-                      label="Mobile Number"
-                      placeholder="Enter your phone number"
-                      value={mobile}
-                      onChange={setMobile}
-                      required
-                    />
-                    <div className="space-y-2">
-                      <Label htmlFor="password" className="text-foreground font-medium text-subheadline">Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="password"
-                          type={showPassword ? "text" : "password"}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Enter your password"
-                          className="rounded-xl border-input bg-card/90 h-11 pr-12 text-callout text-foreground placeholder:text-muted-foreground"
+              {/* Login/Register Forms.
+                  The negative margin plus matching padding gives focus rings
+                  room to sit outside the inputs without overflow-hidden
+                  clipping them while the height animates. */}
+              <div
+                className="-mx-2 overflow-hidden px-2 transition-[height] duration-300 ease-apple"
+                style={{ height: panelHeight }}
+              >
+                <div ref={panelRef}>
+                  <TabsContent value="cleaner" className="mt-0 animate-fade-in">
+                      <form onSubmit={handleLogin} className="space-y-5">
+                        <PhoneInput
+                          id="mobile"
+                          label="Mobile Number"
+                          placeholder="Enter your phone number"
+                          value={mobile}
+                          onChange={setMobile}
                           required
                         />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-muted-foreground hover:text-foreground"
-                          onClick={() => setShowPassword(!showPassword)}
+                        <div className="space-y-2">
+                          <Label htmlFor="password" className="text-foreground font-medium text-subheadline">Password</Label>
+                          <div className="relative">
+                            <Input
+                              id="password"
+                              type={showPassword ? "text" : "password"}
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              placeholder="Enter your password"
+                              className="rounded-xl border-input bg-card/90 h-11 pr-12 text-callout text-foreground placeholder:text-muted-foreground"
+                              required
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-muted-foreground hover:text-foreground"
+                              onClick={() => setShowPassword(!showPassword)}
+                            >
+                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </div>
+                        <Button 
+                          type="submit" 
+                          className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm transition-all duration-200 hover:opacity-90 active:scale-[0.99]" 
+                          disabled={loading}
                         >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          {loading ? 'Signing in...' : 'Sign in as Cleaner'}
                         </Button>
+                      </form>
+                  </TabsContent>
+
+                  <TabsContent value="manager" className="mt-0 animate-fade-in">
+                    <form onSubmit={handleLogin} className="space-y-5">
+                      <PhoneInput
+                        id="mobile-mgr"
+                        label="Mobile Number"
+                        placeholder="Enter your phone number"
+                        value={mobile}
+                        onChange={setMobile}
+                        required
+                      />
+                      <div className="space-y-2">
+                        <Label htmlFor="password-mgr" className="text-foreground font-medium text-subheadline">Password</Label>
+                        <div className="relative">
+                          <Input
+                            id="password-mgr"
+                            type={showPassword ? "text" : "password"}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Enter your password"
+                            className="rounded-xl border-input bg-card/90 h-11 pr-12 text-callout text-foreground placeholder:text-muted-foreground"
+                            required
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-muted-foreground hover:text-foreground"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                    <Button 
-                      type="submit" 
-                      className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm transition-all duration-200 hover:opacity-90 active:scale-[0.99]" 
-                      disabled={loading}
-                    >
-                      {loading ? 'Signing in...' : 'Sign in as Cleaner'}
-                    </Button>
-                  </form>
-              </TabsContent>
-
-              <TabsContent value="manager" className="mt-0">
-                <form onSubmit={handleLogin} className="space-y-5">
-                  <PhoneInput
-                    id="mobile-mgr"
-                    label="Mobile Number"
-                    placeholder="Enter your phone number"
-                    value={mobile}
-                    onChange={setMobile}
-                    required
-                  />
-                  <div className="space-y-2">
-                    <Label htmlFor="password-mgr" className="text-foreground font-medium text-subheadline">Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="password-mgr"
-                        type={showPassword ? "text" : "password"}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Enter your password"
-                        className="rounded-xl border-input bg-card/90 h-11 pr-12 text-callout text-foreground placeholder:text-muted-foreground"
-                        required
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-muted-foreground hover:text-foreground"
-                        onClick={() => setShowPassword(!showPassword)}
+                      <Button 
+                        type="submit" 
+                        className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm transition-all duration-200 hover:opacity-90 active:scale-[0.99]" 
+                        disabled={loading}
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {loading ? 'Signing in...' : 'Sign in as Manager'}
                       </Button>
-                    </div>
-                  </div>
-                  <Button 
-                    type="submit" 
-                    className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm transition-all duration-200 hover:opacity-90 active:scale-[0.99]" 
-                    disabled={loading}
-                  >
-                    {loading ? 'Signing in...' : 'Sign in as Manager'}
-                  </Button>
-                </form>
-                <p className="mt-4 text-caption text-center text-muted-foreground">Manager accounts are provisioned by administrators.</p>
-                {/* Quick access removed */}
-              </TabsContent>
+                    </form>
+                    <p className="mt-4 text-caption text-center text-muted-foreground">Manager accounts are provisioned by administrators.</p>
+                    {/* Quick access removed */}
+                  </TabsContent>
 
-              <TabsContent value="ops_manager" className="mt-0">
-                <form onSubmit={handleLogin} className="space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="username-ops" className="text-foreground font-medium text-subheadline">Username</Label>
-                    <Input
-                      id="username-ops"
-                      type="text"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      placeholder="Enter your username"
-                      className="rounded-xl border-input bg-card/90 h-11 text-callout text-foreground placeholder:text-muted-foreground"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password-ops" className="text-foreground font-medium text-subheadline">Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="password-ops"
-                        type={showPassword ? "text" : "password"}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Enter your password"
-                        className="rounded-xl border-input bg-card/90 h-11 pr-12 text-callout text-foreground placeholder:text-muted-foreground"
-                        required
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-muted-foreground hover:text-foreground"
-                        onClick={() => setShowPassword(!showPassword)}
+                  <TabsContent value="ops_manager" className="mt-0 animate-fade-in">
+                    <form onSubmit={handleLogin} className="space-y-5">
+                      <div className="space-y-2">
+                        <Label htmlFor="username-ops" className="text-foreground font-medium text-subheadline">Username</Label>
+                        <Input
+                          id="username-ops"
+                          type="text"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          placeholder="Enter your username"
+                          className="rounded-xl border-input bg-card/90 h-11 text-callout text-foreground placeholder:text-muted-foreground"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="password-ops" className="text-foreground font-medium text-subheadline">Password</Label>
+                        <div className="relative">
+                          <Input
+                            id="password-ops"
+                            type={showPassword ? "text" : "password"}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Enter your password"
+                            className="rounded-xl border-input bg-card/90 h-11 pr-12 text-callout text-foreground placeholder:text-muted-foreground"
+                            required
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-muted-foreground hover:text-foreground"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                      <Button 
+                        type="submit" 
+                        className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm transition-all duration-200 hover:opacity-90 active:scale-[0.99]" 
+                        disabled={loading}
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {loading ? 'Signing in...' : 'Sign in as Ops'}
                       </Button>
-                    </div>
-                  </div>
-                  <Button 
-                    type="submit" 
-                    className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm transition-all duration-200 hover:opacity-90 active:scale-[0.99]" 
-                    disabled={loading}
-                  >
-                    {loading ? 'Signing in...' : 'Sign in as Ops'}
-                  </Button>
-                </form>
-                <p className="mt-4 text-caption text-center text-muted-foreground">Operations manager access is assigned by administrators.</p>
-              </TabsContent>
+                    </form>
+                    <p className="mt-4 text-caption text-center text-muted-foreground">Operations manager access is assigned by administrators.</p>
+                  </TabsContent>
 
-              <TabsContent value="admin" className="mt-0">
-                <form onSubmit={handleLogin} className="space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="username-admin" className="text-foreground font-medium text-subheadline">Username</Label>
-                    <Input
-                      id="username-admin"
-                      type="text"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      placeholder="Enter your username"
-                      className="rounded-xl border-input bg-card/90 h-11 text-callout text-foreground placeholder:text-muted-foreground"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password-admin" className="text-foreground font-medium text-subheadline">Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="password-admin"
-                        type={showPassword ? "text" : "password"}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Enter your password"
-                        className="rounded-xl border-input bg-card/90 h-11 pr-12 text-callout text-foreground placeholder:text-muted-foreground"
-                        required
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-muted-foreground hover:text-foreground"
-                        onClick={() => setShowPassword(!showPassword)}
+                  <TabsContent value="admin" className="mt-0 animate-fade-in">
+                    <form onSubmit={handleLogin} className="space-y-5">
+                      <div className="space-y-2">
+                        <Label htmlFor="username-admin" className="text-foreground font-medium text-subheadline">Username</Label>
+                        <Input
+                          id="username-admin"
+                          type="text"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          placeholder="Enter your username"
+                          className="rounded-xl border-input bg-card/90 h-11 text-callout text-foreground placeholder:text-muted-foreground"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="password-admin" className="text-foreground font-medium text-subheadline">Password</Label>
+                        <div className="relative">
+                          <Input
+                            id="password-admin"
+                            type={showPassword ? "text" : "password"}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Enter your password"
+                            className="rounded-xl border-input bg-card/90 h-11 pr-12 text-callout text-foreground placeholder:text-muted-foreground"
+                            required
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-muted-foreground hover:text-foreground"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+                      <Button 
+                        type="submit" 
+                        className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm transition-all duration-200 hover:opacity-90 active:scale-[0.99]" 
+                        disabled={loading}
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {loading ? 'Signing in...' : 'Sign in as Admin'}
                       </Button>
-                    </div>
-                  </div>
-                  <Button 
-                    type="submit" 
-                    className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm transition-all duration-200 hover:opacity-90 active:scale-[0.99]" 
-                    disabled={loading}
-                  >
-                    {loading ? 'Signing in...' : 'Sign in as Admin'}
-                  </Button>
-                </form>
-                <p className="mt-4 text-caption text-center text-muted-foreground">Admin access is managed centrally. Please contact system support for assistance.</p>
-              </TabsContent>
+                    </form>
+                    <p className="mt-4 text-caption text-center text-muted-foreground">Admin access is managed centrally. Please contact system support for assistance.</p>
+                  </TabsContent>
+                </div>
+              </div>
             </Tabs>
           </CardContent>
         </Card>
