@@ -105,7 +105,7 @@ const LayoutShell: React.FC<Sidebar07LayoutProps> = ({ children, userType, userN
             <img
               src="/suburban_services_logo-scaled.webp"
               alt="Suburban Services"
-              className="h-16 w-16 object-contain sm:h-20 sm:w-20"
+              className="h-auto w-40 max-w-full object-contain"
             />
           </div>
         </SidebarHeader>
