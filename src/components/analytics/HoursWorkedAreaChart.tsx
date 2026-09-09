@@ -12,7 +12,7 @@ import { AnalyticsChartCard } from './AnalyticsChartCard'
 const chartConfig = {
   hours: {
     label: 'Hours Worked',
-    color: '#00339B',
+    color: 'hsl(var(--chart-1))',
   },
 } satisfies ChartConfig
 
@@ -92,20 +92,20 @@ const HoursWorkedChart: React.FC<HoursWorkedChartProps> = ({
       data={data}
       margin={margin}
     >
-      <CartesianGrid vertical={false} stroke="#d7e3f8" strokeDasharray="3 6" />
+      <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeDasharray="3 6" />
       <XAxis
         dataKey="date"
         tickLine={false}
         axisLine={false}
         tickMargin={12}
-        stroke="#94a3b8"
+        stroke="hsl(var(--muted-foreground))"
         minTickGap={24}
         tickFormatter={toCompactDate}
         fontSize={12}
         height={xAxisHeight}
       />
       <YAxis
-        stroke="#94a3b8"
+        stroke="hsl(var(--muted-foreground))"
         tickLine={false}
         axisLine={false}
         width={yAxisWidth}
@@ -117,7 +117,7 @@ const HoursWorkedChart: React.FC<HoursWorkedChartProps> = ({
           value="hrs"
           position="insideLeft"
           offset={labelOffset}
-          className="fill-slate-400 text-xs"
+          className="fill-muted-foreground text-xs"
         />
       </YAxis>
       <ChartTooltip
@@ -125,7 +125,7 @@ const HoursWorkedChart: React.FC<HoursWorkedChartProps> = ({
         content={
           <ChartTooltipContent
             indicator="line"
-            className="!bg-white"
+            className="!bg-card"
             labelFormatter={(value) => toCompactDate(String(value))}
             formatter={(value, name, item, index, payload: any) => {
               const numericValue = typeof value === 'number' ? value : Number(value)
@@ -134,22 +134,22 @@ const HoursWorkedChart: React.FC<HoursWorkedChartProps> = ({
               return (
                 <div className="flex min-w-[220px] flex-col gap-3">
                   <div className="flex w-full items-center justify-between gap-3">
-                    <span className="text-xs font-medium text-gray-500">Hours Worked</span>
-                    <span className="font-mono font-semibold text-[#00339B]">
+                    <span className="text-xs font-medium text-muted-foreground">Hours Worked</span>
+                    <span className="font-mono font-semibold text-primary">
                       {Number.isFinite(numericValue) ? `${hoursFormatter.format(numericValue)}h` : '0h'}
                     </span>
                   </div>
                   {details.length > 0 && (
-                    <div className="mt-1 flex flex-col gap-2 border-t border-slate-100 pt-3">
-                      <span className="text-xs font-medium text-slate-400">Breakdown</span>
+                    <div className="mt-1 flex flex-col gap-2 border-t border-border pt-3">
+                      <span className="text-xs font-medium text-muted-foreground">Breakdown</span>
                       <div className="flex max-h-[240px] flex-col gap-2 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200">
                         {details.map((d: CleanerSiteHours, i: number) => (
-                          <div key={i} className="flex flex-col rounded-md bg-slate-50 p-2 text-xs">
+                          <div key={i} className="flex flex-col rounded-md bg-muted p-2 text-xs">
                             <div className="flex justify-between gap-2">
-                              <span className="truncate font-medium text-slate-700">{d.cleanerName}</span>
-                              <span className="shrink-0 font-mono text-slate-600">{d.hours.toFixed(1)}h</span>
+                              <span className="truncate font-medium text-foreground">{d.cleanerName}</span>
+                              <span className="shrink-0 font-mono text-muted-foreground">{d.hours.toFixed(1)}h</span>
                             </div>
-                            <span className="truncate text-[10px] text-slate-400">{d.siteName}</span>
+                            <span className="truncate text-caption2 text-muted-foreground">{d.siteName}</span>
                           </div>
                         ))}
                       </div>
@@ -167,8 +167,8 @@ const HoursWorkedChart: React.FC<HoursWorkedChartProps> = ({
         stroke="var(--color-hours)"
         fill="var(--color-hours)"
         fillOpacity={0.22}
-        dot={{ r: 3, fill: '#00339B', stroke: '#fff', strokeWidth: 2 }}
-        activeDot={{ r: 5, fill: '#00339B', stroke: '#fff', strokeWidth: 3 }}
+        dot={{ r: 3, fill: 'hsl(var(--chart-1))', stroke: 'hsl(var(--card))', strokeWidth: 2 }}
+        activeDot={{ r: 5, fill: 'hsl(var(--chart-1))', stroke: 'hsl(var(--card))', strokeWidth: 3 }}
       />
     </AreaChart>
   </ChartContainer>
@@ -222,7 +222,7 @@ export const HoursWorkedAreaChart: React.FC<HoursWorkedAreaChartProps> = ({ summ
 
   if (layout === 'inline') {
     return (
-      <div className={cn('rounded-[24px] border border-blue-100 bg-white/80 p-4 shadow-sm', className)}>
+      <div className={cn('rounded-[24px] border border-border bg-card/80 p-4 shadow-sm', className)}>
         <HoursWorkedChart
           data={data}
           containerClassName="h-64"
@@ -247,14 +247,14 @@ export const HoursWorkedAreaChart: React.FC<HoursWorkedAreaChartProps> = ({ summ
       className={className}
     >
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-2 text-sm text-gray-600">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-2 text-sm text-muted-foreground">
           <div className="flex flex-col">
-            <span className="text-xs uppercase tracking-wide text-gray-400">Total hours</span>
-            <span className="text-xl font-semibold text-[#00339B]">{hoursFormatter.format(totalHours)}h</span>
+            <span className="text-xs uppercase tracking-wide text-muted-foreground">Total hours</span>
+            <span className="text-xl font-semibold text-primary">{hoursFormatter.format(totalHours)}h</span>
           </div>
           <div className="flex flex-col text-right">
-            <span className="text-xs uppercase tracking-wide text-gray-400">Avg / day</span>
-            <span className="text-xl font-semibold text-[#00339B]">{hoursFormatter.format(averageDailyHours)}h</span>
+            <span className="text-xs uppercase tracking-wide text-muted-foreground">Avg / day</span>
+            <span className="text-xl font-semibold text-primary">{hoursFormatter.format(averageDailyHours)}h</span>
           </div>
         </div>
         <HoursWorkedChart data={data} />

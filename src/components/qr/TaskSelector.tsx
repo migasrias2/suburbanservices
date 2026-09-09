@@ -359,9 +359,9 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
     return (
       <div className="w-full max-w-md mx-auto space-y-4 text-center">
         <div className="flex justify-center">
-          <div className="flex items-center gap-3 rounded-3xl border border-blue-100 bg-blue-50 px-6 py-4">
-            <Loader2 className="h-5 w-5 animate-spin text-[#00339B]" />
-            <span className="text-sm font-medium text-[#00339B]">Loading tasks...</span>
+          <div className="flex items-center gap-3 rounded-3xl border border-border bg-primary/10 px-6 py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <span className="text-sm font-medium text-primary">Loading tasks...</span>
           </div>
         </div>
       </div>
@@ -376,7 +376,7 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
             No specific tasks defined for this area yet. Your scan has been logged successfully.
           </AlertDescription>
         </Alert>
-        <Button onClick={onCancel} className="w-full rounded-full text-white" style={{ backgroundColor: '#00339B' }}>
+        <Button onClick={onCancel} className="w-full rounded-full text-primary-foreground bg-primary">
           Continue
         </Button>
       </div>
@@ -401,24 +401,24 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
 
       {/* Top progress */}
       <div className="space-y-3">
-        <div className="text-center text-sm text-gray-600">working on: {getDisplayArea()}</div>
+        <div className="text-center text-sm text-muted-foreground">working on: {getDisplayArea()}</div>
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-5 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full" style={{ width: `${progressPercent}%`, backgroundColor: '#00339B', transition: 'width 400ms ease' }} />
+          <div className="flex-1 h-5 bg-secondary rounded-full overflow-hidden">
+            <div className="h-full bg-primary" style={{ width: `${progressPercent}%`, transition: 'width 400ms ease' }} />
           </div>
-          <Flag className="w-5 h-5 text-gray-400" />
+          <Flag className="w-5 h-5 text-muted-foreground" />
         </div>
       </div>
 
       {/* Task title */}
       <div className="text-center space-y-2">
-        <div className="text-sm text-gray-500">Task {currentIndex + 1}/{tasks.length}</div>
-        <h2 className="text-3xl font-bold text-gray-900">{currentTask.name}</h2>
+        <div className="text-sm text-muted-foreground">Task {currentIndex + 1}/{tasks.length}</div>
+        <h2 className="text-3xl font-bold text-foreground">{currentTask.name}</h2>
       </div>
 
       {/* Photo frame with in-frame capture options */}
       <div className="space-y-4">
-        <div className="relative rounded-3xl overflow-hidden border-2 border-blue-200 bg-blue-50" style={{ aspectRatio: '4 / 3' }}>
+        <div className="relative rounded-3xl overflow-hidden border-2 border-border bg-primary/10" style={{ aspectRatio: '4 / 3' }}>
           {currentHasPhoto && !isCameraOpen && (
             <img src={currentCompletion?.photos?.[0]?.photo} alt="Task" className="w-full h-full object-cover" />
           )}
@@ -432,16 +432,16 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
                 <button
                   aria-label="Close camera"
                   onClick={stopCamera}
-                  className="absolute bottom-4 left-4 h-12 w-12 rounded-full bg-white/95 border border-blue-200 shadow flex items-center justify-center hover:bg-white"
+                  className="absolute bottom-4 left-4 h-12 w-12 rounded-full bg-card/95 border border-border shadow flex items-center justify-center hover:bg-card"
                 >
-                  <X className="h-5 w-5" style={{ color: '#00339B' }} />
+                  <X className="h-5 w-5 text-primary" />
                 </button>
                 <button
                   aria-label="Take photo"
                   onClick={captureFromCamera}
-                  className="absolute bottom-4 left-1/2 -translate-x-1/2 h-14 w-14 rounded-full bg-white/95 border border-blue-200 shadow flex items-center justify-center hover:bg-white"
+                  className="absolute bottom-4 left-1/2 -translate-x-1/2 h-14 w-14 rounded-full bg-card/95 border border-border shadow flex items-center justify-center hover:bg-card"
                 >
-                  <Camera className="h-6 w-6" style={{ color: '#00339B' }} />
+                  <Camera className="h-6 w-6 text-primary" />
                 </button>
               </div>
             ) : (
@@ -452,22 +452,22 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
                        <div className="flex flex-col items-center justify-end justify-self-end">
                          <button
                            onClick={() => startCamera(currentTask.id)}
-                           className="h-20 w-20 rounded-full bg-white/95 border border-blue-200 shadow flex items-center justify-center hover:bg-white"
+                           className="h-20 w-20 rounded-full bg-card/95 border border-border shadow flex items-center justify-center hover:bg-card"
                          >
-                           <Camera className="h-8 w-8" style={{ color: '#00339B' }} />
+                           <Camera className="h-8 w-8 text-primary" />
                          </button>
-                         <span className="mt-3 text-[13px] text-gray-400">take photo</span>
+                         <span className="mt-3 text-footnote text-muted-foreground">take photo</span>
                        </div>
-                       <span className="self-center justify-self-center text-2xl font-medium select-none" style={{ color: '#00339B' }}>or</span>
+                       <span className="self-center justify-self-center text-2xl font-medium select-none text-primary">or</span>
                        <div className="flex flex-col items-center justify-end justify-self-start">
                          <button
                            onClick={() => fileInputRef.current?.click()}
-                           className="h-20 w-20 rounded-full bg-white/95 border border-blue-200 shadow flex items-center justify-center hover:bg-white"
+                           className="h-20 w-20 rounded-full bg-card/95 border border-border shadow flex items-center justify-center hover:bg-card"
                          >
-                           <Folder className="h-8 w-8" style={{ color: '#00339B' }} />
+                           <Folder className="h-8 w-8 text-primary" />
                          </button>
-                        <span className="mt-3 text-[13px] text-gray-400 hidden sm:block">select from gallery</span>
-                        <span className="mt-3 text-[13px] text-gray-400 sm:hidden">from gallery</span>
+                        <span className="mt-3 text-footnote text-muted-foreground hidden sm:block">select from gallery</span>
+                        <span className="mt-3 text-footnote text-muted-foreground sm:hidden">from gallery</span>
                        </div>
                      </div>
                    </div>
@@ -477,9 +477,9 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
                       <button
                         aria-label="Delete photo"
                         onClick={() => clearPhoto(currentTask.id)}
-                        className="h-12 w-12 rounded-full bg-white/95 border border-blue-200 shadow hover:bg-white flex items-center justify-center"
+                        className="h-12 w-12 rounded-full bg-card/95 border border-border shadow hover:bg-card flex items-center justify-center"
                       >
-                        <Trash2 className="h-5 w-5" style={{ color: '#00339B' }} />
+                        <Trash2 className="h-5 w-5 text-primary" />
                       </button>
                     </div>
                     {!confirmedPhotos[currentTask.id] && (
@@ -487,16 +487,16 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
                         <button
                           aria-label="Retake photo"
                           onClick={() => startCamera(currentTask.id)}
-                          className="h-12 w-12 rounded-full bg-white/95 border border-blue-200 shadow hover:bg-white flex items-center justify-center"
+                          className="h-12 w-12 rounded-full bg-card/95 border border-border shadow hover:bg-card flex items-center justify-center"
                         >
-                          <RotateCcw className="h-5 w-5" style={{ color: '#00339B' }} />
+                          <RotateCcw className="h-5 w-5 text-primary" />
                         </button>
                         <button
                           aria-label="Confirm photo"
                           onClick={confirmCurrentPhoto}
-                          className="h-12 w-12 rounded-full bg-white/95 border border-blue-200 shadow hover:bg-white flex items-center justify-center"
+                          className="h-12 w-12 rounded-full bg-card/95 border border-border shadow hover:bg-card flex items-center justify-center"
                         >
-                          <Check className="h-5 w-5" style={{ color: '#00339B' }} />
+                          <Check className="h-5 w-5 text-primary" />
                         </button>
                       </div>
                     )}
@@ -522,7 +522,7 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
             if (currentIndex > 0) setCurrentIndex(currentIndex - 1)
             else onCancel?.()
           }}
-          className="flex-1 rounded-full border-blue-200 text-blue-700 hover:bg-blue-50"
+          className="flex-1 rounded-full border-border text-primary hover:bg-primary/10"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
@@ -539,8 +539,7 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
               setTimeout(() => setCurrentIndex(currentIndex + 1), 420)
             }}
             disabled={!currentHasPhoto}
-            className="flex-1 rounded-full text-white"
-            style={{ backgroundColor: '#00339B' }}
+            className="flex-1 rounded-full text-primary-foreground bg-primary"
           >
             Continue
           </Button>
@@ -548,12 +547,11 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
           <Button
             onClick={handleWorkSubmission}
             disabled={isSubmitting || completedTasksCount !== tasks.length || !currentHasPhoto}
-            className="flex-1 rounded-full text-white"
-            style={{ backgroundColor: '#00339B' }}
+            className="flex-1 rounded-full text-primary-foreground bg-primary"
           >
             {isSubmitting ? (
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-border border-t-transparent rounded-full animate-spin" />
                 Finishing...
               </div>
             ) : (
@@ -568,11 +566,11 @@ export const TaskSelector: React.FC<TaskCompletionProps> = ({
 
       <div className="text-center">
         {completedTasksCount < tasks.length ? (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground">
             Photos taken: {completedTasksCount}/{tasks.length} — all tasks need a photo to finish
           </p>
         ) : (
-          <p className="text-xs text-gray-500">All photos taken — ready to finish!</p>
+          <p className="text-xs text-muted-foreground">All photos taken — ready to finish!</p>
         )}
       </div>
     </div>

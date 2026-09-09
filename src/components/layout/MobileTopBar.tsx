@@ -34,17 +34,17 @@ export const MobileTopBar: React.FC<MobileTopBarProps> = ({
   const { setOpenMobile } = useSidebar()
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-gray-100 bg-white/90 px-2 backdrop-blur-md md:hidden">
+    <header className="glass-thin sticky top-0 z-30 flex h-14 items-center gap-2 border-x-0 border-t-0 border-b border-border px-2 md:hidden">
       <button
         type="button"
         onClick={() => setOpenMobile(true)}
         aria-label="Open menu"
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-gray-600 transition active:bg-gray-100"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition active:bg-accent"
       >
         <Menu className="h-5 w-5" />
       </button>
 
-      <h1 className="min-w-0 flex-1 truncate text-[17px] font-semibold tracking-tight text-gray-900">
+      <h1 className="min-w-0 flex-1 truncate text-headline text-foreground">
         {title}
       </h1>
 
@@ -56,7 +56,7 @@ export const MobileTopBar: React.FC<MobileTopBarProps> = ({
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
           >
             <Avatar className="h-9 w-9">
-              <AvatarFallback className="bg-gradient-to-r from-red-600 to-red-700 text-sm font-semibold text-white">
+              <AvatarFallback className="bg-primary text-sm font-semibold text-primary-foreground">
                 {userName.charAt(0).toUpperCase()}
               </AvatarFallback>
             </Avatar>
@@ -64,8 +64,8 @@ export const MobileTopBar: React.FC<MobileTopBarProps> = ({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" sideOffset={6} className="min-w-56 rounded-2xl border-0 shadow-xl">
           <DropdownMenuLabel className="pb-1">
-            <div className="truncate text-sm font-semibold text-gray-900">{userName}</div>
-            <div className="truncate text-xs font-normal text-gray-500">{userTypeLabel}</div>
+            <div className="truncate text-sm font-semibold text-foreground">{userName}</div>
+            <div className="truncate text-caption font-normal text-muted-foreground">{userTypeLabel}</div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => navigate('/profile')} className="gap-2 rounded-xl">
@@ -74,7 +74,7 @@ export const MobileTopBar: React.FC<MobileTopBarProps> = ({
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={onSignOut}
-            className="gap-2 rounded-xl text-red-600 focus:text-red-600"
+            className="gap-2 rounded-xl text-destructive focus:text-destructive"
           >
             <LogOut className="h-4 w-4" />
             Log out

@@ -92,13 +92,13 @@ export const Step3Areas: React.FC<Step3Props> = ({ state, totalSteps, onUpdate, 
       <div className="space-y-6">
         {presets.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs uppercase tracking-wider text-gray-400">Presets</span>
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">Presets</span>
             {presets.map((p) => (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => applyPreset(p)}
-                className="rounded-full bg-gray-100 px-4 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
+                className="rounded-full bg-muted px-4 py-1.5 text-xs font-medium text-foreground hover:bg-secondary"
               >
                 {p.name}
               </button>
@@ -108,19 +108,19 @@ export const Step3Areas: React.FC<Step3Props> = ({ state, totalSteps, onUpdate, 
 
         <div className="space-y-2">
           {areas.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-200 py-12 text-center text-sm text-gray-400">
+            <div className="rounded-2xl border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
               No areas yet. Pick a preset or add one below.
             </div>
           ) : (
             areas.map((area, idx) => (
               <div
                 key={`${area.name}-${idx}`}
-                className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3"
+                className="flex items-center justify-between rounded-xl bg-muted px-4 py-3"
               >
                 <div>
-                  <div className="text-base font-medium text-gray-900">{area.name}</div>
+                  <div className="text-base font-medium text-foreground">{area.name}</div>
                   {area.tasks && area.tasks.length > 0 && (
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-muted-foreground">
                       {area.tasks.length} task{area.tasks.length === 1 ? '' : 's'}
                     </div>
                   )}
@@ -129,7 +129,7 @@ export const Step3Areas: React.FC<Step3Props> = ({ state, totalSteps, onUpdate, 
                   variant="ghost"
                   size="sm"
                   onClick={() => removeArea(idx)}
-                  className="h-8 w-8 rounded-full p-0 text-gray-400 hover:bg-white hover:text-red-600"
+                  className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:bg-card hover:text-destructive"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -138,9 +138,9 @@ export const Step3Areas: React.FC<Step3Props> = ({ state, totalSteps, onUpdate, 
           )}
         </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 space-y-4">
+        <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-gray-700">Area name</Label>
+            <Label className="text-sm font-medium text-foreground">Area name</Label>
             <Input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
@@ -151,13 +151,13 @@ export const Step3Areas: React.FC<Step3Props> = ({ state, totalSteps, onUpdate, 
                   addArea()
                 }
               }}
-              className="h-11 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
+              className="h-11 rounded-2xl border-border bg-muted/70 px-4"
             />
           </div>
           <Button
             onClick={addArea}
             disabled={!newName.trim()}
-            className="w-full rounded-full bg-[#00339B] py-5 text-white hover:bg-[#002d7a] disabled:bg-gray-200 disabled:text-gray-400"
+            className="w-full rounded-full bg-primary py-5 text-primary-foreground hover:bg-primary/90 disabled:bg-secondary disabled:text-muted-foreground"
           >
             <Plus className="mr-2 h-4 w-4" />
             Add area

@@ -71,8 +71,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ managerI
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-[#00339B]">Analytics</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-3xl font-semibold text-primary">Analytics</h1>
+          <p className="text-sm text-muted-foreground">
             {role === 'admin' || role === 'ops_manager'
               ? 'Monitoring performance across all cleaners'
               : 'Focused insights for your cleaner team'}
@@ -84,7 +84,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ managerI
               <Button
                 variant="outline"
                 className={cn(
-                  'flex items-center gap-2 rounded-full border-blue-100 bg-white px-4 py-2 text-sm font-semibold text-[#00339B] shadow-sm hover:bg-blue-50',
+                  'flex items-center gap-2 rounded-full border-border bg-card px-4 py-2 text-sm font-semibold text-primary shadow-sm hover:bg-primary/10',
                 )}
               >
                 <CalendarIcon className="h-4 w-4" />
@@ -107,18 +107,18 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ managerI
       </div>
 
       {query.isLoading ? (
-        <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-blue-200 bg-blue-50/40 py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-[#00339B]" />
-          <p className="mt-3 text-sm font-medium text-[#00339B]">Loading analytics...</p>
+        <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-border bg-primary/5 py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="mt-3 text-sm font-medium text-primary">Loading analytics...</p>
         </div>
       ) : query.isError ? (
-        <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
+        <div className="rounded-3xl border border-destructive/30 bg-destructive/10 p-6 text-sm text-destructive">
           Unable to load analytics right now. Please try again later.
         </div>
       ) : query.data ? (
         <AnalyticsContent summary={query.data} />
       ) : (
-        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-700">
+        <div className="rounded-3xl border border-warning/30 bg-warning/10 p-6 text-sm text-warning">
           No analytics available for the selected range.
         </div>
       )}

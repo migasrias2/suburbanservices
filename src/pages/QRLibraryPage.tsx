@@ -140,8 +140,8 @@ export default function QRLibraryPage() {
 
   if (!userType || !userId || !userName) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-50">
-        <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent"></div>
+      <div className="flex justify-center items-center min-h-screen bg-muted">
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary/40 border-t-transparent"></div>
       </div>
     )
   }
@@ -312,15 +312,14 @@ export default function QRLibraryPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div>
             {/* Hidden on phones — the mobile top bar already names the page. */}
-            <h1 className="hidden text-3xl font-semibold tracking-tight text-gray-900 md:block lg:text-4xl">QR Library</h1>
-            <p className="text-sm text-gray-500 md:mt-1 md:text-base">{qrCodes.length} codes · {groupedByCustomer.length} customers</p>
+            <h1 className="hidden text-3xl font-semibold tracking-tight text-foreground md:block lg:text-4xl">QR Library</h1>
+            <p className="text-sm text-muted-foreground md:mt-1 md:text-base">{qrCodes.length} codes · {groupedByCustomer.length} customers</p>
           </div>
           <div className="flex items-center gap-2 [&>*]:h-11 [&>*]:flex-1 sm:[&>*]:h-10 sm:[&>*]:flex-none">
             {isSelecting && selectedIds.length > 0 && (
               <Button
                 disabled={downloadingSelected}
-                className="gap-2 rounded-full text-white px-5"
-                style={{ backgroundColor: '#00339B' }}
+                className="gap-2 rounded-full text-primary-foreground px-5 bg-primary"
                 onClick={handleDownloadSelected}
               >
                 <Download className="h-4 w-4" />
@@ -329,7 +328,7 @@ export default function QRLibraryPage() {
             )}
             <Button
               variant="outline"
-              className="rounded-full gap-2 border-gray-200 text-gray-700"
+              className="rounded-full gap-2 border-border text-foreground"
               onClick={toggleSelecting}
             >
               {isSelecting ? (
@@ -352,12 +351,12 @@ export default function QRLibraryPage() {
               }
             }}>
               <DialogTrigger asChild>
-                <Button className="gap-2 rounded-full text-white" style={{ backgroundColor: '#00339B' }}>
+                <Button className="gap-2 rounded-full text-primary-foreground bg-primary">
                   <Upload className="h-4 w-4" />
                   Upload
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto !rounded-3xl border-0 p-6 shadow-2xl bg-white">
+              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto !rounded-3xl border-0 p-6 shadow-2xl bg-card">
                 <DialogHeader>
                   <DialogTitle className="sr-only">Upload QR Codes</DialogTitle>
                 </DialogHeader>
@@ -369,25 +368,25 @@ export default function QRLibraryPage() {
 
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
             placeholder="Search customers or areas"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-11 h-12 rounded-2xl border-gray-200 bg-white text-base shadow-sm focus-visible:ring-1 focus-visible:ring-gray-300"
+            className="pl-11 h-12 rounded-2xl border-border bg-card text-base shadow-sm focus-visible:ring-1 focus-visible:ring-ring"
           />
         </div>
 
         {/* Grouped list */}
         {loading ? (
           <div className="flex justify-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent"></div>
+            <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary/40 border-t-transparent"></div>
           </div>
         ) : groupedByCustomer.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-2xl border border-gray-100">
-            <QrCode className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-700 font-medium">No QR codes found</p>
-            <p className="text-gray-400 text-sm mt-1">Try adjusting your search</p>
+          <div className="text-center py-20 bg-card rounded-2xl border border-border">
+            <QrCode className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+            <p className="text-foreground font-medium">No QR codes found</p>
+            <p className="text-muted-foreground text-sm mt-1">Try adjusting your search</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -399,57 +398,57 @@ export default function QRLibraryPage() {
               return (
                 <div
                   key={group.key}
-                  className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden transition-shadow hover:shadow-md"
+                  className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden transition-shadow hover:shadow-md"
                 >
                   <button
                     type="button"
                     onClick={() => toggleExpanded(group.key)}
-                    className="w-full flex items-center gap-4 p-4 sm:p-5 text-left hover:bg-gray-50/60 transition-colors"
+                    className="w-full flex items-center gap-4 p-4 sm:p-5 text-left hover:bg-muted/60 transition-colors"
                   >
                     {/* Stacked QR thumbnail */}
                     <div className="relative w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0">
                       {group.items.length > 1 && (
-                        <div className="absolute inset-0 bg-white border border-gray-200 rounded-xl rotate-[-6deg] translate-x-1 translate-y-1" />
+                        <div className="absolute inset-0 bg-card border border-border rounded-xl rotate-[-6deg] translate-x-1 translate-y-1" />
                       )}
                       <img
                         src={sampleQR.imageUrl || generateQRCodeImage(sampleQR.qrCodeData, sampleQR.imageUrl)}
                         alt={`QR for ${group.label}`}
-                        className="relative w-16 h-16 sm:w-20 sm:h-20 border border-gray-200 rounded-xl bg-white object-cover"
+                        className="relative w-16 h-16 sm:w-20 sm:h-20 border border-border rounded-xl bg-card object-cover"
                       />
                     </div>
 
                     {/* Title */}
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 text-base sm:text-lg truncate capitalize">
+                      <h3 className="font-semibold text-foreground text-base sm:text-lg truncate capitalize">
                         {group.label}
                       </h3>
-                      <p className="text-sm text-gray-500 mt-0.5">{group.items.length} QR codes</p>
+                      <p className="text-sm text-muted-foreground mt-0.5">{group.items.length} QR codes</p>
                     </div>
 
                     {/* Count badge + chevron */}
                     <div className="flex items-center gap-3 flex-shrink-0">
-                      <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-semibold tabular-nums">
+                      <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold tabular-nums">
                         {group.items.length}
                       </span>
                       <ChevronDown
-                        className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                        className={`h-5 w-5 text-muted-foreground transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                       />
                     </div>
                   </button>
 
                   {isExpanded && (
-                    <div className="border-t border-gray-100 bg-gray-50/40 p-4 sm:p-5">
+                    <div className="border-t border-border bg-muted/40 p-4 sm:p-5">
                       {isSelecting && (
                         <div className="flex items-center justify-between mb-3 px-1">
                           <button
                             type="button"
                             onClick={() => handleToggleGroupSelection(group)}
-                            className="text-sm font-medium text-[#00339B] hover:underline"
+                            className="text-sm font-medium text-primary hover:underline"
                           >
                             {allGroupSelected ? 'Unselect all in group' : 'Select all in group'}
                           </button>
                           {groupSelectedCount > 0 && (
-                            <span className="text-xs text-gray-500">{groupSelectedCount} selected</span>
+                            <span className="text-xs text-muted-foreground">{groupSelectedCount} selected</span>
                           )}
                         </div>
                       )}
@@ -459,10 +458,10 @@ export default function QRLibraryPage() {
                           return (
                             <div
                               key={qr.id}
-                              className={`group relative bg-white rounded-xl border p-3 transition-all ${
+                              className={`group relative bg-card rounded-xl border p-3 transition-all ${
                                 isSelecting && isChecked
-                                  ? 'border-[#00339B] ring-2 ring-[#00339B]/20'
-                                  : 'border-gray-100 hover:border-gray-200 hover:shadow-sm'
+                                  ? 'border-primary ring-2 ring-ring/20'
+                                  : 'border-border hover:border-border hover:shadow-sm'
                               }`}
                               onClick={(e) => {
                                 if (!isSelecting) return
@@ -477,26 +476,25 @@ export default function QRLibraryPage() {
                                   <Checkbox
                                     checked={isChecked}
                                     onCheckedChange={() => handleToggleSelection(qr.id)}
-                                    className="h-5 w-5 rounded-md border-2 border-white shadow"
+                                    className="h-5 w-5 rounded-md border-2 border-border shadow"
                                   />
                                 </div>
                               )}
                               <img
                                 src={qr.imageUrl || generateQRCodeImage(qr.qrCodeData, qr.imageUrl)}
                                 alt={`QR for ${qr.area}`}
-                                className="w-full aspect-square rounded-lg border border-gray-100 bg-white"
+                                className="w-full aspect-square rounded-lg border border-border bg-card"
                               />
                               <div className="mt-2 min-h-[2.5rem]">
-                                <p className="text-sm font-medium text-gray-900 truncate">{qr.area || 'Untitled'}</p>
+                                <p className="text-sm font-medium text-foreground truncate">{qr.area || 'Untitled'}</p>
                                 {qr.subArea && (
-                                  <p className="text-xs text-gray-500 truncate">{qr.subArea}</p>
+                                  <p className="text-xs text-muted-foreground truncate">{qr.subArea}</p>
                                 )}
                               </div>
                               <div className="flex gap-1.5 mt-2">
                                 <Button
                                   size="sm"
-                                  className="flex-1 h-8 gap-1 rounded-full text-white text-xs"
-                                  style={{ backgroundColor: '#00339B' }}
+                                  className="flex-1 h-8 gap-1 rounded-full text-primary-foreground text-xs bg-primary"
                                   onClick={() => handleDownloadQR(qr)}
                                 >
                                   <Download className="h-3 w-3" />
@@ -505,7 +503,7 @@ export default function QRLibraryPage() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  className="h-8 w-8 p-0 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                  className="h-8 w-8 p-0 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                                   onClick={() => handleDeleteQR(qr.id)}
                                   aria-label="Delete QR code"
                                 >

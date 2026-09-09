@@ -257,26 +257,26 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
   const getStatusIcon = (status: UploadedFile['status']) => {
     switch (status) {
       case 'pending':
-        return <FileArchive className="h-5 w-5 text-gray-400" />
+        return <FileArchive className="h-5 w-5 text-muted-foreground" />
       case 'processing':
-        return <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent" />
+        return <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary/40 border-t-transparent" />
       case 'completed':
-        return <CheckCircle className="h-5 w-5 text-green-600" />
+        return <CheckCircle className="h-5 w-5 text-success" />
       case 'error':
-        return <XCircle className="h-5 w-5 text-red-600" />
+        return <XCircle className="h-5 w-5 text-destructive" />
     }
   }
 
   const getStatusColor = (status: UploadedFile['status']) => {
     switch (status) {
       case 'pending':
-        return 'text-gray-600'
+        return 'text-muted-foreground'
       case 'processing':
-        return 'text-blue-600'
+        return 'text-primary'
       case 'completed':
-        return 'text-green-600'
+        return 'text-success'
       case 'error':
-        return 'text-red-600'
+        return 'text-destructive'
     }
   }
 
@@ -292,20 +292,20 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
     <div className="space-y-6">
       {/* Header */}
       <div className="text-center">
-        <h2 className="flex items-center justify-center gap-3 text-xl font-semibold text-gray-900 mb-2">
-          <Upload className="h-6 w-6 text-blue-600" />
+        <h2 className="flex items-center justify-center gap-3 text-xl font-semibold text-foreground mb-2">
+          <Upload className="h-6 w-6 text-primary" />
           Upload QR Code Collections
         </h2>
       </div>
         {/* Upload Area */}
-        <div className="rounded-3xl p-8 text-center bg-gray-50 border border-gray-200">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-gray-300">
-            <Upload className="h-8 w-8 text-gray-400" />
+        <div className="rounded-3xl p-8 text-center bg-muted border border-border">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-border">
+            <Upload className="h-8 w-8 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">
+          <h3 className="text-lg font-semibold text-foreground mb-1">
             Upload Customer QR Code Collections
           </h3>
-          <p className="text-gray-600 mb-6">
+          <p className="text-muted-foreground mb-6">
             Select a folder of PNG/JPG images (or ZIPs). Folder structure: Customer/Area/Images
           </p>
           <input
@@ -321,7 +321,7 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
             // @ts-ignore
             directory="true"
           />
-          <Button asChild className="gap-2 rounded-full text-white px-5" style={{ backgroundColor: '#00339B' }}>
+          <Button asChild className="gap-2 rounded-full text-primary-foreground px-5 bg-primary">
             <label htmlFor="zip-upload" className="cursor-pointer">
               <Folder className="h-4 w-4" />
               Select Folder
@@ -331,9 +331,9 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
 
         {/* Errors */}
         {errorMsg && (
-          <Alert className="border-red-200 bg-red-50 rounded-2xl">
-            <AlertCircle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-700">{errorMsg}</AlertDescription>
+          <Alert className="border-destructive/30 bg-destructive/10 rounded-2xl">
+            <AlertCircle className="h-4 w-4 text-destructive" />
+            <AlertDescription className="text-destructive">{errorMsg}</AlertDescription>
           </Alert>
         )}
 
@@ -341,7 +341,7 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
         {files.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h4 className="font-medium text-gray-900">Selected Files ({files.length})</h4>
+              <h4 className="font-medium text-foreground">Selected Files ({files.length})</h4>
               {!uploading && files.some(f => f.status === 'pending') && (
                 <Button onClick={() => processSelectedFiles(files)} className="gap-2">
                   <Upload className="h-4 w-4" />
@@ -353,8 +353,8 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
             {uploading && (
                 <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Processing files...</span>
-                  <span className="text-gray-600">{Math.round(uploadProgress)}%</span>
+                  <span className="text-muted-foreground">Processing files...</span>
+                  <span className="text-muted-foreground">{Math.round(uploadProgress)}%</span>
                 </div>
                 <Progress value={uploadProgress} className="h-2 rounded-full" />
               </div>
@@ -362,18 +362,18 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
 
             <div className="space-y-3">
               {files.map((file, index) => (
-                <div key={index} className="flex items-center gap-4 p-4 border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors">
+                <div key={index} className="flex items-center gap-4 p-4 border border-border rounded-2xl hover:bg-muted transition-colors">
                   {getStatusIcon(file.status)}
                   
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <h5 className="font-medium text-gray-900">{file.name}</h5>
+                      <h5 className="font-medium text-foreground">{file.name}</h5>
                       <span className={`text-sm font-medium capitalize ${getStatusColor(file.status)}`}>
                         {file.status}
                       </span>
                     </div>
                     
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-muted-foreground">
                       Size: {formatFileSize(file.size)}
                       {file.customer && (
                         <span className="ml-4">Customer: {file.customer}</span>
@@ -384,9 +384,9 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
                     </div>
                     
                     {file.error && (
-                      <Alert className="mt-2 border-red-200 bg-red-50">
-                        <AlertCircle className="h-4 w-4 text-red-600" />
-                        <AlertDescription className="text-red-600">
+                      <Alert className="mt-2 border-destructive/30 bg-destructive/10">
+                        <AlertCircle className="h-4 w-4 text-destructive" />
+                        <AlertDescription className="text-destructive">
                           {file.error}
                         </AlertDescription>
                       </Alert>
@@ -399,9 +399,9 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
         )}
 
         {/* Instructions */}
-        <Alert className="border-blue-100 bg-blue-50 rounded-2xl">
-          <AlertCircle className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-800">
+        <Alert className="border-border bg-primary/10 rounded-2xl">
+          <AlertCircle className="h-4 w-4 text-primary" />
+          <AlertDescription className="text-primary">
             <strong>Instructions:</strong> Choose a folder containing QR images. Use folders to organize by
             customer and area, for example: <em>Avtrade/Toilets/*.png</em>. ZIP files are also accepted.
           </AlertDescription>

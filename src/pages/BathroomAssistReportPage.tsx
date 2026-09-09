@@ -268,14 +268,14 @@ const BathroomAssistReportPage: React.FC = () => {
 
   if (!customer || !bathroomLabel) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <Card className="max-w-lg w-full border-0 shadow-2xl rounded-3xl">
           <CardHeader className="space-y-2 text-center">
-            <CardTitle className="text-2xl font-semibold text-red-600 flex items-center justify-center gap-2">
+            <CardTitle className="text-2xl font-semibold text-destructive flex items-center justify-center gap-2">
               <AlertCircle className="h-6 w-6" />
               Missing QR details
             </CardTitle>
-            <p className="text-gray-600">
+            <p className="text-muted-foreground">
               This QR code is missing some setup information. Please contact support or scan a different code.
             </p>
           </CardHeader>
@@ -295,26 +295,26 @@ const BathroomAssistReportPage: React.FC = () => {
 
   if (submittedRequestId) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <Card className="max-w-lg w-full border-0 shadow-2xl rounded-3xl">
           <CardHeader className="text-center space-y-3">
-            <CardTitle className="text-3xl font-bold text-[#00339B] flex items-center justify-center gap-3">
+            <CardTitle className="text-3xl font-bold text-primary flex items-center justify-center gap-3">
               <CheckCircle2 className="h-8 w-8" />
               Request submitted
             </CardTitle>
-            <p className="text-gray-600">
+            <p className="text-muted-foreground">
               Thank you! Our cleaning team has been notified about the issue in {humanize(bathroomLabel)}.
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3">
-              <div className="bg-blue-50 rounded-2xl p-4">
-                <p className="text-sm text-blue-900">Request reference</p>
-                <p className="font-semibold text-blue-700 text-sm break-all">{submittedRequestId}</p>
+              <div className="bg-primary/10 rounded-2xl p-4">
+                <p className="text-sm text-primary">Request reference</p>
+                <p className="font-semibold text-primary text-sm break-all">{submittedRequestId}</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Badge className="bg-blue-100 text-blue-700 rounded-full">{humanize(customer)}</Badge>
-                <Badge className="bg-green-100 text-green-700 rounded-full">{humanize(bathroomLabel)}</Badge>
+                <Badge className="bg-primary/10 text-primary rounded-full">{humanize(customer)}</Badge>
+                <Badge className="bg-success/10 text-success rounded-full">{humanize(bathroomLabel)}</Badge>
               </div>
             </div>
             <Button className="w-full rounded-full" onClick={startNewRequest}>
@@ -331,53 +331,53 @@ const BathroomAssistReportPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-2xl border-0 shadow-2xl rounded-3xl">
         <CardHeader className="space-y-3 text-center">
           <div className="flex items-center justify-center">
-            <Badge className="bg-blue-100 text-blue-700 rounded-full px-4 py-2 text-sm">Bathroom Assist</Badge>
+            <Badge className="bg-primary/10 text-primary rounded-full px-4 py-2 text-sm">Bathroom Assist</Badge>
           </div>
-          <CardTitle className="text-3xl font-bold text-[#00339B]">
+          <CardTitle className="text-3xl font-bold text-primary">
             Need help in {humanize(bathroomLabel)}?
           </CardTitle>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             Tell us what’s wrong and our cleaning team will sort it right away.
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="bg-blue-50 rounded-2xl p-4 flex flex-wrap gap-3 justify-between items-center">
+          <div className="bg-primary/10 rounded-2xl p-4 flex flex-wrap gap-3 justify-between items-center">
             <div>
-              <p className="text-xs uppercase tracking-wide text-blue-700">Location</p>
-              <p className="text-lg font-semibold text-blue-900">{humanize(bathroomLabel)}</p>
+              <p className="text-xs uppercase tracking-wide text-primary">Location</p>
+              <p className="text-lg font-semibold text-primary">{humanize(bathroomLabel)}</p>
             </div>
-            <Badge className="bg-white text-blue-700 border border-blue-200 rounded-full px-4 py-1 text-sm">
+            <Badge className="bg-card text-primary border border-border rounded-full px-4 py-1 text-sm">
               {humanize(customer)}
             </Badge>
           </div>
 
           <section className="space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-gray-700">Last Cleaning Check</p>
+              <p className="text-sm font-semibold text-foreground">Last Cleaning Check</p>
               {historyLoading ? (
-                <span className="text-xs text-gray-400">Loading…</span>
+                <span className="text-xs text-muted-foreground">Loading…</span>
               ) : historyError ? (
-                <span className="text-xs text-red-500">{historyError}</span>
+                <span className="text-xs text-destructive">{historyError}</span>
               ) : null}
             </div>
-            <div className="rounded-2xl border border-red-200 overflow-hidden">
+            <div className="rounded-2xl border border-destructive/30 overflow-hidden">
               <div className="grid grid-cols-1">
-                <div className="bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 uppercase tracking-wide">Time</div>
+                <div className="bg-destructive/10 px-4 py-2 text-sm font-semibold text-destructive uppercase tracking-wide">Time</div>
                 {historyLoading ? (
-                  <div className="px-4 py-3 text-sm text-gray-500 border-t border-red-200">Fetching recent cleanings…</div>
+                  <div className="px-4 py-3 text-sm text-muted-foreground border-t border-destructive/30">Fetching recent cleanings…</div>
                 ) : history.length > 0 ? (
                   history.map(request => (
-                    <div key={request.id} className="px-4 py-3 text-sm text-gray-700 border-t border-red-200">
+                    <div key={request.id} className="px-4 py-3 text-sm text-foreground border-t border-destructive/30">
                       {formatHistoryEntry(request.resolved_at as string)}
                       {request.resolved_by_name ? ` · ${request.resolved_by_name}` : ''}
                     </div>
                   ))
                 ) : historyError ? null : (
-                  <div className="px-4 py-3 text-sm text-gray-500 border-t border-red-200">No recent cleanings recorded.</div>
+                  <div className="px-4 py-3 text-sm text-muted-foreground border-t border-destructive/30">No recent cleanings recorded.</div>
                 )}
               </div>
             </div>
@@ -392,7 +392,7 @@ const BathroomAssistReportPage: React.FC = () => {
 
           <form className="space-y-6" onSubmit={handleSubmit}>
             <section className="space-y-3">
-              <Label className="text-sm font-semibold text-gray-700">What’s the issue?</Label>
+              <Label className="text-sm font-semibold text-foreground">What’s the issue?</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {issueOptions.map(option => (
                   <button
@@ -402,8 +402,8 @@ const BathroomAssistReportPage: React.FC = () => {
                     className={cn(
                       'rounded-2xl border px-4 py-3 text-left transition-all',
                       issueType === option.key
-                        ? 'border-blue-500 bg-blue-50 text-blue-900 shadow-lg'
-                        : 'border-gray-200 hover:border-blue-200 hover:bg-blue-50'
+                        ? 'border-primary/40 bg-primary/10 text-primary shadow-lg'
+                        : 'border-border hover:border-border hover:bg-primary/10'
                     )}
                   >
                     <span className="font-medium">{option.label}</span>
@@ -414,7 +414,7 @@ const BathroomAssistReportPage: React.FC = () => {
 
             {issueType === 'other' ? (
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-700">Describe the issue</Label>
+                <Label className="text-sm font-semibold text-foreground">Describe the issue</Label>
                 <Textarea
                   placeholder="Give us a few details so we know what to fix."
                   value={description}
@@ -425,7 +425,7 @@ const BathroomAssistReportPage: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-700">Anything else we should know? (optional)</Label>
+                <Label className="text-sm font-semibold text-foreground">Anything else we should know? (optional)</Label>
                 <Textarea
                   placeholder="Add extra information if you want."
                   value={description}
@@ -437,12 +437,12 @@ const BathroomAssistReportPage: React.FC = () => {
             )}
 
             <section className="space-y-3">
-              <Label className="text-sm font-semibold text-gray-700">Add photos (optional)</Label>
+              <Label className="text-sm font-semibold text-foreground">Add photos (optional)</Label>
               <label
-                className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-blue-200 bg-blue-50/60 p-6 cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition"
+                className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-primary/5 p-6 cursor-pointer hover:border-primary/30 hover:bg-primary/10 transition"
               >
-                <UploadCloud className="h-8 w-8 text-blue-500" />
-                <span className="text-sm text-blue-700">
+                <UploadCloud className="h-8 w-8 text-primary" />
+                <span className="text-sm text-primary">
                   Tap to upload up to {MAX_FILES} photos
                 </span>
                 <Input
@@ -475,7 +475,7 @@ const BathroomAssistReportPage: React.FC = () => {
 
             <section className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-700">Your name (optional)</Label>
+                <Label className="text-sm font-semibold text-foreground">Your name (optional)</Label>
                 <Input
                   placeholder="You can stay anonymous"
                   value={reporterName}
@@ -484,7 +484,7 @@ const BathroomAssistReportPage: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-700">Contact info (optional)</Label>
+                <Label className="text-sm font-semibold text-foreground">Contact info (optional)</Label>
                 <Input
                   placeholder="Phone or email"
                   value={contactInfo}
@@ -510,7 +510,7 @@ const BathroomAssistReportPage: React.FC = () => {
             </Button>
           </form>
 
-          <p className="text-xs text-gray-400 text-center">
+          <p className="text-xs text-muted-foreground text-center">
             Powered by Suburban Services • Your request is sent securely to the cleaning ops team.
           </p>
         </CardContent>

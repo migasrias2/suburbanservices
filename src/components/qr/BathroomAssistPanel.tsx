@@ -27,11 +27,11 @@ interface LocalMedia extends AssistMedia {
 }
 
 const statusStyles: Record<BathroomAssistRequest['status'], string> = {
-  pending: 'bg-amber-50 text-amber-700 border border-amber-200',
-  accepted: 'bg-blue-50 text-blue-700 border border-blue-200',
-  resolved: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-  escalated: 'bg-red-50 text-red-700 border border-red-200',
-  cancelled: 'bg-gray-50 text-gray-600 border border-gray-200'
+  pending: 'bg-warning/10 text-warning border border-warning/30',
+  accepted: 'bg-primary/10 text-primary border border-border',
+  resolved: 'bg-success/10 text-success border border-success/30',
+  escalated: 'bg-destructive/10 text-destructive border border-destructive/30',
+  cancelled: 'bg-muted text-muted-foreground border border-border'
 }
 
 const storageBucket = 'bathroom-assist'
@@ -281,8 +281,8 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
 
   const renderRequestCard = (request: BathroomAssistRequest, type: 'pending' | 'accepted') => {
     const containerStyles = type === 'pending'
-      ? 'border-amber-100 bg-white/90 shadow-sm hover:shadow-lg hover:border-amber-200'
-      : 'border-blue-100 bg-white/90 shadow-sm hover:shadow-lg hover:border-blue-200'
+      ? 'border-warning/30 bg-card/90 shadow-sm hover:shadow-lg hover:border-warning/30'
+      : 'border-border bg-card/90 shadow-sm hover:shadow-lg hover:border-border'
 
     return (
       // A <button> here would nest the "Accept job" <button> inside it, which is invalid
@@ -306,13 +306,13 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
       >
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-gray-900 leading-tight">{request.location_label}</p>
-            <p className="text-xs text-gray-500 capitalize">{request.issue_type.replace(/_/g, ' ')} · {formatTime(request.reported_at)}</p>
+            <p className="text-sm font-semibold text-foreground leading-tight">{request.location_label}</p>
+            <p className="text-xs text-muted-foreground capitalize">{request.issue_type.replace(/_/g, ' ')} · {formatTime(request.reported_at)}</p>
           </div>
           {type === 'pending' ? (
             <Button
               size="sm"
-              className="rounded-full bg-[#00339B] px-5 text-xs font-semibold text-white shadow-md shadow-blue-200 transition hover:bg-[#002c82] hover:shadow-lg hover:-translate-y-[1px]"
+              className="rounded-full bg-primary px-5 text-xs font-semibold text-primary-foreground shadow-md shadow-blue-200 transition hover:bg-primary/90 hover:shadow-lg hover:-translate-y-[1px]"
               onClick={(event) => {
                 event.stopPropagation()
                 handleAccept(request)
@@ -327,7 +327,7 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
           )}
         </div>
         {request.issue_description ? (
-          <p className="text-xs text-gray-600 rounded-2xl bg-gray-50 px-3 py-2">
+          <p className="text-xs text-muted-foreground rounded-2xl bg-muted px-3 py-2">
             {request.issue_description}
           </p>
         ) : null}
@@ -341,10 +341,10 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-2xl font-semibold text-[#00339B]">
+              <CardTitle className="text-2xl font-semibold text-primary">
                 Bathroom Assist Requests
               </CardTitle>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Live queue of staff reports. Tap a request to view details and close it out.
               </p>
             </div>
@@ -353,12 +353,12 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : requests.length === 0 ? (
-            <Alert className="border-blue-200 bg-blue-50 rounded-2xl">
-              <AlertCircle className="h-5 w-5 text-blue-600" />
-              <AlertDescription className="text-blue-800">
+            <Alert className="border-border bg-primary/10 rounded-2xl">
+              <AlertCircle className="h-5 w-5 text-primary" />
+              <AlertDescription className="text-primary">
                 No requests right now. You’ll see new issues here instantly when they come in.
               </AlertDescription>
             </Alert>
@@ -366,8 +366,8 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
             <div className="grid gap-6 lg:grid-cols-2">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-[0.18em]">Pending</h3>
-                  <span className="text-xs font-medium text-gray-400">{pending.length}</span>
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.18em]">Pending</h3>
+                  <span className="text-xs font-medium text-muted-foreground">{pending.length}</span>
                 </div>
                 <ScrollArea className="h-[380px] pr-2">
                   <div className="space-y-4">
@@ -377,8 +377,8 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
               </div>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-[0.18em]">In progress</h3>
-                  <span className="text-xs font-medium text-gray-400">{accepted.length}</span>
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.18em]">In progress</h3>
+                  <span className="text-xs font-medium text-muted-foreground">{accepted.length}</span>
                 </div>
                 <ScrollArea className="h-[380px] pr-2">
                   <div className="space-y-4">
@@ -396,23 +396,23 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
           {selectedRequest ? (
             <div className="space-y-5">
               <DialogHeader className="space-y-2">
-                <DialogTitle className="text-xl font-semibold text-gray-900">
+                <DialogTitle className="text-xl font-semibold text-foreground">
                   {selectedRequest.location_label}
                 </DialogTitle>
-                <DialogDescription className="text-sm text-gray-500">
+                <DialogDescription className="text-sm text-muted-foreground">
                   {humanStatus[selectedRequest.status]} · {selectedRequest.issue_type.replace(/_/g, ' ')} · {selectedRequest.accepted_at ? `Accepted ${formatTime(selectedRequest.accepted_at)}` : `Reported ${formatTime(selectedRequest.reported_at)}`}
                 </DialogDescription>
               </DialogHeader>
 
               {selectedRequest.issue_description ? (
-                <p className="rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                <p className="rounded-2xl bg-muted px-4 py-3 text-sm text-muted-foreground">
                   {selectedRequest.issue_description}
                 </p>
               ) : null}
 
               {selectedRequest.before_media && Array.isArray(selectedRequest.before_media) && selectedRequest.before_media.length > 0 ? (
                 <section className="space-y-3">
-                  <h4 className="text-sm font-semibold text-gray-700">Existing photos</h4>
+                  <h4 className="text-sm font-semibold text-foreground">Existing photos</h4>
                   <div className="grid grid-cols-2 gap-3">
                     {selectedRequest.before_media.map((media: any, index: number) => (
                       <a key={index} href={media.url || media} target="_blank" rel="noreferrer">
@@ -426,8 +426,8 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
               <section className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-gray-700">Before photos (optional)</Label>
-                    <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-blue-200 bg-blue-50/60 p-5 text-center text-sm text-blue-600 transition hover:border-blue-300 hover:bg-blue-50 cursor-pointer">
+                    <Label className="text-sm font-semibold text-foreground">Before photos (optional)</Label>
+                    <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-primary/5 p-5 text-center text-sm text-primary transition hover:border-primary/30 hover:bg-primary/10 cursor-pointer">
                       <UploadCloud className="h-6 w-6" />
                       Tap to add before photos
                       <Input type="file" multiple accept={ACCEPTED_TYPES.join(',')} className="hidden" onChange={(event) => handleFileSelect(event, 'before')} />
@@ -435,9 +435,9 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
                     {beforePhotos.length > 0 ? (
                       <div className="grid grid-cols-2 gap-3">
                         {beforePhotos.map(photo => (
-                          <div key={photo.id} className="relative overflow-hidden rounded-3xl border border-blue-100 bg-white shadow-sm">
+                          <div key={photo.id} className="relative overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
                             <img src={photo.preview} alt={photo.name} className="h-28 w-full object-cover" />
-                            <div className="absolute top-2 left-2 rounded-full bg-blue-600/90 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-white">
+                            <div className="absolute top-2 left-2 rounded-full bg-primary/90 px-2 py-1 text-caption2 font-medium uppercase tracking-[0.14em] text-primary-foreground">
                               Before
                             </div>
                             <Button
@@ -450,12 +450,12 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
                               <Trash2 className="h-4 w-4" />
                             </Button>
                             {photo.uploading ? (
-                              <div className="absolute inset-0 flex items-center justify-center bg-white/70">
-                                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                              <div className="absolute inset-0 flex items-center justify-center bg-card/70">
+                                <Loader2 className="h-5 w-5 animate-spin text-primary" />
                               </div>
                             ) : null}
                             {photo.error ? (
-                              <div className="absolute inset-x-0 bottom-0 bg-red-600 text-white text-xs text-center py-1">
+                              <div className="absolute inset-x-0 bottom-0 bg-destructive text-destructive-foreground text-xs text-center py-1">
                                 Upload failed
                               </div>
                             ) : null}
@@ -465,8 +465,8 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
                     ) : null}
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-gray-700">After photos</Label>
-                    <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-green-200 bg-green-50/60 p-5 text-center text-sm text-green-600 transition hover:border-green-300 hover:bg-green-50 cursor-pointer">
+                    <Label className="text-sm font-semibold text-foreground">After photos</Label>
+                    <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-success/30 bg-success/5 p-5 text-center text-sm text-success transition hover:border-success/30 hover:bg-success/10 cursor-pointer">
                       <UploadCloud className="h-6 w-6" />
                       Tap to add proof photos
                       <Input type="file" multiple accept={ACCEPTED_TYPES.join(',')} className="hidden" onChange={(event) => handleFileSelect(event, 'after')} />
@@ -474,9 +474,9 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
                     {afterPhotos.length > 0 ? (
                       <div className="grid grid-cols-2 gap-3">
                         {afterPhotos.map(photo => (
-                          <div key={photo.id} className="relative overflow-hidden rounded-3xl border border-green-100 bg-white shadow-sm">
+                          <div key={photo.id} className="relative overflow-hidden rounded-3xl border border-success/30 bg-card shadow-sm">
                             <img src={photo.preview} alt={photo.name} className="h-28 w-full object-cover" />
-                            <div className="absolute top-2 left-2 rounded-full bg-green-600/90 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-white">
+                            <div className="absolute top-2 left-2 rounded-full bg-success/90 px-2 py-1 text-caption2 font-medium uppercase tracking-[0.14em] text-success-foreground">
                               After
                             </div>
                             <Button
@@ -489,12 +489,12 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
                               <Trash2 className="h-4 w-4" />
                             </Button>
                             {photo.uploading ? (
-                              <div className="absolute inset-0 flex items-center justify-center bg-white/70">
-                                <Loader2 className="h-5 w-5 animate-spin text-green-600" />
+                              <div className="absolute inset-0 flex items-center justify-center bg-card/70">
+                                <Loader2 className="h-5 w-5 animate-spin text-success" />
                               </div>
                             ) : null}
                             {photo.error ? (
-                              <div className="absolute inset-x-0 bottom-0 bg-red-600 text-white text-xs text-center py-1">
+                              <div className="absolute inset-x-0 bottom-0 bg-destructive text-destructive-foreground text-xs text-center py-1">
                                 Upload failed
                               </div>
                             ) : null}
@@ -511,7 +511,7 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
               <Button
                 onClick={handleResolve}
                 disabled={resolving || afterPhotos.some(photo => photo.uploading) || beforePhotos.some(photo => photo.uploading)}
-                className="w-full rounded-full bg-[#00339B] py-4 text-lg font-semibold text-white shadow-sm transition hover:bg-[#002c82]"
+                className="w-full rounded-full bg-primary py-4 text-lg font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
               >
                 {resolving ? (
                   <span className="flex items-center justify-center gap-2">
@@ -528,20 +528,20 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
 
             <section className="space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-gray-700">Last cleaning checks</h4>
+                <h4 className="text-sm font-semibold text-foreground">Last cleaning checks</h4>
                 {historyLoading ? (
-                  <span className="text-xs text-gray-400">Loading…</span>
+                  <span className="text-xs text-muted-foreground">Loading…</span>
                 ) : historyError ? (
-                  <span className="text-xs text-red-500">{historyError}</span>
+                  <span className="text-xs text-destructive">{historyError}</span>
                 ) : null}
               </div>
-              <div className="rounded-2xl border border-red-200 overflow-hidden">
-                <div className="bg-red-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-red-700">Time</div>
+              <div className="rounded-2xl border border-destructive/30 overflow-hidden">
+                <div className="bg-destructive/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-destructive">Time</div>
                 {historyLoading ? (
-                  <div className="px-4 py-3 text-sm text-gray-500 border-t border-red-200">Fetching recent cleanings…</div>
+                  <div className="px-4 py-3 text-sm text-muted-foreground border-t border-destructive/30">Fetching recent cleanings…</div>
                 ) : history.length > 0 ? (
                   history.map(entry => (
-                    <div key={entry.id} className="px-4 py-3 text-sm text-gray-700 border-t border-red-200">
+                    <div key={entry.id} className="px-4 py-3 text-sm text-foreground border-t border-destructive/30">
                       {new Date(entry.resolved_at || '').toLocaleString(undefined, {
                         day: '2-digit',
                         month: 'long',
@@ -553,7 +553,7 @@ const BathroomAssistPanel: React.FC<BathroomAssistPanelProps> = ({ cleanerId, cl
                     </div>
                   ))
                 ) : historyError ? null : (
-                  <div className="px-4 py-3 text-sm text-gray-500 border-t border-red-200">No recent cleanings recorded.</div>
+                  <div className="px-4 py-3 text-sm text-muted-foreground border-t border-destructive/30">No recent cleanings recorded.</div>
                 )}
               </div>
             </section>

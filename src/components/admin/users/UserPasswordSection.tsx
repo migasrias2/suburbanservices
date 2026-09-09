@@ -122,16 +122,16 @@ export const UserPasswordSection: React.FC<UserPasswordSectionProps> = ({ user }
 
   return (
     <section>
-      <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
         Password
       </h3>
 
       {loading ? (
-        <div className="h-[60px] animate-pulse rounded-2xl bg-gray-100" />
+        <div className="h-[60px] animate-pulse rounded-2xl bg-muted" />
       ) : stored ? (
-        <div className="rounded-2xl border border-gray-100">
+        <div className="rounded-2xl border border-border">
           <div className="flex items-center gap-2 px-4 py-3">
-            <code className="min-w-0 flex-1 truncate font-mono text-sm text-gray-900">
+            <code className="min-w-0 flex-1 truncate font-mono text-sm text-foreground">
               {revealed ? stored.password : '•'.repeat(12)}
             </code>
             <Button
@@ -139,7 +139,7 @@ export const UserPasswordSection: React.FC<UserPasswordSectionProps> = ({ user }
               size="sm"
               onClick={() => setRevealed((v) => !v)}
               aria-label={revealed ? 'Hide password' : 'Show password'}
-              className="h-8 w-8 shrink-0 rounded-full p-0 text-gray-500 hover:bg-gray-100"
+              className="h-8 w-8 shrink-0 rounded-full p-0 text-muted-foreground hover:bg-muted"
             >
               {revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </Button>
@@ -148,26 +148,26 @@ export const UserPasswordSection: React.FC<UserPasswordSectionProps> = ({ user }
               size="sm"
               onClick={copy}
               aria-label="Copy password"
-              className="h-8 w-8 shrink-0 rounded-full p-0 text-gray-500 hover:bg-gray-100"
+              className="h-8 w-8 shrink-0 rounded-full p-0 text-muted-foreground hover:bg-muted"
             >
               {copied ? (
-                <Check className="h-4 w-4 text-green-600" />
+                <Check className="h-4 w-4 text-success" />
               ) : (
                 <Copy className="h-4 w-4" />
               )}
             </Button>
           </div>
-          <p className="border-t border-gray-50 px-4 py-2 text-xs text-gray-400">
+          <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
             Set {formatSetAt(stored.updatedAt)}
           </p>
         </div>
       ) : loadFailed ? (
-        <div className="rounded-2xl bg-gray-50 px-4 py-4 text-sm text-gray-600">
+        <div className="rounded-2xl bg-muted px-4 py-4 text-sm text-muted-foreground">
           Couldn't load this password. Close the panel and reopen it to try again.
         </div>
       ) : (
-        <div className="flex items-start gap-3 rounded-2xl bg-gray-50 px-4 py-4 text-sm text-gray-600">
-          <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+        <div className="flex items-start gap-3 rounded-2xl bg-muted px-4 py-4 text-sm text-muted-foreground">
+          <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
           <span>
             Not recorded. This account was created before passwords were kept, and the original
             can't be recovered — set a new one to show it here.
@@ -178,13 +178,13 @@ export const UserPasswordSection: React.FC<UserPasswordSectionProps> = ({ user }
       {isChoosing ? (
         <div className="mt-3 space-y-3">
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-gray-700">New password</Label>
+            <Label className="text-sm font-medium text-foreground">New password</Label>
             <Input
               value={chosen}
               onChange={(e) => setChosen(e.target.value)}
               placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
               autoComplete="off"
-              className="h-11 rounded-2xl border-gray-200 bg-gray-50/70 px-4 font-mono"
+              className="h-11 rounded-2xl border-border bg-muted/70 px-4 font-mono"
             />
           </div>
           <div className="flex justify-end gap-2">
@@ -194,14 +194,14 @@ export const UserPasswordSection: React.FC<UserPasswordSectionProps> = ({ user }
                 setIsChoosing(false)
                 setChosen('')
               }}
-              className="rounded-full text-gray-600"
+              className="rounded-full text-muted-foreground"
             >
               Cancel
             </Button>
             <Button
               onClick={() => applyPassword(chosen)}
               disabled={isSaving || chosen.trim().length < MIN_PASSWORD_LENGTH}
-              className="rounded-full bg-[#00339B] px-5 text-white hover:bg-[#002d7a]"
+              className="rounded-full bg-primary px-5 text-primary-foreground hover:bg-primary/90"
             >
               {isSaving ? 'Saving…' : 'Save password'}
             </Button>
@@ -213,7 +213,7 @@ export const UserPasswordSection: React.FC<UserPasswordSectionProps> = ({ user }
             variant="ghost"
             onClick={() => applyPassword('')}
             disabled={isSaving}
-            className="rounded-full text-gray-600 hover:bg-gray-100"
+            className="rounded-full text-muted-foreground hover:bg-muted"
           >
             <RefreshCw className="mr-2 h-4 w-4" />
             {isSaving ? 'Working…' : 'Generate new'}
@@ -222,7 +222,7 @@ export const UserPasswordSection: React.FC<UserPasswordSectionProps> = ({ user }
             variant="ghost"
             onClick={() => setIsChoosing(true)}
             disabled={isSaving}
-            className="rounded-full text-gray-600 hover:bg-gray-100"
+            className="rounded-full text-muted-foreground hover:bg-muted"
           >
             <KeyRound className="mr-2 h-4 w-4" />
             Set specific
@@ -231,7 +231,7 @@ export const UserPasswordSection: React.FC<UserPasswordSectionProps> = ({ user }
       )}
 
       {isSelf && (
-        <p className="mt-3 text-xs leading-relaxed text-amber-600">
+        <p className="mt-3 text-xs leading-relaxed text-warning">
           This is your own account — changing it may sign you out of this session.
         </p>
       )}

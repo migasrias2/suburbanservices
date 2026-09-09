@@ -32,8 +32,8 @@ export default function ProfilePage() {
 
   if (!userType || !userId || !userName) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
+      <div className="flex justify-center items-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary/40 border-t-transparent"></div>
       </div>
     )
   }
@@ -60,7 +60,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary/40"></div>
       </div>
     )
   }
@@ -71,16 +71,16 @@ export default function ProfilePage() {
         {/* Header */}
         <div className="text-center space-y-3">
           <div className="flex justify-center">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center">
-              <span className="text-white font-bold text-2xl">
+            <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-2xl">
                 {userName.charAt(0).toUpperCase()}
               </span>
             </div>
           </div>
-          <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          <h1 className="text-3xl lg:text-4xl font-bold text-primary">
             {userName}
           </h1>
-          <p className="text-gray-600 text-lg">
+          <p className="text-muted-foreground text-lg">
             {(() => {
               switch (userType) {
                 case 'ops_manager':
@@ -100,8 +100,8 @@ export default function ProfilePage() {
         {/* Profile Information */}
         <Card className="card-modern border-0 shadow-xl rounded-3xl">
           <CardContent className="p-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-              <User className="h-6 w-6 text-blue-600" />
+            <h2 className="text-xl font-bold text-foreground mb-6 flex items-center gap-3">
+              <User className="h-6 w-6 text-primary" />
               Personal Information
             </h2>
             
@@ -109,53 +109,53 @@ export default function ProfilePage() {
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-600 mb-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
                       <User className="h-4 w-4" />
                       First Name
                     </label>
-                    <p className="text-lg text-gray-900 bg-gray-50 p-3 rounded-full">
+                    <p className="text-lg text-foreground bg-muted p-3 rounded-full">
                       {cleaner.first_name || 'Not provided'}
                     </p>
                   </div>
                   
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-600 mb-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
                       <User className="h-4 w-4" />
                       Last Name
                     </label>
-                    <p className="text-lg text-gray-900 bg-gray-50 p-3 rounded-full">
+                    <p className="text-lg text-foreground bg-muted p-3 rounded-full">
                       {cleaner.last_name || 'Not provided'}
                     </p>
                   </div>
                 </div>
 
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-600 mb-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
                     <Phone className="h-4 w-4" />
                     Mobile Number
                   </label>
-                  <p className="text-lg text-gray-900 bg-gray-50 p-3 rounded-xl">
+                  <p className="text-lg text-foreground bg-muted p-3 rounded-xl">
                     {cleaner.mobile_number || 'Not provided'}
                   </p>
                 </div>
 
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-600 mb-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
                     <Mail className="h-4 w-4" />
                     Email Address
                   </label>
-                  <p className="text-lg text-gray-900 bg-gray-50 p-3 rounded-xl">
+                  <p className="text-lg text-foreground bg-muted p-3 rounded-xl">
                     {cleaner.email_address || 'Not provided'}
                   </p>
                 </div>
 
                 {cleaner.employee_number && (
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-600 mb-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
                       <Hash className="h-4 w-4" />
                       Employee Number
                     </label>
-                    <p className="text-lg text-gray-900 bg-gray-50 p-3 rounded-full">
+                    <p className="text-lg text-foreground bg-muted p-3 rounded-full">
                       {cleaner.employee_number}
                     </p>
                   </div>
@@ -163,11 +163,11 @@ export default function ProfilePage() {
 
                 {cleaner.customer_name && (
                   <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-600 mb-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
                       <Building className="h-4 w-4" />
                       Assigned Customer
                     </label>
-                    <p className="text-lg text-gray-900 bg-gray-50 p-3 rounded-full">
+                    <p className="text-lg text-foreground bg-muted p-3 rounded-full">
                       {cleaner.customer_name}
                     </p>
                   </div>
@@ -175,8 +175,8 @@ export default function ProfilePage() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">Unable to load profile information</p>
+                <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">Unable to load profile information</p>
               </div>
             )}
           </CardContent>
@@ -185,23 +185,23 @@ export default function ProfilePage() {
         {/* Quick Actions */}
         <Card className="card-modern border-0 shadow-lg">
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h3>
             <div className="space-y-3">
               <button 
                 onClick={() => navigate('/clock-in')}
-                className="w-full text-left p-3 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors text-blue-700 font-medium"
+                className="w-full text-left p-3 rounded-xl bg-primary/10 hover:bg-primary/10 transition-colors text-primary font-medium"
               >
                 → Go to Clock In
               </button>
               <button 
                 onClick={() => navigate('/scanner')}
-                className="w-full text-left p-3 rounded-xl bg-green-50 hover:bg-green-100 transition-colors text-green-700 font-medium"
+                className="w-full text-left p-3 rounded-xl bg-success/10 hover:bg-success/10 transition-colors text-success font-medium"
               >
                 → Open Scanner
               </button>
               <button 
                 onClick={() => navigate('/history')}
-                className="w-full text-left p-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 transition-colors text-indigo-700 font-medium"
+                className="w-full text-left p-3 rounded-xl bg-primary/10 hover:bg-primary/10 transition-colors text-primary font-medium"
               >
                 → View History
               </button>

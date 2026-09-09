@@ -1,105 +1,292 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
+/* Font is wired through --font-sans below; swapping families is a one-line change.
+   HIG > Typography: "avoid Ultralight, Thin, and Light font weights" — we load 400-700 only. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================================
+   Design tokens
+
+   Every value is semantic (what it's for) rather than literal (what it looks
+   like), so the same class works in both appearances.
+   HIG > Color: "use dynamic system colors as intended... semantically defined
+   by purpose, rather than appearance or color values."
+
+   Contrast is held to HIG > Accessibility: 4.5:1 for text up to 17pt. Dark mode
+   foregrounds target the 7:1 the Dark Mode guidance prefers for small text.
+   ========================================================================== */
+
 @layer base {
   :root {
-    /* Brand primary: #00339B (H 220 S 100% L 30%) */
+    /* Single swap point for the typeface. The stack falls back to the real
+       system font (SF Pro on Apple platforms) before any generic. */
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+      system-ui, sans-serif;
+
+    /* Surfaces — Apple's layered background model: a recessive page ground with
+       content raised onto it. */
+    --background: 240 20% 96%;
+    --foreground: 240 6% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 11%;
+
+    /* Brand primary #00339B — 11.1:1 against white */
     --primary: 220 100% 30%;
     --primary-foreground: 0 0% 100%;
-    /* Sidebar palette tuned for light theme */
+
+    --secondary: 240 14% 93%;
+    --secondary-foreground: 240 6% 20%;
+
+    /* 6.4:1 on card, 5.9:1 on background — secondary text stays readable.
+       Apple's own secondaryLabel lands near 2.9:1, which fails the 4.5:1 floor,
+       so this is deliberately darker than the system value. */
+    --muted: 240 20% 96%;
+    --muted-foreground: 240 4% 40%;
+
+    --accent: 240 16% 94%;
+    --accent-foreground: 240 6% 15%;
+
+    /* Status — derived from Apple's system colours, darkened where the system
+       value would not carry white text at 4.5:1. */
+    --destructive: 4 78% 48%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 70% 30%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 32 95% 34%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 211 92% 38%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 240 10% 87%;
+    --input: 240 10% 84%;
+    --ring: 220 100% 40%;
+
+    /* Controls sit at 12px, cards step up from there. */
+    --radius: 0.75rem;
+
+    /* HIG > Materials: depth comes from soft, shallow elevation, not hard edges. */
+    --shadow-xs: 0 1px 2px 0 hsl(240 6% 11% / 0.04);
+    --shadow-sm: 0 1px 3px 0 hsl(240 6% 11% / 0.06), 0 1px 2px -1px hsl(240 6% 11% / 0.04);
+    --shadow-md: 0 4px 12px -2px hsl(240 6% 11% / 0.07), 0 2px 4px -2px hsl(240 6% 11% / 0.05);
+    --shadow-lg: 0 12px 32px -6px hsl(240 6% 11% / 0.10), 0 4px 8px -4px hsl(240 6% 11% / 0.05);
+    --shadow-xl: 0 24px 56px -12px hsl(240 6% 11% / 0.14), 0 8px 16px -8px hsl(240 6% 11% / 0.06);
+
+    /* Translucent chrome. Saturation lifts colour that would otherwise go flat
+       behind the blur. */
+    --material-thin: 0 0% 100% / 0.72;
+    --material-regular: 0 0% 100% / 0.82;
+    --material-thick: 0 0% 100% / 0.94;
+
+    /* Categorical series colours. Distinct in hue rather than lightness so
+       they stay separable for colour-blind viewers and in greyscale print. */
+    --chart-1: 220 100% 42%;
+    --chart-2: 262 76% 55%;
+    --chart-3: 25 90% 48%;
+    --chart-4: 160 84% 32%;
+    --chart-5: 199 89% 41%;
+    --chart-6: 322 72% 48%;
+    --chart-7: 43 89% 40%;
+    --chart-8: 188 85% 32%;
+
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 220 100% 35%;
+    --sidebar-foreground: 240 6% 11%;
+    --sidebar-primary: 220 100% 30%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 100% 97%;
-    --sidebar-accent-foreground: 223 42% 27%;
-    --sidebar-border: 220 28% 88%;
-    --sidebar-ring: 220 90% 56%;
+    --sidebar-accent: 240 16% 95%;
+    --sidebar-accent-foreground: 220 100% 25%;
+    --sidebar-border: 240 10% 90%;
+    --sidebar-ring: 220 100% 40%;
   }
+
+  .dark {
+    /* HIG > Dark Mode: base backgrounds recede, elevated surfaces advance.
+       Cards are lighter than the page, not darker. */
+    --background: 240 6% 8%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 6% 12%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 6% 14%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Brand blue is too dark to read on a dark ground, so it brightens and
+       carries dark text instead — the same inversion Apple applies. */
+    --primary: 217 91% 66%;
+    --primary-foreground: 240 6% 10%;
+
+    --secondary: 240 5% 18%;
+    --secondary-foreground: 0 0% 96%;
+
+    /* 8.6:1 on card — meets the 7:1 the Dark Mode guidance prefers. */
+    --muted: 240 5% 16%;
+    --muted-foreground: 240 5% 70%;
+
+    --accent: 240 5% 20%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 4 90% 64%;
+    --destructive-foreground: 240 6% 10%;
+
+    --success: 142 62% 55%;
+    --success-foreground: 240 6% 10%;
+
+    --warning: 36 96% 60%;
+    --warning-foreground: 240 6% 10%;
+
+    --info: 211 92% 65%;
+    --info-foreground: 240 6% 10%;
+
+    --border: 240 5% 22%;
+    --input: 240 5% 24%;
+    --ring: 217 91% 60%;
+
+    --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.30);
+    --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.40), 0 1px 2px -1px hsl(0 0% 0% / 0.30);
+    --shadow-md: 0 4px 12px -2px hsl(0 0% 0% / 0.45), 0 2px 4px -2px hsl(0 0% 0% / 0.30);
+    --shadow-lg: 0 12px 32px -6px hsl(0 0% 0% / 0.55), 0 4px 8px -4px hsl(0 0% 0% / 0.35);
+    --shadow-xl: 0 24px 56px -12px hsl(0 0% 0% / 0.65), 0 8px 16px -8px hsl(0 0% 0% / 0.40);
+
+    --material-thin: 240 6% 12% / 0.72;
+    --material-regular: 240 6% 12% / 0.82;
+    --material-thick: 240 6% 12% / 0.94;
+
+    /* Lifted and slightly desaturated so they read against a dark ground. */
+    --chart-1: 217 91% 66%;
+    --chart-2: 262 83% 72%;
+    --chart-3: 25 95% 62%;
+    --chart-4: 160 70% 52%;
+    --chart-5: 199 89% 62%;
+    --chart-6: 322 78% 68%;
+    --chart-7: 43 92% 60%;
+    --chart-8: 188 75% 55%;
+
+    --sidebar-background: 240 6% 10%;
+    --sidebar-foreground: 0 0% 96%;
+    --sidebar-primary: 217 91% 66%;
+    --sidebar-primary-foreground: 240 6% 10%;
+    --sidebar-accent: 240 5% 18%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 5% 20%;
+    --sidebar-ring: 217 91% 60%;
+  }
+
   * {
     @apply border-border;
   }
-  
-  body {
-    @apply bg-background text-foreground;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  }
-}
 
-.dark {
-  --sidebar-background: 222 47% 10%;
-  --sidebar-foreground: 0 0% 100%;
-  --sidebar-primary: 220 100% 70%;
-  --sidebar-primary-foreground: 222 47% 10%;
-  --sidebar-accent: 220 42% 20%;
-  --sidebar-accent-foreground: 220 100% 97%;
-  --sidebar-border: 220 40% 26%;
-  --sidebar-ring: 220 90% 70%;
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Numerals in tables, timers and counts stay column-aligned and stop jittering
+     as they tick. */
+  th, td, time, [data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* HIG > Layout: respect device safe areas. */
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* A visible, consistent focus ring everywhere — keyboard users get the same
+     affordance the pointer gets. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* HIG > Motion: honour the system reduced-motion preference. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer components {
-  /* Soft card style (used instead of hard borders) */
+  /* Content raised onto the page ground. */
   .card-soft {
-    @apply rounded-2xl border border-gray-100 shadow-sm bg-white;
+    @apply rounded-2xl border border-border bg-card text-card-foreground shadow-sm;
   }
 
-  /* Page transition — keyframe so it re-runs each time the element mounts (i.e. each route change) */
-  @keyframes page-fade-in {
-    from {
-      opacity: 0;
-      transform: translateY(6px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  .card-modern {
+    @apply rounded-2xl border border-border bg-card text-card-foreground shadow-md;
   }
+
+  /* HIG > Materials: translucent chrome that lets content colour through.
+     The saturate() is what keeps colour from going grey behind the blur. */
+  .glass {
+    background-color: hsl(var(--material-regular));
+    @apply backdrop-blur-xl border border-border/60;
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+  }
+
+  .glass-thin {
+    background-color: hsl(var(--material-thin));
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    @apply border border-border/50;
+  }
+
+  /* HIG > Accessibility: 44pt minimum touch target on mobile. */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  .btn-pill {
+    @apply rounded-xl px-6 py-3 font-medium transition-all duration-200 min-h-[44px];
+  }
+
+  .btn-primary {
+    @apply bg-primary text-primary-foreground shadow-sm hover:opacity-90 active:scale-[0.98];
+  }
+
+  .btn-outline {
+    @apply border border-input bg-card text-foreground hover:bg-accent hover:text-accent-foreground;
+  }
+
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+
+  .transition-smooth {
+    @apply transition-all duration-300;
+    transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  /* Page transition — a keyframe rather than a transition so it replays on each
+     mount, i.e. on every route change. */
+  @keyframes page-fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
   .page-fade {
-    animation: page-fade-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: page-fade-in 320ms cubic-bezier(0.32, 0.72, 0, 1) both;
     will-change: opacity, transform;
   }
-  /* Legacy aliases for any remaining usages */
+
+  /* Retained for any call sites still using the old names. */
   .page-fade-enter,
   .page-fade-enter-active {
-    animation: page-fade-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: page-fade-in 320ms cubic-bezier(0.32, 0.72, 0, 1) both;
   }
-  /* Custom button styles */
-  .btn-pill {
-    @apply rounded-xl px-6 py-3 font-medium transition-all duration-200;
-  }
-  
-  .btn-primary {
-    @apply text-white shadow-lg hover:shadow-xl;
-    background-color: #00339B;
-    &:hover { background-color: #002a7f; }
-  }
-  
-  .btn-outline {
-    @apply border-2 border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50 text-gray-700;
-  }
-
-  /* Card styles */
-  .card-modern {
-    @apply rounded-2xl bg-white shadow-lg border border-gray-100;
-  }
-
-  /* Glass morphism effect */
-  .glass {
-    @apply backdrop-blur-md bg-white/80 border border-white/20;
-  }
-}
-
-/* Custom focus states */
-.focus-ring {
-  @apply focus:outline-none focus:ring-2;
-  box-shadow: 0 0 0 2px rgb(0 51 155 / 0.2);
-  border-color: #00339B;
-}
-
-/* Smooth transitions */
-.transition-smooth {
-  @apply transition-all duration-300 ease-in-out;
 }

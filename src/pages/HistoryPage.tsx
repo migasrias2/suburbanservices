@@ -33,8 +33,8 @@ export default function HistoryPage() {
 
   if (!userType || !userId || !userName) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
+      <div className="flex justify-center items-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary/40 border-t-transparent"></div>
       </div>
     )
   }
@@ -60,7 +60,7 @@ export default function HistoryPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary/40"></div>
       </div>
     )
   }
@@ -71,38 +71,38 @@ export default function HistoryPage() {
         {/* Header */}
         <div className="text-center space-y-3">
           <div className="flex justify-center">
-            <div className="p-4 rounded-2xl bg-blue-100">
-              <FileText className="h-8 w-8 text-blue-600" />
+            <div className="p-4 rounded-2xl bg-primary/10">
+              <FileText className="h-8 w-8 text-primary" />
             </div>
           </div>
-          <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          <h1 className="text-3xl lg:text-4xl font-bold text-primary">
             Activity History
           </h1>
-          <p className="text-gray-600 text-lg">Your recent cleaning activities and QR code scans</p>
+          <p className="text-muted-foreground text-lg">Your recent cleaning activities and QR code scans</p>
         </div>
 
         {/* Stats Summary */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card className="card-modern border-0 shadow-lg">
             <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-blue-600 mb-1">{recentScans.length}</div>
-              <div className="text-sm text-gray-600">Total Activities</div>
+              <div className="text-2xl font-bold text-primary mb-1">{recentScans.length}</div>
+              <div className="text-sm text-muted-foreground">Total Activities</div>
             </CardContent>
           </Card>
           <Card className="card-modern border-0 shadow-lg">
             <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-green-600 mb-1">
+              <div className="text-2xl font-bold text-success mb-1">
                 {recentScans.filter(scan => scan.action.includes('Clock In')).length}
               </div>
-              <div className="text-sm text-gray-600">Clock Ins</div>
+              <div className="text-sm text-muted-foreground">Clock Ins</div>
             </CardContent>
           </Card>
           <Card className="card-modern border-0 shadow-lg">
             <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-indigo-600 mb-1">
+              <div className="text-2xl font-bold text-primary mb-1">
                 {new Set(recentScans.map(scan => scan.site_area).filter(Boolean)).size}
               </div>
-              <div className="text-sm text-gray-600">Locations</div>
+              <div className="text-sm text-muted-foreground">Locations</div>
             </CardContent>
           </Card>
         </div>
@@ -110,8 +110,8 @@ export default function HistoryPage() {
         {/* Activity List */}
         <Card className="card-modern border-0 shadow-xl">
           <CardContent className="p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-              <Clock className="h-6 w-6 text-blue-600" />
+            <h2 className="text-xl font-bold text-foreground mb-6 flex items-center gap-3">
+              <Clock className="h-6 w-6 text-primary" />
               Recent Activity
             </h2>
             
@@ -121,17 +121,17 @@ export default function HistoryPage() {
                   {recentScans.map((scan) => (
                     <div key={scan.id} className="card-modern border-0 shadow-lg p-4 hover:shadow-xl transition-shadow">
                       <div className="flex items-center gap-4">
-                        <div className="p-2 rounded-xl bg-blue-100">
-                          <QrCode className="h-5 w-5 text-blue-600" />
+                        <div className="p-2 rounded-xl bg-primary/10">
+                          <QrCode className="h-5 w-5 text-primary" />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold text-gray-900">{scan.action}</span>
-                            <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-full">
+                            <span className="font-semibold text-foreground">{scan.action}</span>
+                            <Badge className="bg-primary/10 text-primary hover:bg-primary/10 rounded-full">
                               {scan.site_area}
                             </Badge>
                           </div>
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
                             <span>{new Date(scan.timestamp).toLocaleString()}</span>
                             {scan.customer_name && (
                               <span>• {scan.customer_name}</span>
@@ -139,7 +139,7 @@ export default function HistoryPage() {
                           </div>
                         </div>
                         {scan.location_lat && scan.location_lng && (
-                          <div className="flex items-center gap-1 text-sm text-green-600">
+                          <div className="flex items-center gap-1 text-sm text-success">
                             <MapPin className="h-4 w-4" />
                             <span>Located</span>
                           </div>
@@ -150,9 +150,9 @@ export default function HistoryPage() {
                 </div>
               ) : (
                 <div className="text-center py-12">
-                  <QrCode className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500 text-lg">No activity recorded yet</p>
-                  <p className="text-gray-400">Start scanning QR codes to see your history</p>
+                  <QrCode className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground text-lg">No activity recorded yet</p>
+                  <p className="text-muted-foreground">Start scanning QR codes to see your history</p>
                 </div>
               )}
             </div>

@@ -254,7 +254,7 @@ export default function UsersPage() {
   if (!userName) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/40 border-t-transparent" />
       </div>
     )
   }
@@ -268,7 +268,7 @@ export default function UsersPage() {
           actions={
             <Button
               onClick={openAdd}
-              className="h-11 rounded-full bg-[#00339B] px-5 text-white hover:bg-[#002d7a]"
+              className="h-11 rounded-full bg-primary px-5 text-primary-foreground hover:bg-primary/90"
             >
               <Plus className="mr-2 h-4 w-4" />
               Add user
@@ -277,12 +277,12 @@ export default function UsersPage() {
         />
 
         <div className="relative mb-3">
-          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or identifier"
-            className="h-12 rounded-2xl border-gray-200 bg-white pl-11"
+            className="h-12 rounded-2xl border-border bg-card pl-11"
           />
         </div>
 
@@ -297,7 +297,7 @@ export default function UsersPage() {
           ))}
           <FilterPill
             active={unlinkedOnly}
-            activeClass="bg-amber-600 text-white"
+            activeClass="bg-warning text-warning-foreground"
             onClick={() => setUnlinkedOnly((v) => !v)}
           >
             No site
@@ -308,9 +308,9 @@ export default function UsersPage() {
         </FilterStrip>
 
         {isLoading ? (
-          <div className="py-16 text-center text-sm text-gray-400">Loading…</div>
+          <div className="py-16 text-center text-sm text-muted-foreground">Loading…</div>
         ) : filtered.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-gray-200 bg-white/60 py-20 text-center text-gray-400">
+          <div className="rounded-3xl border border-dashed border-border bg-card/60 py-20 text-center text-muted-foreground">
             No users match.
           </div>
         ) : (
@@ -321,19 +321,19 @@ export default function UsersPage() {
               return (
                 <section key={role}>
                   <div className="mb-3 flex items-baseline justify-between px-1">
-                    <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
+                    <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                       {ROLE_LABEL[role]}s
                     </h2>
-                    <span className="text-xs font-medium text-gray-400">{rows.length}</span>
+                    <span className="text-xs font-medium text-muted-foreground">{rows.length}</span>
                   </div>
-                  <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white">
+                  <div className="overflow-hidden rounded-3xl border border-border bg-card">
                     {rows.map((u, idx) => (
                       <button
                         key={`${u.role}-${u.user_id}`}
                         type="button"
                         onClick={() => setDetail({ role: u.role, userId: u.user_id })}
-                        className={`flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-gray-50 ${
-                          idx > 0 ? 'border-t border-gray-50' : ''
+                        className={`flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-muted ${
+                          idx > 0 ? 'border-t border-border' : ''
                         } ${!u.is_active ? 'opacity-50' : ''}`}
                       >
                         <div className="flex min-w-0 flex-1 items-center gap-4">
@@ -343,19 +343,19 @@ export default function UsersPage() {
                             {initials(u)}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-base font-medium text-gray-900">
+                            <div className="truncate text-base font-medium text-foreground">
                               {u.first_name} {u.last_name}
                               {!u.is_active && (
-                                <span className="ml-2 text-xs text-gray-400">· inactive</span>
+                                <span className="ml-2 text-xs text-muted-foreground">· inactive</span>
                               )}
                             </div>
                             <div className="mt-0.5 flex items-center gap-2 text-xs">
-                              <span className="truncate text-gray-500">{u.identifier ?? '—'}</span>
+                              <span className="truncate text-muted-foreground">{u.identifier ?? '—'}</span>
                               <SiteBadge user={u} links={linksFor(u)} />
                             </div>
                           </div>
                         </div>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-gray-300" />
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                       </button>
                     ))}
                   </div>
@@ -378,12 +378,12 @@ export default function UsersPage() {
             // Bottom sheet on phones, centred card from sm up. max-h + scroll
             // matters most with the keyboard open, where the admin/email variant
             // of this form is taller than the visible viewport.
-            <div className="pointer-events-none fixed inset-0 z-[100] flex items-end justify-center bg-white/30 backdrop-blur-sm sm:items-center sm:p-4">
-              <div className="pointer-events-auto max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-gray-200 bg-white p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-black/5 sm:rounded-3xl sm:p-8 sm:pb-8">
+            <div className="pointer-events-none fixed inset-0 z-[100] flex items-end justify-center bg-card/30 backdrop-blur-sm sm:items-center sm:p-4">
+              <div className="pointer-events-auto max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-border bg-card p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-border sm:rounded-3xl sm:p-8 sm:pb-8">
                 {created ? (
                   <>
                     <div className="mb-6 flex items-center justify-between">
-                      <h2 className="text-xl font-semibold text-gray-900">User created</h2>
+                      <h2 className="text-xl font-semibold text-foreground">User created</h2>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -391,39 +391,39 @@ export default function UsersPage() {
                           setIsAdding(false)
                           setCreated(null)
                         }}
-                        className="h-8 w-8 rounded-full p-0 text-gray-500"
+                        className="h-8 w-8 rounded-full p-0 text-muted-foreground"
                       >
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
-                    <p className="mb-4 text-sm text-gray-500">
+                    <p className="mb-4 text-sm text-muted-foreground">
                       {created.recorded
                         ? "Share this with them. You can see it again any time on their profile."
                         : 'Save this password now — it could not be stored, so this profile will not show it.'}
                     </p>
                     <div className="space-y-4">
-                      <div className="rounded-2xl bg-gray-50 p-4">
-                        <div className="text-xs uppercase tracking-wider text-gray-400">Name</div>
-                        <div className="mt-1 text-base font-medium text-gray-900">
+                      <div className="rounded-2xl bg-muted p-4">
+                        <div className="text-xs uppercase tracking-wider text-muted-foreground">Name</div>
+                        <div className="mt-1 text-base font-medium text-foreground">
                           {created.firstName} {created.lastName}
                         </div>
-                        <div className="mt-3 text-xs uppercase tracking-wider text-gray-400">
+                        <div className="mt-3 text-xs uppercase tracking-wider text-muted-foreground">
                           {ROLE_LABEL[created.role]} ·{' '}
                           {created.role === 'cleaner' || created.role === 'manager'
                             ? 'Phone'
                             : 'Username'}
                         </div>
-                        <div className="mt-1 text-sm text-gray-700">{created.identifier}</div>
+                        <div className="mt-1 text-sm text-foreground">{created.identifier}</div>
                       </div>
                       <div>
-                        <Label className="text-sm font-medium text-gray-700">Password</Label>
+                        <Label className="text-sm font-medium text-foreground">Password</Label>
                         <div className="mt-2 flex items-center gap-2">
-                          <code className="flex-1 select-all rounded-2xl bg-gray-50 px-4 py-3 font-mono text-base text-gray-900">
+                          <code className="flex-1 select-all rounded-2xl bg-muted px-4 py-3 font-mono text-base text-foreground">
                             {created.password}
                           </code>
                           <Button
                             onClick={copyPassword}
-                            className="rounded-full bg-[#00339B] px-4 text-white hover:bg-[#002d7a]"
+                            className="rounded-full bg-primary px-4 text-primary-foreground hover:bg-primary/90"
                           >
                             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                           </Button>
@@ -436,7 +436,7 @@ export default function UsersPage() {
                           setIsAdding(false)
                           setCreated(null)
                         }}
-                        className="rounded-full bg-[#00339B] px-6 text-white hover:bg-[#002d7a]"
+                        className="rounded-full bg-primary px-6 text-primary-foreground hover:bg-primary/90"
                       >
                         Done
                       </Button>
@@ -445,22 +445,22 @@ export default function UsersPage() {
                 ) : (
                   <>
                     <div className="mb-6 flex items-center justify-between">
-                      <h2 className="text-xl font-semibold text-gray-900">Add user</h2>
+                      <h2 className="text-xl font-semibold text-foreground">Add user</h2>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setIsAdding(false)}
-                        className="h-8 w-8 rounded-full p-0 text-gray-500"
+                        className="h-8 w-8 rounded-full p-0 text-muted-foreground"
                       >
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
                     {orphanNotice && (
-                      <div className="mb-6 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                      <div className="mb-6 flex gap-3 rounded-2xl border border-warning/30 bg-warning/10 p-4">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-amber-900">{orphanNotice}</p>
-                          <p className="mt-1 text-xs text-amber-800">
+                          <p className="text-sm font-medium text-warning">{orphanNotice}</p>
+                          <p className="mt-1 text-xs text-warning">
                             There is no profile to open — the login exists without a staff record
                             behind it, so it will not appear in this list.
                           </p>
@@ -468,13 +468,13 @@ export default function UsersPage() {
                       </div>
                     )}
                     {collision && (
-                      <div className="mb-6 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+                      <div className="mb-6 flex gap-3 rounded-2xl border border-warning/30 bg-warning/10 p-4">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-amber-900">
+                          <p className="text-sm font-medium text-warning">
                             {describeCollision(collision)}
                           </p>
-                          <p className="mt-1 text-xs text-amber-800">
+                          <p className="mt-1 text-xs text-warning">
                             {collision.isActive
                               ? 'Open their profile instead of adding a second account.'
                               : 'Deactivated people are hidden from this list until you switch the Show inactive filter on.'}
@@ -482,7 +482,7 @@ export default function UsersPage() {
                           {(collision.matchCount ?? 1) > 1 && (
                             // Saying "a record exists" when several do would send the
                             // admin to fix one of them and hit the same refusal again.
-                            <p className="mt-1 text-xs font-medium text-amber-900">
+                            <p className="mt-1 text-xs font-medium text-warning">
                               {collision.matchCount} records share this number. Opening one will not
                               clear the conflict on its own.
                             </p>
@@ -490,7 +490,7 @@ export default function UsersPage() {
                           <Button
                             variant="ghost"
                             onClick={openCollidingUser}
-                            className="mt-2 h-8 rounded-full px-3 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                            className="mt-2 h-8 rounded-full px-3 text-xs font-medium text-warning hover:bg-warning/10"
                           >
                             View profile
                           </Button>
@@ -499,7 +499,7 @@ export default function UsersPage() {
                     )}
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label className="text-sm font-medium text-gray-700">Role</Label>
+                        <Label className="text-sm font-medium text-foreground">Role</Label>
                         <div className="flex flex-wrap gap-1.5">
                           {ALL_ROLES.map((r) => (
                             <button
@@ -508,8 +508,8 @@ export default function UsersPage() {
                               onClick={() => setAddRole(r)}
                               className={`rounded-full px-4 py-2 text-xs font-medium transition ${
                                 addRole === r
-                                  ? 'bg-[#00339B] text-white'
-                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-muted text-muted-foreground hover:bg-secondary'
                               }`}
                             >
                               {ROLE_LABEL[r]}
@@ -519,51 +519,51 @@ export default function UsersPage() {
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium text-gray-700">First name</Label>
+                          <Label className="text-sm font-medium text-foreground">First name</Label>
                           <Input
                             value={addFirst}
                             onChange={(e) => setAddFirst(e.target.value)}
-                            className="h-12 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
+                            className="h-12 rounded-2xl border-border bg-muted/70 px-4"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium text-gray-700">Last name</Label>
+                          <Label className="text-sm font-medium text-foreground">Last name</Label>
                           <Input
                             value={addLast}
                             onChange={(e) => setAddLast(e.target.value)}
-                            className="h-12 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
+                            className="h-12 rounded-2xl border-border bg-muted/70 px-4"
                           />
                         </div>
                       </div>
                       {(addRole === 'cleaner' || addRole === 'manager') && (
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium text-gray-700">Mobile number</Label>
+                          <Label className="text-sm font-medium text-foreground">Mobile number</Label>
                           <Input
                             value={addPhone}
                             onChange={(e) => setAddPhone(e.target.value)}
                             placeholder="+44…"
-                            className="h-12 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
+                            className="h-12 rounded-2xl border-border bg-muted/70 px-4"
                           />
                         </div>
                       )}
                       {(addRole === 'ops_manager' || addRole === 'admin') && (
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium text-gray-700">Username</Label>
+                          <Label className="text-sm font-medium text-foreground">Username</Label>
                           <Input
                             value={addUsername}
                             onChange={(e) => setAddUsername(e.target.value)}
-                            className="h-12 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
+                            className="h-12 rounded-2xl border-border bg-muted/70 px-4"
                           />
                         </div>
                       )}
                       {addRole === 'admin' && (
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium text-gray-700">Email</Label>
+                          <Label className="text-sm font-medium text-foreground">Email</Label>
                           <Input
                             type="email"
                             value={addEmail}
                             onChange={(e) => setAddEmail(e.target.value)}
-                            className="h-12 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
+                            className="h-12 rounded-2xl border-border bg-muted/70 px-4"
                           />
                         </div>
                       )}
@@ -572,14 +572,14 @@ export default function UsersPage() {
                       <Button
                         variant="ghost"
                         onClick={() => setIsAdding(false)}
-                        className="rounded-full text-gray-600"
+                        className="rounded-full text-muted-foreground"
                       >
                         Cancel
                       </Button>
                       <Button
                         onClick={submitAdd}
                         disabled={isCreating}
-                        className="rounded-full bg-[#00339B] px-6 text-white hover:bg-[#002d7a]"
+                        className="rounded-full bg-primary px-6 text-primary-foreground hover:bg-primary/90"
                       >
                         {isCreating ? 'Creating…' : 'Create user'}
                       </Button>
@@ -613,12 +613,12 @@ const FilterPill: React.FC<{
   onClick: () => void
   children: React.ReactNode
   activeClass?: string
-}> = ({ active, onClick, children, activeClass = 'bg-[#00339B] text-white' }) => (
+}> = ({ active, onClick, children, activeClass = 'bg-primary text-primary-foreground' }) => (
   <button
     type="button"
     onClick={onClick}
     className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2.5 text-xs font-medium transition ${
-      active ? activeClass : 'bg-white text-gray-600 hover:bg-gray-100'
+      active ? activeClass : 'bg-card text-muted-foreground hover:bg-muted'
     }`}
   >
     {children}
@@ -630,14 +630,14 @@ const SiteBadge: React.FC<{ user: ManagedUser; links: UserCustomerLink[] }> = ({
 
   if (links.length === 0) {
     return (
-      <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700">
+      <span className="shrink-0 rounded-full bg-warning/10 px-2 py-0.5 font-medium text-warning">
         No site
       </span>
     )
   }
 
   return (
-    <span className="max-w-[12rem] truncate rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
+    <span className="max-w-[12rem] truncate rounded-full bg-success/10 px-2 py-0.5 font-medium text-success">
       {links.length === 1 ? links[0].customerLabel : `${links.length} sites`}
     </span>
   )

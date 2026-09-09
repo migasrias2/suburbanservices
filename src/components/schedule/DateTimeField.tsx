@@ -85,19 +85,19 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
           id={id}
           type="button"
           className={cn(
-            'flex h-11 w-full items-center justify-between rounded-xl bg-gray-100/80 px-3.5 text-left text-[14px] text-gray-900 transition-colors',
-            'focus-visible:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#007AFF]/30',
-            !safeValue && 'text-gray-400',
+            'flex h-11 w-full items-center justify-between rounded-xl bg-muted/80 px-3.5 text-left text-subheadline text-foreground transition-colors',
+            'focus-visible:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
+            !safeValue && 'text-muted-foreground',
           )}
         >
           <span className="truncate">{displayLabel}</span>
-          <CalendarDays className="h-4 w-4 shrink-0 text-gray-400" />
+          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
         </button>
       </PopoverTrigger>
       <PopoverContent
         align="start"
         sideOffset={6}
-        className="w-auto rounded-2xl border border-gray-100 bg-white p-4 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.2)]"
+        className="w-auto rounded-2xl border border-border bg-card p-4 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.2)]"
       >
         <DayPicker
           mode="single"
@@ -108,24 +108,24 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
             months: 'flex flex-col',
             month: 'space-y-3',
             caption: 'flex items-center justify-between px-1',
-            caption_label: 'text-[14px] font-semibold tracking-tight text-gray-900',
+            caption_label: 'text-subheadline font-semibold tracking-tight text-foreground',
             nav: 'flex items-center gap-1',
             nav_button:
-              'inline-flex h-7 w-7 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900',
+              'inline-flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground',
             nav_button_previous: '',
             nav_button_next: '',
             table: 'w-full border-collapse',
             head_row: 'flex',
             head_cell:
-              'flex h-7 w-9 items-center justify-center text-[10px] font-medium uppercase tracking-[0.06em] text-gray-400',
+              'flex h-7 w-9 items-center justify-center text-caption2 font-medium uppercase tracking-[0.06em] text-muted-foreground',
             row: 'flex w-full mt-1',
             cell: 'h-9 w-9 p-0 text-center',
-            day: 'inline-flex h-9 w-9 items-center justify-center rounded-full text-[13px] text-gray-700 transition-colors hover:bg-gray-100 focus:outline-none',
+            day: 'inline-flex h-9 w-9 items-center justify-center rounded-full text-footnote text-foreground transition-colors hover:bg-muted focus:outline-none',
             day_selected:
-              '!bg-[#007AFF] !text-white hover:!bg-[#0064D2] focus:!bg-[#0064D2]',
-            day_today: 'font-semibold text-[#007AFF]',
-            day_outside: 'text-gray-300',
-            day_disabled: 'text-gray-300 opacity-50',
+              '!bg-primary !text-primary-foreground hover:!bg-primary/90 focus:!bg-primary/90',
+            day_today: 'font-semibold text-primary',
+            day_outside: 'text-muted-foreground',
+            day_disabled: 'text-muted-foreground opacity-50',
             day_hidden: 'invisible',
           }}
           components={{
@@ -134,16 +134,16 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
           }}
         />
 
-        <div className="mt-3 flex items-center gap-2 border-t border-gray-100 pt-3">
-          <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-gray-400">
+        <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
+          <span className="text-caption2 font-medium uppercase tracking-[0.06em] text-muted-foreground">
             Time
           </span>
           <div className="ml-auto flex items-center gap-1.5">
             <Select value={String(hour12)} onValueChange={handleHourChange}>
-              <SelectTrigger className="h-9 w-[68px] rounded-lg border-0 bg-gray-100/80 px-2.5 text-[13px] font-medium text-gray-900 shadow-none focus:ring-2 focus:ring-[#007AFF]/30">
+              <SelectTrigger className="h-9 w-[68px] rounded-lg border-0 bg-muted/80 px-2.5 text-footnote font-medium text-foreground shadow-none focus:ring-2 focus:ring-ring/30">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="rounded-xl border border-gray-100 bg-white shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]">
+              <SelectContent className="rounded-xl border border-border bg-card shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]">
                 {HOURS.map((h) => (
                   <SelectItem key={h} value={String(h)}>
                     {pad(h)}
@@ -151,12 +151,12 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
                 ))}
               </SelectContent>
             </Select>
-            <span className="text-[14px] font-semibold text-gray-400">:</span>
+            <span className="text-subheadline font-semibold text-muted-foreground">:</span>
             <Select value={String(minute)} onValueChange={handleMinuteChange}>
-              <SelectTrigger className="h-9 w-[68px] rounded-lg border-0 bg-gray-100/80 px-2.5 text-[13px] font-medium text-gray-900 shadow-none focus:ring-2 focus:ring-[#007AFF]/30">
+              <SelectTrigger className="h-9 w-[68px] rounded-lg border-0 bg-muted/80 px-2.5 text-footnote font-medium text-foreground shadow-none focus:ring-2 focus:ring-ring/30">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="rounded-xl border border-gray-100 bg-white shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]">
+              <SelectContent className="rounded-xl border border-border bg-card shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]">
                 {MINUTES.map((m) => (
                   <SelectItem key={m} value={String(m)}>
                     {pad(m)}
@@ -164,7 +164,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
                 ))}
               </SelectContent>
             </Select>
-            <div className="ml-1 inline-flex rounded-full bg-gray-100/80 p-0.5">
+            <div className="ml-1 inline-flex rounded-full bg-muted/80 p-0.5">
               {(['AM', 'PM'] as const).map((p) => {
                 const active = p === period
                 return (
@@ -173,10 +173,10 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
                     type="button"
                     onClick={() => handlePeriodChange(p)}
                     className={cn(
-                      'rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                      'rounded-full px-2.5 py-1 text-caption2 font-semibold transition-colors',
                       active
-                        ? 'bg-white text-gray-900 shadow-[0_1px_2px_rgba(0,0,0,0.06)]'
-                        : 'text-gray-500 hover:text-gray-700',
+                        ? 'bg-card text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.06)]'
+                        : 'text-muted-foreground hover:text-foreground',
                     )}
                   >
                     {p}
@@ -191,7 +191,7 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="h-8 rounded-full bg-[#007AFF] px-4 text-[12px] font-semibold text-white hover:bg-[#0064D2]"
+            className="h-8 rounded-full bg-primary px-4 text-caption font-semibold text-primary-foreground hover:bg-primary/90"
           >
             Done
           </button>

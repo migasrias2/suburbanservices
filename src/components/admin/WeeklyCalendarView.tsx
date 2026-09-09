@@ -16,7 +16,7 @@ const DEFAULT_DAY_START_HOUR = 6
 const DEFAULT_DAY_END_HOUR = 22
 const DAY_COUNT = 7
 
-const COLOR_PALETTE = ['#8B5CF6', '#0F60FF', '#6366F1', '#2563EB', '#EA580C', '#F97316', '#10B981', '#0EA5E9', '#14B8A6']
+const COLOR_PALETTE = Array.from({ length: 8 }, (_, i) => `hsl(var(--chart-${i + 1}))`)
 const cleanerColorCache = new Map<string, string>()
 
 const getColorForCleaner = (cleanerName: string) => {
@@ -197,32 +197,32 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarProps> = ({ visits, week
     <div className="space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-3xl font-semibold text-[#00339B]">Weekly Schedule</h2>
-          <p className="text-sm text-gray-500">Cleaner attendance for {weekRangeLabel}</p>
+          <h2 className="text-3xl font-semibold text-primary">Weekly Schedule</h2>
+          <p className="text-sm text-muted-foreground">Cleaner attendance for {weekRangeLabel}</p>
         </div>
         {headerAction ? <div className="flex items-center gap-3">{headerAction}</div> : null}
       </div>
 
-      <Card className="relative overflow-hidden rounded-3xl border-blue-100 bg-white shadow-lg shadow-blue-100/60">
-        <div className="grid grid-cols-8 border-b border-blue-50 text-sm font-medium text-[#00339B]">
-          <div className="border-r border-blue-50 px-4 py-3">Time</div>
+      <Card className="relative overflow-hidden rounded-3xl border-border bg-card shadow-lg shadow-blue-100/60">
+        <div className="grid grid-cols-8 border-b border-border text-sm font-medium text-primary">
+          <div className="border-r border-border px-4 py-3">Time</div>
           {dayDates.map((date) => (
-            <div key={date.toISOString()} className="border-r border-blue-50 px-4 py-3 text-center">
+            <div key={date.toISOString()} className="border-r border-border px-4 py-3 text-center">
               <div className="text-sm font-semibold">{format(date, 'EEEE')}</div>
-              <div className="text-xs font-medium text-gray-400">{format(date, 'MMM d')}</div>
+              <div className="text-xs font-medium text-muted-foreground">{format(date, 'MMM d')}</div>
             </div>
           ))}
         </div>
 
         <div className="relative">
-          <div className="grid grid-cols-8 divide-x divide-blue-50 text-sm">
+          <div className="grid grid-cols-8 divide-x divide-primary/30 text-sm">
             <div className="relative">
               {hours.map((hour) => {
                 const timeLabel = new Date()
                 timeLabel.setHours(hour, 0, 0, 0)
                 return (
-                  <div key={hour} className="border-b border-blue-50 px-4" style={{ height: HOUR_HEIGHT }}>
-                    <span className="text-xs text-gray-500">{format(timeLabel, 'h a')}</span>
+                  <div key={hour} className="border-b border-border px-4" style={{ height: HOUR_HEIGHT }}>
+                    <span className="text-xs text-muted-foreground">{format(timeLabel, 'h a')}</span>
                   </div>
                 )
               })}
@@ -231,7 +231,7 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarProps> = ({ visits, week
             {dayDates.map((date, dayIndex) => (
               <div key={date.toISOString()} className="relative h-full">
                 {hours.map((hour) => (
-                  <div key={`${dayIndex}-${hour}`} className="border-b border-blue-50" style={{ height: HOUR_HEIGHT }} />
+                  <div key={`${dayIndex}-${hour}`} className="border-b border-border" style={{ height: HOUR_HEIGHT }} />
                 ))}
 
                 <div className="absolute inset-0 pb-4">
@@ -256,7 +256,7 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarProps> = ({ visits, week
                         type="button"
                         onClick={() => setSelectedId(visit.id)}
                         className={cn(
-                          'absolute left-3 right-3 flex flex-col gap-2 rounded-3xl border border-white/30 px-4 py-3 text-left shadow-xl transition duration-150 focus:outline-none focus:ring-2 focus:ring-white/60 focus:ring-offset-2 focus:ring-offset-blue-200',
+                          'absolute left-3 right-3 flex flex-col gap-2 rounded-3xl border border-white/30 px-4 py-3 text-left shadow-xl transition duration-150 focus:outline-none focus:ring-2 focus:ring-white/60 focus:ring-offset-2 focus:ring-offset-background',
                           'backdrop-blur-sm text-white hover:-translate-y-1 hover:shadow-2xl'
                         )}
                         style={{
@@ -265,7 +265,7 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarProps> = ({ visits, week
                           background: `linear-gradient(135deg, ${visit.color} 0%, rgba(255,255,255,0.25) 100%)`,
                         }}
                       >
-                        <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-white/80">
+                        <div className="flex items-center justify-between text-caption2 font-semibold uppercase tracking-wide text-white/80">
                           <span>{format(visit.start, 'h:mm a')}</span>
                           <span>{visit.isCompleted ? format(visit.end, 'h:mm a') : 'Now'}</span>
                         </div>
@@ -275,8 +275,8 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarProps> = ({ visits, week
                         </div>
                         <Badge
                           className={cn(
-                            'w-fit rounded-full px-3 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] transition',
-                            visit.isCompleted ? 'bg-white/95 text-emerald-600' : 'bg-white/80 text-amber-600 hover:bg-white'
+                            'w-fit rounded-full px-3 py-0.5 text-caption2 font-semibold uppercase tracking-[0.08em] transition',
+                            visit.isCompleted ? 'bg-card/95 text-success' : 'bg-card/80 text-warning hover:bg-card'
                           )}
                         >
                           {visit.isCompleted ? 'Clocked out' : 'In progress'}
@@ -291,9 +291,9 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarProps> = ({ visits, week
         </div>
 
         {isLoadingData ? (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/70 backdrop-blur-sm">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
-            <p className="mt-3 text-sm font-medium text-[#00339B]">Loading attendance...</p>
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-card/70 backdrop-blur-sm">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary/40 border-t-transparent" />
+            <p className="mt-3 text-sm font-medium text-primary">Loading attendance...</p>
           </div>
         ) : null}
       </Card>
@@ -310,7 +310,7 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarProps> = ({ visits, week
           {selectedVisit && (
             <>
               <DialogHeader>
-                <DialogTitle className="text-2xl font-semibold text-[#00339B]">{selectedVisit.siteName}</DialogTitle>
+                <DialogTitle className="text-2xl font-semibold text-primary">{selectedVisit.siteName}</DialogTitle>
                 <DialogDescription>
                   {format(selectedVisit.start, 'EEEE • MMM d, yyyy')} · {format(selectedVisit.start, 'h:mm a')} –{' '}
                   {selectedVisit.isCompleted ? format(selectedVisit.end, 'h:mm a') : 'Now'}
@@ -318,19 +318,19 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarProps> = ({ visits, week
               </DialogHeader>
 
               <div className="space-y-4">
-                <div className="grid gap-3 rounded-2xl bg-blue-50/70 p-4">
-                  <div className="text-sm text-blue-900">
+                <div className="grid gap-3 rounded-2xl bg-primary/5 p-4">
+                  <div className="text-sm text-primary">
                     <span className="font-semibold">Cleaner:</span> {selectedVisit.cleanerName}
                   </div>
-                  <div className="text-sm text-blue-900">
+                  <div className="text-sm text-primary">
                     <span className="font-semibold">Duration:</span> {formatDuration(selectedVisit.durationMinutes)}
                   </div>
-                  <div className="text-sm text-blue-900">
+                  <div className="text-sm text-primary">
                     <span className="font-semibold">Status:</span>{' '}
                     <Badge
                       className={cn(
                         'rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide',
-                        selectedVisit.isCompleted ? 'bg-emerald-600 text-white' : 'bg-amber-500/20 text-amber-700'
+                        selectedVisit.isCompleted ? 'bg-success text-success-foreground' : 'bg-warning/20 text-warning'
                       )}
                     >
                       {selectedVisit.isCompleted ? 'Clocked out' : 'Still clocked in'}
@@ -338,8 +338,8 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarProps> = ({ visits, week
                   </div>
                 </div>
 
-                <ScrollArea className="max-h-48 rounded-2xl border border-blue-100">
-                  <div className="space-y-3 p-4 text-sm text-gray-600">
+                <ScrollArea className="max-h-48 rounded-2xl border border-border">
+                  <div className="space-y-3 p-4 text-sm text-muted-foreground">
                     <p>
                       {selectedVisit.clockIn
                         ? `Clock-in recorded at ${format(new Date(selectedVisit.clockIn), 'PPpp')}`

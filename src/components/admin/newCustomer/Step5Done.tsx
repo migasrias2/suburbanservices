@@ -23,15 +23,15 @@ export const Step5Done: React.FC<Step5Props> = ({ state, totalSteps, onFinish })
       hideNext
     >
       <div className="space-y-8 text-center">
-        <div className="mx-auto inline-flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50">
-          <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+        <div className="mx-auto inline-flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
+          <CheckCircle2 className="h-8 w-8 text-success" />
         </div>
 
         <div className="space-y-2">
-          <p className="text-lg text-gray-700">
-            <strong className="text-gray-900">{state.customerName}</strong> is ready to go.
+          <p className="text-lg text-foreground">
+            <strong className="text-foreground">{state.customerName}</strong> is ready to go.
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             {state.selectedManagerIds.length} manager{state.selectedManagerIds.length === 1 ? '' : 's'} assigned ·{' '}
             {state.areas.length} area{state.areas.length === 1 ? '' : 's'} ·{' '}
             {state.qrPack.length} QR code{state.qrPack.length === 1 ? '' : 's'} generated
@@ -45,13 +45,13 @@ export const Step5Done: React.FC<Step5Props> = ({ state, totalSteps, onFinish })
               navigate('/qr-library')
             }}
             variant="outline"
-            className="rounded-full border-gray-200 py-5 text-base text-gray-700 hover:bg-gray-50"
+            className="rounded-full border-border py-5 text-base text-foreground hover:bg-muted"
           >
             View QR Library
           </Button>
           <Button
             onClick={onFinish}
-            className="rounded-full bg-[#00339B] py-5 text-base text-white hover:bg-[#002d7a]"
+            className="rounded-full bg-primary py-5 text-base text-primary-foreground hover:bg-primary/90"
           >
             Add another client
           </Button>

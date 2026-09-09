@@ -76,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, userType, use
       
       {/* Sidebar */}
       <div className={`
-        h-full w-80 bg-white flex flex-col
+        h-full w-80 bg-card flex flex-col
         lg:relative lg:shadow-none
         ${isOpen 
           ? 'fixed top-0 left-0 shadow-2xl z-50 transform translate-x-0' 
@@ -84,7 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, userType, use
         transition-transform duration-300 ease-in-out
       `}>
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+        <div className="flex items-center justify-between p-6 border-b border-border">
           <div className="flex items-center gap-3">
             <img 
               src="/suburban_services_logo-scaled.webp" 
@@ -117,8 +117,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, userType, use
                   className={`
                     w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all duration-200
                     ${isActive(item.path)
-                      ? 'bg-blue-50 text-blue-600 font-semibold'
-                      : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+                      ? 'bg-primary/10 text-primary font-semibold'
+                      : 'text-foreground hover:bg-muted hover:text-primary'
                     }
                   `}
                 >
@@ -131,14 +131,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, userType, use
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-100 space-y-2">
+        <div className="p-4 border-t border-border space-y-2">
           {/* Profile Button */}
           <button
             onClick={() => {
               navigate(profileMenuItem.path)
               onClose()
             }}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all duration-200 text-gray-700 hover:bg-gray-50 hover:text-blue-600"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all duration-200 text-foreground hover:bg-muted hover:text-primary"
           >
             <Settings className="h-5 w-5" />
             <span className="font-medium">Profile</span>
@@ -148,7 +148,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, userType, use
           <Button
             onClick={handleLogout}
             variant="ghost"
-            className="w-full justify-start gap-3 px-4 py-3 rounded-2xl text-gray-700 hover:bg-red-50 hover:text-red-600"
+            className="w-full justify-start gap-3 px-4 py-3 rounded-2xl text-foreground hover:bg-destructive/10 hover:text-destructive"
           >
             <LogOut className="h-5 w-5" />
             <span className="font-medium">Logout</span>

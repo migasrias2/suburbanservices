@@ -13,9 +13,9 @@ export const AssistanceBoard: React.FC<AssistanceBoardProps> = ({ cleanerId, cle
     <div className="space-y-8">
       <Card className="border-none shadow-xl rounded-[28px]">
         <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-3 text-lg font-semibold text-gray-900">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
-              <Info className="h-5 w-5 text-[#00339B]" />
+          <CardTitle className="flex items-center gap-3 text-lg font-semibold text-foreground">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+              <Info className="h-5 w-5 text-primary" />
             </div>
             How it works
           </CardTitle>
@@ -35,9 +35,9 @@ export const AssistanceBoard: React.FC<AssistanceBoardProps> = ({ cleanerId, cle
               description: 'Mark resolved—customers instantly see the update on their dashboard.'
             }
           ].map((step) => (
-            <div key={step.title} className="rounded-3xl border border-blue-100 bg-blue-50/30 p-4">
-              <h3 className="text-sm font-semibold text-[#00339B]">{step.title}</h3>
-              <p className="mt-1 text-xs text-gray-600">{step.description}</p>
+            <div key={step.title} className="rounded-3xl border border-border bg-primary/5 p-4">
+              <h3 className="text-sm font-semibold text-primary">{step.title}</h3>
+              <p className="mt-1 text-xs text-muted-foreground">{step.description}</p>
             </div>
           ))}
         </CardContent>

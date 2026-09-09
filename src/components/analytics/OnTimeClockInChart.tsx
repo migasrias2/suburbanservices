@@ -58,7 +58,7 @@ export const OnTimeClockInChart: React.FC<{ summary: AnalyticsSummary }> = ({ su
         config={{
           rate: {
             label: 'On-Time %',
-            color: '#2563eb',
+            color: 'hsl(var(--chart-1))',
           },
         }}
         className="h-72"
@@ -67,10 +67,10 @@ export const OnTimeClockInChart: React.FC<{ summary: AnalyticsSummary }> = ({ su
           data={data}
           margin={{ top: 24, right: 32, left: 32, bottom: 48 }}
         >
-          <CartesianGrid strokeDasharray="4 8" stroke="#e2e8f0" vertical={false} />
+          <CartesianGrid strokeDasharray="4 8" stroke="hsl(var(--border))" vertical={false} />
           <XAxis
             dataKey="cleaner"
-            stroke="#94a3b8"
+            stroke="hsl(var(--muted-foreground))"
             tickLine={false}
             axisLine={false}
             dy={8}
@@ -80,7 +80,7 @@ export const OnTimeClockInChart: React.FC<{ summary: AnalyticsSummary }> = ({ su
             height={70}
           />
           <YAxis
-            stroke="#94a3b8"
+            stroke="hsl(var(--muted-foreground))"
             tickLine={false}
             axisLine={false}
             width={48}
@@ -88,7 +88,7 @@ export const OnTimeClockInChart: React.FC<{ summary: AnalyticsSummary }> = ({ su
             tickFormatter={(value) => `${value}%`}
           />
           <ChartTooltip
-            content={<ChartTooltipContent indicator="line" className="!bg-white" />}
+            content={<ChartTooltipContent indicator="line" className="!bg-card" />}
             cursor={{ fill: 'rgba(37, 99, 235, 0.12)' }}
           />
           <Bar
@@ -97,7 +97,7 @@ export const OnTimeClockInChart: React.FC<{ summary: AnalyticsSummary }> = ({ su
             fill="var(--color-rate)"
             activeBar={{
               fill: 'rgba(59, 130, 246, 0.55)',
-              stroke: '#2563eb',
+              stroke: 'hsl(var(--chart-1))',
               strokeWidth: 2,
             }}
           >
@@ -105,7 +105,7 @@ export const OnTimeClockInChart: React.FC<{ summary: AnalyticsSummary }> = ({ su
               dataKey="rate"
               position="top"
               formatter={(value: number) => `${value}%`}
-              fill="#1f2937"
+              fill="hsl(var(--foreground))"
               fontSize={12}
             />
           </Bar>

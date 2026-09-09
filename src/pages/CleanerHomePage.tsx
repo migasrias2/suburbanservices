@@ -30,8 +30,8 @@ export default function CleanerHomePage() {
 
   if (!cleanerId || !cleanerName) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-white">
-        <div className="h-9 w-9 animate-spin rounded-full border-2 border-gray-200 border-t-[#00339B]" />
+      <div className="flex min-h-screen items-center justify-center bg-card">
+        <div className="h-9 w-9 animate-spin rounded-full border-2 border-border border-t-primary" />
       </div>
     )
   }

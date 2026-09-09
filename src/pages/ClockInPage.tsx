@@ -209,13 +209,13 @@ export default function ClockInPage() {
           <div className="flex flex-col items-center text-center gap-8">
             {/* Header */}
             <div className="space-y-4">
-              <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
-                <Clock className="w-10 h-10 text-white" />
+              <div className="w-20 h-20 mx-auto bg-primary rounded-full flex items-center justify-center shadow-lg">
+                <Clock className="w-10 h-10 text-primary-foreground" />
               </div>
-              <h1 className="text-4xl font-bold" style={{ color: '#00339B' }}>
+              <h1 className="text-4xl font-bold text-primary">
                 Clock In
               </h1>
-              <p className="text-lg text-gray-600 max-w-md">
+              <p className="text-lg text-muted-foreground max-w-md">
                 To begin your shift, scan the Clock In QR code at your work location
               </p>
             </div>
@@ -223,16 +223,15 @@ export default function ClockInPage() {
             {/* Clock-in Scanner */}
             {!showScanner ? (
               <div className="space-y-6">
-                <div className="p-6 bg-blue-50 rounded-3xl max-w-md mx-auto">
-                  <div className="flex items-center justify-center gap-3 text-blue-800">
+                <div className="p-6 bg-primary/10 rounded-3xl max-w-md mx-auto">
+                  <div className="flex items-center justify-center gap-3 text-primary">
                     <QrCode className="w-6 h-6" />
                     <span className="text-lg font-medium">Ready to scan</span>
                   </div>
                 </div>
                 <Button
                   onClick={() => setShowScanner(true)}
-                  className="rounded-full px-12 py-6 text-lg font-semibold text-white shadow-lg transition-all duration-200"
-                  style={{ backgroundColor: '#00339B' }}
+                  className="rounded-full px-12 py-6 text-lg font-semibold text-primary-foreground shadow-lg transition-all duration-200 bg-primary"
                 >
                   <QrCode className="w-6 h-6 mr-3" />
                   Start Clock In
@@ -251,7 +250,7 @@ export default function ClockInPage() {
                   <Button 
                     variant="ghost" 
                     onClick={() => setShowScanner(false)}
-                    className="text-gray-500 rounded-full"
+                    className="text-muted-foreground rounded-full"
                   >
                     Cancel Scanning
                   </Button>

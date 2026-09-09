@@ -66,12 +66,12 @@ export const AreaTaskForm = ({ defaultValues, onSubmit, submitting }: AreaTaskFo
           name="customer_name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-sm font-semibold text-gray-700">Customer</FormLabel>
+              <FormLabel className="text-sm font-semibold text-foreground">Customer</FormLabel>
               <FormControl>
                 <Input
                   placeholder="e.g. Adams"
                   {...field}
-                  className="rounded-2xl border-gray-200 bg-gray-50/70 px-4 py-2 text-sm font-medium text-gray-700 focus-visible:ring-[#00339B]"
+                  className="rounded-2xl border-border bg-muted/70 px-4 py-2 text-sm font-medium text-foreground focus-visible:ring-ring"
                 />
               </FormControl>
               <FormMessage />
@@ -84,12 +84,12 @@ export const AreaTaskForm = ({ defaultValues, onSubmit, submitting }: AreaTaskFo
             name="area"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-sm font-semibold text-gray-700">Area</FormLabel>
+                <FormLabel className="text-sm font-semibold text-foreground">Area</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="e.g. Reception"
                     {...field}
-                    className="rounded-2xl border-gray-200 bg-gray-50/70 px-4 py-2 text-sm font-medium text-gray-700 focus-visible:ring-[#00339B]"
+                    className="rounded-2xl border-border bg-muted/70 px-4 py-2 text-sm font-medium text-foreground focus-visible:ring-ring"
                   />
                 </FormControl>
                 <FormMessage />
@@ -101,12 +101,12 @@ export const AreaTaskForm = ({ defaultValues, onSubmit, submitting }: AreaTaskFo
             name="task_type"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-sm font-semibold text-gray-700">Task Type</FormLabel>
+                <FormLabel className="text-sm font-semibold text-foreground">Task Type</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Optional"
                     {...field}
-                    className="rounded-2xl border-gray-200 bg-gray-50/70 px-4 py-2 text-sm font-medium text-gray-700 focus-visible:ring-[#00339B]"
+                    className="rounded-2xl border-border bg-muted/70 px-4 py-2 text-sm font-medium text-foreground focus-visible:ring-ring"
                   />
                 </FormControl>
                 <FormMessage />
@@ -119,12 +119,12 @@ export const AreaTaskForm = ({ defaultValues, onSubmit, submitting }: AreaTaskFo
           name="task_description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-sm font-semibold text-gray-700">Task Description</FormLabel>
+              <FormLabel className="text-sm font-semibold text-foreground">Task Description</FormLabel>
               <FormControl>
                 <Input
                   placeholder="What needs to be done"
                   {...field}
-                  className="rounded-2xl border-gray-200 bg-gray-50/70 px-4 py-2 text-sm font-medium text-gray-700 focus-visible:ring-[#00339B]"
+                  className="rounded-2xl border-border bg-muted/70 px-4 py-2 text-sm font-medium text-foreground focus-visible:ring-ring"
                 />
               </FormControl>
               <FormMessage />
@@ -136,12 +136,12 @@ export const AreaTaskForm = ({ defaultValues, onSubmit, submitting }: AreaTaskFo
           name="qr_code"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-sm font-semibold text-gray-700">QR Code (optional)</FormLabel>
+              <FormLabel className="text-sm font-semibold text-foreground">QR Code (optional)</FormLabel>
               <FormControl>
                 <Input
                   placeholder="QR identifier"
                   {...field}
-                  className="rounded-2xl border-gray-200 bg-gray-50/70 px-4 py-2 text-sm font-medium text-gray-700 focus-visible:ring-[#00339B]"
+                  className="rounded-2xl border-border bg-muted/70 px-4 py-2 text-sm font-medium text-foreground focus-visible:ring-ring"
                 />
               </FormControl>
               <FormMessage />
@@ -153,10 +153,10 @@ export const AreaTaskForm = ({ defaultValues, onSubmit, submitting }: AreaTaskFo
           name="active"
           render={({ field }) => (
             <FormItem>
-              <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-gradient-to-r from-white via-gray-50 to-white px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+              <div className="flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                 <div>
-                  <FormLabel className="text-sm font-semibold text-gray-900">Active</FormLabel>
-                  <p className="text-xs text-gray-500">Inactive tasks stay in the list but are hidden from cleaners.</p>
+                  <FormLabel className="text-sm font-semibold text-foreground">Active</FormLabel>
+                  <p className="text-xs text-muted-foreground">Inactive tasks stay in the list but are hidden from cleaners.</p>
                 </div>
                 <FormControl>
                   <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -169,7 +169,7 @@ export const AreaTaskForm = ({ defaultValues, onSubmit, submitting }: AreaTaskFo
         <DialogFooter>
           <Button
             type="submit"
-            className="rounded-full bg-[#00339B] px-6 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(0,51,155,0.25)] transition hover:bg-[#00297a]"
+            className="rounded-full bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground shadow-[0_12px_24px_rgba(0,51,155,0.25)] transition hover:bg-primary/90"
             disabled={submitting}
           >
             {submitting ? 'Saving...' : 'Save Task'}

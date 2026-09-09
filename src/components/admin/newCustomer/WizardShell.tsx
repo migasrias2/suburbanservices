@@ -41,20 +41,20 @@ export const WizardShell: React.FC<WizardShellProps> = ({
             <span
               key={i}
               className={`h-1.5 rounded-full transition-all duration-300 ${
-                filled ? 'w-8 bg-[#00339B]' : 'w-2 bg-gray-300'
+                filled ? 'w-8 bg-primary' : 'w-2 bg-secondary'
               }`}
             />
           )
         })}
       </div>
 
-      <div className="rounded-3xl bg-white/80 p-5 shadow-sm backdrop-blur sm:p-8 md:p-12">
+      <div className="rounded-3xl bg-card/80 p-5 shadow-sm backdrop-blur sm:p-8 md:p-12">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 sm:text-3xl md:text-4xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl md:text-4xl">
             {title}
           </h1>
           {subtitle && (
-            <p className="mt-2 text-sm text-gray-500 sm:mt-3 sm:text-base md:text-lg">{subtitle}</p>
+            <p className="mt-2 text-sm text-muted-foreground sm:mt-3 sm:text-base md:text-lg">{subtitle}</p>
           )}
         </div>
 
@@ -67,7 +67,7 @@ export const WizardShell: React.FC<WizardShellProps> = ({
                 variant="ghost"
                 onClick={onBack}
                 disabled={isWorking}
-                className="rounded-full px-5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                className="rounded-full px-5 text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <ChevronLeft className="mr-1 h-4 w-4" />
                 Back
@@ -78,7 +78,7 @@ export const WizardShell: React.FC<WizardShellProps> = ({
               <Button
                 onClick={onNext}
                 disabled={nextDisabled || isWorking}
-                className="h-12 rounded-full bg-[#00339B] px-6 text-base font-medium text-white shadow-sm transition hover:bg-[#002d7a] disabled:bg-gray-200 disabled:text-gray-400 sm:px-7"
+                className="h-12 rounded-full bg-primary px-6 text-base font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:bg-secondary disabled:text-muted-foreground sm:px-7"
               >
                 {isWorking ? 'Working…' : nextLabel}
                 {!isWorking && <ChevronRight className="ml-1 h-4 w-4" />}

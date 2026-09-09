@@ -35,17 +35,17 @@ export const ClockOutReminderBanner: React.FC<ClockOutReminderBannerProps> = ({
   return (
     <div
       role="status"
-      className="mb-4 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+      className="mb-4 flex flex-col gap-3 rounded-2xl border border-warning/30 bg-warning/10 p-4 sm:flex-row sm:items-center sm:justify-between"
     >
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warning/20 text-warning">
           <Clock className="h-4 w-4" />
         </span>
         <div>
-          <p className="text-[14px] font-semibold text-amber-900">
+          <p className="text-subheadline font-semibold text-foreground">
             You're still clocked in
           </p>
-          <p className="text-[12.5px] leading-snug text-amber-800">
+          <p className="text-footnote text-muted-foreground">
             {basis === 'rostered'
               ? `Your shift ended ${formatOverdue(minutesOverdue)} ago.`
               : `You've been on the clock for over ${formatOverdue(minutesOverdue)} past a normal shift.`}{' '}
@@ -59,7 +59,7 @@ export const ClockOutReminderBanner: React.FC<ClockOutReminderBannerProps> = ({
           <button
             type="button"
             onClick={() => navigate('/clock-in')}
-            className="rounded-full bg-amber-600 px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-amber-700"
+            className="min-h-[44px] rounded-full bg-warning px-4 py-2 text-footnote font-semibold text-warning-foreground transition-colors hover:opacity-90"
           >
             Clock out
           </button>
@@ -68,7 +68,7 @@ export const ClockOutReminderBanner: React.FC<ClockOutReminderBannerProps> = ({
           type="button"
           onClick={dismiss}
           aria-label="Remind me later"
-          className="rounded-full p-2 text-amber-700 transition-colors hover:bg-amber-100"
+          className="flex h-11 w-11 items-center justify-center rounded-full text-warning transition-colors hover:bg-warning/15"
         >
           <X className="h-4 w-4" />
         </button>

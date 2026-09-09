@@ -50,7 +50,7 @@ export const ShadcnDashboardLayout: React.FC<ShadcnDashboardLayoutProps> = ({
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex w-full">
+      <div className="min-h-screen bg-background flex w-full">
         <Sidebar variant="floating" className="border-sidebar-border">
           <SidebarHeader className="p-4">
             <div className="flex items-center gap-3">
@@ -113,7 +113,7 @@ export const ShadcnDashboardLayout: React.FC<ShadcnDashboardLayoutProps> = ({
                     className="flex items-center gap-3 w-full"
                   >
                     <Avatar className="h-6 w-6">
-                      <AvatarFallback className="text-xs bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+                      <AvatarFallback className="text-xs bg-primary text-primary-foreground">
                         {userName.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
@@ -130,7 +130,7 @@ export const ShadcnDashboardLayout: React.FC<ShadcnDashboardLayoutProps> = ({
                 <SidebarMenuButton asChild tooltip="Log out">
                   <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 w-full text-red-600 hover:text-red-700 hover:bg-red-50"
+                    className="flex items-center gap-3 w-full text-destructive hover:text-destructive hover:bg-destructive/10"
                   >
                     <LogOut className="h-4 w-4" />
                     <span>Log out</span>

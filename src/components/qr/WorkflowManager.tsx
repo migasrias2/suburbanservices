@@ -201,29 +201,29 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
       <div className="w-full max-w-lg mx-auto space-y-6 px-4 sm:px-0">
         {/* Welcome Header */}
         <div className="text-center space-y-4">
-          <div className="w-14 h-14 sm:w-20 sm:h-20 mx-auto bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
-            <CheckCircle2 className="w-7 h-7 sm:w-10 sm:h-10 text-white" />
+          <div className="w-14 h-14 sm:w-20 sm:h-20 mx-auto bg-primary rounded-full flex items-center justify-center shadow-lg">
+            <CheckCircle2 className="w-7 h-7 sm:w-10 sm:h-10 text-primary-foreground" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
               Welcome back, {cleanerName}!
             </h1>
-            <p className="text-sm sm:text-lg text-gray-600">You're successfully clocked in</p>
+            <p className="text-sm sm:text-lg text-muted-foreground">You're successfully clocked in</p>
           </div>
         </div>
 
         {/* Clock-in Info Card */}
-        <Card className="rounded-3xl border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100">
+        <Card className="rounded-3xl border-0 shadow-lg bg-background">
           <CardContent className="p-5 sm:p-6">
             <div className="space-y-4">
               {/* Clock-in Time */}
               <div className="flex items-center gap-3 sm:gap-4">
-                <div className="w-9 h-9 sm:w-12 sm:h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <Clock className="w-4 h-4 sm:w-6 sm:h-6" style={{ color: '#00339B' }} />
+                <div className="w-9 h-9 sm:w-12 sm:h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                  <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-primary" />
                 </div>
                 <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-500">Clocked in at</p>
-                  <p className="text-base sm:text-xl font-bold" style={{ color: '#00339B' }}>
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Clocked in at</p>
+                  <p className="text-base sm:text-xl font-bold text-primary">
                     {getClockInTime()}
                   </p>
                 </div>
@@ -232,24 +232,24 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
               {/* Site Info */}
               {(persistentSiteName || siteName) && (
                 <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="w-9 h-9 sm:w-12 sm:h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <MapPin className="w-4 h-4 sm:w-6 sm:h-6" style={{ color: '#00339B' }} />
+                  <div className="w-9 h-9 sm:w-12 sm:h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <MapPin className="w-4 h-4 sm:w-6 sm:h-6 text-primary" />
                   </div>
                   <div>
-                    <p className="text-xs sm:text-sm font-medium text-gray-500">Location</p>
-                    <p className="text-sm sm:text-lg font-semibold" style={{ color: '#00339B' }}>{persistentSiteName || siteName}</p>
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground">Location</p>
+                    <p className="text-sm sm:text-lg font-semibold text-primary">{persistentSiteName || siteName}</p>
                   </div>
                 </div>
               )}
 
               {/* Current Date */}
               <div className="flex items-center gap-3 sm:gap-4">
-                <div className="w-9 h-9 sm:w-12 sm:h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <Calendar className="w-4 h-4 sm:w-6 sm:h-6" style={{ color: '#00339B' }} />
+                <div className="w-9 h-9 sm:w-12 sm:h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                  <Calendar className="w-4 h-4 sm:w-6 sm:h-6 text-primary" />
                 </div>
                 <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-500">Date</p>
-                  <p className="text-sm sm:text-lg font-semibold" style={{ color: '#00339B' }}>
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Date</p>
+                  <p className="text-sm sm:text-lg font-semibold text-primary">
                     {new Date().toLocaleDateString('en-US', { 
                       weekday: 'long',
                       month: 'long', 
@@ -266,19 +266,18 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
         <Card className="rounded-3xl border-0 shadow-lg">
           <CardContent className="p-5 sm:p-6">
             <div className="text-center space-y-4">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
-                <QrCode className="w-6 h-6 sm:w-8 sm:h-8" style={{ color: '#00339B' }} />
+              <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
+                <QrCode className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
               </div>
               <div className="space-y-2">
-                <h3 className="text-base sm:text-xl font-bold text-gray-900">Ready to Start</h3>
-                <p className="text-sm sm:text-base text-gray-600">
+                <h3 className="text-base sm:text-xl font-bold text-foreground">Ready to Start</h3>
+                <p className="text-sm sm:text-base text-muted-foreground">
                   Scan the Area QR code to begin your cleaning tasks
                 </p>
               </div>
               <Button
                 onClick={() => setCurrentStep('area_scan')}
-                className="w-full rounded-full py-3 sm:py-4 text-sm sm:text-lg font-semibold text-white shadow-lg transition-all duration-200"
-                style={{ backgroundColor: '#00339B' }}
+                className="w-full rounded-full py-3 sm:py-4 text-sm sm:text-lg font-semibold text-primary-foreground shadow-lg transition-all duration-200 bg-primary"
               >
                 <QrCode className="w-5 h-5 mr-2 sm:mr-3" />
                 Scan Area QR Code
@@ -292,7 +291,7 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
           <Button
             variant="outline"
             onClick={handleClockOutStart}
-            className="rounded-full px-8 py-3 text-red-600 border-red-200 hover:bg-red-50 transition-colors duration-200"
+            className="rounded-full px-8 py-3 text-destructive border-destructive/30 hover:bg-destructive/10 transition-colors duration-200"
           >
             <Clock className="w-4 h-4 mr-2" />
             Clock Out
@@ -308,12 +307,12 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
       <div className="w-full max-w-lg mx-auto space-y-6 px-4 sm:px-0">
         {/* Header */}
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
-            <QrCode className="w-8 h-8" style={{ color: '#00339B' }} />
+          <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
+            <QrCode className="w-8 h-8 text-primary" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-gray-900">Scan Area QR Code</h1>
-            <p className="text-gray-600">
+            <h1 className="text-2xl font-bold text-foreground">Scan Area QR Code</h1>
+            <p className="text-muted-foreground">
               Point your camera at the QR code to start cleaning this area
             </p>
           </div>
@@ -321,15 +320,15 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
 
         {/* Completed Areas Summary */}
         {completedAreas.length > 0 && (
-          <Card className="rounded-2xl border-0 shadow-sm bg-blue-50">
+          <Card className="rounded-2xl border-0 shadow-sm bg-primary/10">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <CheckCircle2 className="w-5 h-5" style={{ color: '#00339B' }} />
+                <CheckCircle2 className="w-5 h-5 text-primary" />
                 <div>
-                  <p className="text-sm font-medium" style={{ color: '#00339B' }}>
+                  <p className="text-sm font-medium text-primary">
                     Areas completed: {completedAreas.length}
                   </p>
-                  <p className="text-xs text-blue-700">
+                  <p className="text-xs text-primary">
                     Great work so far!
                   </p>
                 </div>
@@ -353,8 +352,7 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
           <Button
             variant="outline"
             onClick={() => setCurrentStep('welcome')}
-            className="flex-1 rounded-full py-3 border-blue-200 hover:bg-blue-50"
-            style={{ color: '#00339B' }}
+            className="flex-1 rounded-full py-3 border-border hover:bg-primary/10 text-primary"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Welcome
@@ -363,7 +361,7 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
           <Button
             variant="outline"
             onClick={handleClockOutStart}
-            className="flex-1 rounded-full py-3 text-red-600 border-red-200 hover:bg-red-50"
+            className="flex-1 rounded-full py-3 text-destructive border-destructive/30 hover:bg-destructive/10"
           >
             <Clock className="w-4 h-4 mr-2" />
             Clock Out
@@ -396,23 +394,23 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
       <div className="w-full max-w-lg mx-auto space-y-6">
         {/* Success Header */}
         <div className="text-center space-y-4">
-          <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
-            <CheckCircle2 className="w-10 h-10 text-white" />
+          <div className="w-20 h-20 mx-auto bg-primary rounded-full flex items-center justify-center shadow-lg">
+            <CheckCircle2 className="w-10 h-10 text-primary-foreground" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold" style={{ color: '#00339B' }}>Task Complete!</h1>
-            <p className="text-gray-600">
+            <h1 className="text-2xl font-bold text-primary">Task Complete!</h1>
+            <p className="text-muted-foreground">
               Great work! All photos have been uploaded successfully.
             </p>
           </div>
         </div>
 
         {/* Summary Card */}
-        <Card className="rounded-3xl border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100">
+        <Card className="rounded-3xl border-0 shadow-lg bg-background">
           <CardContent className="p-6">
             <div className="space-y-4">
               <div className="text-center">
-                <Badge className="text-white px-4 py-2 text-sm rounded-full" style={{ backgroundColor: '#00339B' }}>
+                <Badge className="text-primary-foreground px-4 py-2 text-sm rounded-full bg-primary">
                   ✓ COMPLETED
                 </Badge>
               </div>
@@ -420,23 +418,23 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
               <div className="space-y-3">
                 {lastCompletedAreaName && (
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Last area:</span>
-                    <span className="font-semibold" style={{ color: '#00339B' }}>{lastCompletedAreaName}</span>
+                    <span className="text-muted-foreground">Last area:</span>
+                    <span className="font-semibold text-primary">{lastCompletedAreaName}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Areas completed:</span>
-                  <span className="font-semibold" style={{ color: '#00339B' }}>{completedAreas.length}</span>
+                  <span className="text-muted-foreground">Areas completed:</span>
+                  <span className="font-semibold text-primary">{completedAreas.length}</span>
                 </div>
                 {lastCompletedTaskCount > 0 && (
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Tasks submitted:</span>
-                    <span className="font-semibold" style={{ color: '#00339B' }}>{lastCompletedTaskCount}</span>
+                    <span className="text-muted-foreground">Tasks submitted:</span>
+                    <span className="font-semibold text-primary">{lastCompletedTaskCount}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Time:</span>
-                  <span className="font-semibold" style={{ color: '#00339B' }}>{getCurrentTime()}</span>
+                  <span className="text-muted-foreground">Time:</span>
+                  <span className="font-semibold text-primary">{getCurrentTime()}</span>
                 </div>
               </div>
             </div>
@@ -451,8 +449,7 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
           <CardContent className="p-6 space-y-4">
             <Button
               onClick={handleScanAnotherArea}
-              className="w-full rounded-full py-4 text-lg font-semibold text-white shadow-lg transition-all duration-200"
-              style={{ backgroundColor: '#00339B' }}
+              className="w-full rounded-full py-4 text-lg font-semibold text-primary-foreground shadow-lg transition-all duration-200 bg-primary"
             >
               <QrCode className="w-5 h-5 mr-3" />
               Scan Another Area
@@ -460,17 +457,17 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200" />
+                <div className="w-full border-t border-border" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-3 bg-white text-gray-500">or</span>
+                <span className="px-3 bg-card text-muted-foreground">or</span>
               </div>
             </div>
 
             <Button
               onClick={handleClockOutStart}
               variant="outline"
-              className="w-full rounded-full py-4 text-lg font-semibold text-red-600 border-red-200 hover:bg-red-50"
+              className="w-full rounded-full py-4 text-lg font-semibold text-destructive border-destructive/30 hover:bg-destructive/10"
             >
               <Clock className="w-5 h-5 mr-3" />
               Finish Shift & Clock Out
@@ -483,7 +480,7 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
           <Button 
             variant="ghost" 
             onClick={handleBackToTasks}
-            className="text-gray-500 rounded-full"
+            className="text-muted-foreground rounded-full"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Tasks
@@ -510,7 +507,7 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
   // Default fallback
   return (
     <div className="text-center space-y-4">
-      <p className="text-gray-600">Loading workflow...</p>
+      <p className="text-muted-foreground">Loading workflow...</p>
     </div>
   )
 }

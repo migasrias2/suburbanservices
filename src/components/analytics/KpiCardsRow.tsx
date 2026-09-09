@@ -49,23 +49,23 @@ export const KpiCardsRow: React.FC<{ summary: AnalyticsSummary }> = ({ summary }
   const hoursHoverContent =
     hoursBreakdown.length > 0 ? (
       <div className="flex flex-col max-h-[400px]">
-        <div className="sticky top-0 z-10 border-b bg-slate-50 px-4 py-3">
-          <h4 className="text-sm font-semibold text-slate-900">Hours by Site</h4>
+        <div className="sticky top-0 z-10 border-b bg-muted px-4 py-3">
+          <h4 className="text-sm font-semibold text-foreground">Hours by Site</h4>
         </div>
         <div className="overflow-y-auto p-2 custom-scrollbar">
           {hoursBreakdown.map((site) => (
-            <div key={site.name} className="mb-2 last:mb-0 rounded-lg border border-slate-100 bg-slate-50/50 p-2">
+            <div key={site.name} className="mb-2 last:mb-0 rounded-lg border border-border bg-muted/50 p-2">
               <div className="mb-2 flex items-center justify-between">
-                <span className="font-medium text-slate-700 text-sm truncate max-w-[180px]" title={site.name}>
+                <span className="font-medium text-foreground text-sm truncate max-w-[180px]" title={site.name}>
                   {site.name}
                 </span>
-                <span className="shrink-0 rounded bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">
+                <span className="shrink-0 rounded bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
                   {site.totalHours.toFixed(1)}h
                 </span>
               </div>
               <div className="space-y-1 pl-1">
                 {site.cleaners.map((cleaner) => (
-                  <div key={cleaner.name} className="flex items-center justify-between text-xs text-slate-500">
+                  <div key={cleaner.name} className="flex items-center justify-between text-xs text-muted-foreground">
                     <span className="truncate max-w-[180px]" title={cleaner.name}>
                       {cleaner.name}
                     </span>

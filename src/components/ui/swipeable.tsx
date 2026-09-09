@@ -48,7 +48,7 @@ export const Swipeable: React.FC<SwipeableProps> = ({ children, action, classNam
   return (
     <div ref={containerRef} className={`relative overflow-hidden ${className || ''}`}>
       <div
-        className="absolute inset-y-0 right-0 w-24 flex items-center justify-center bg-rose-600 text-white rounded-l-3xl"
+        className="absolute inset-y-0 right-0 w-24 flex items-center justify-center bg-destructive text-destructive-foreground rounded-l-3xl"
         style={{ transform: `translateX(${Math.min(0, 96 + offset)}px)` }}
       >
         <button

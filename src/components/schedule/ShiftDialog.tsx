@@ -61,7 +61,7 @@ const buildInitialStart = (day?: Date, hour?: number): Date => {
 }
 
 const fieldClass =
-  'h-11 rounded-xl border-0 bg-gray-100/80 px-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 shadow-none ring-0 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[#007AFF]/30'
+  'h-11 rounded-xl border-0 bg-muted/80 px-3.5 text-subheadline text-foreground placeholder:text-muted-foreground shadow-none ring-0 focus-visible:bg-card focus-visible:ring-2 focus-visible:ring-ring/30'
 
 export const ShiftDialog: React.FC<ShiftDialogProps> = ({
   open,
@@ -156,12 +156,12 @@ export const ShiftDialog: React.FC<ShiftDialogProps> = ({
       {/* max-h + scroll: DialogContent is centred with no height cap of its own,
           so on a phone with the keyboard up this form is clipped at both ends
           and the Save button becomes unreachable. */}
-      <DialogContent className="max-h-[90dvh] max-w-[440px] overflow-y-auto rounded-3xl border-0 bg-white p-5 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.25)] sm:p-7">
+      <DialogContent className="max-h-[90dvh] max-w-[440px] overflow-y-auto rounded-3xl border-0 bg-card p-5 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.25)] sm:p-7">
         <DialogHeader className="space-y-1.5">
-          <DialogTitle className="text-[22px] font-semibold tracking-tight text-gray-900">
+          <DialogTitle className="text-title2 font-semibold tracking-tight text-foreground">
             {mode === 'edit' ? 'Edit shift' : 'New shift'}
           </DialogTitle>
-          <DialogDescription className="text-[13px] text-gray-500">
+          <DialogDescription className="text-footnote text-muted-foreground">
             {mode === 'edit' && shift
               ? `Created ${format(new Date(shift.createdAt), 'PP')}`
               : 'Assign a cleaner to a time and place.'}
@@ -170,14 +170,14 @@ export const ShiftDialog: React.FC<ShiftDialogProps> = ({
 
         <div className="mt-5 space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="shift-cleaner" className="text-[11px] font-medium uppercase tracking-[0.06em] text-gray-500">
+            <Label htmlFor="shift-cleaner" className="text-caption2 font-medium uppercase tracking-[0.06em] text-muted-foreground">
               Cleaner
             </Label>
             <Select value={cleanerId} onValueChange={setCleanerId}>
               <SelectTrigger id="shift-cleaner" className={fieldClass}>
                 <SelectValue placeholder="Pick a cleaner" />
               </SelectTrigger>
-              <SelectContent className="rounded-xl border border-gray-100 bg-white shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]">
+              <SelectContent className="rounded-xl border border-border bg-card shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]">
                 {cleaners.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.name}
@@ -188,14 +188,14 @@ export const ShiftDialog: React.FC<ShiftDialogProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="shift-customer" className="text-[11px] font-medium uppercase tracking-[0.06em] text-gray-500">
+            <Label htmlFor="shift-customer" className="text-caption2 font-medium uppercase tracking-[0.06em] text-muted-foreground">
               Customer
             </Label>
             <Select value={customerId || 'none'} onValueChange={(v) => setCustomerId(v === 'none' ? '' : v)}>
               <SelectTrigger id="shift-customer" className={fieldClass}>
                 <SelectValue placeholder="Pick a customer" />
               </SelectTrigger>
-              <SelectContent className="rounded-xl border border-gray-100 bg-white shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]">
+              <SelectContent className="rounded-xl border border-border bg-card shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]">
                 <SelectItem value="none">No customer</SelectItem>
                 {customers.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
@@ -207,7 +207,7 @@ export const ShiftDialog: React.FC<ShiftDialogProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="shift-site" className="text-[11px] font-medium uppercase tracking-[0.06em] text-gray-500">
+            <Label htmlFor="shift-site" className="text-caption2 font-medium uppercase tracking-[0.06em] text-muted-foreground">
               Site
             </Label>
             <Input
@@ -221,13 +221,13 @@ export const ShiftDialog: React.FC<ShiftDialogProps> = ({
 
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="shift-start" className="text-[11px] font-medium uppercase tracking-[0.06em] text-gray-500">
+              <Label htmlFor="shift-start" className="text-caption2 font-medium uppercase tracking-[0.06em] text-muted-foreground">
                 Start
               </Label>
               <DateTimeField id="shift-start" value={startAt} onChange={setStartAt} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="shift-end" className="text-[11px] font-medium uppercase tracking-[0.06em] text-gray-500">
+              <Label htmlFor="shift-end" className="text-caption2 font-medium uppercase tracking-[0.06em] text-muted-foreground">
                 End
               </Label>
               <DateTimeField id="shift-end" value={endAt} onChange={setEndAt} />
@@ -235,7 +235,7 @@ export const ShiftDialog: React.FC<ShiftDialogProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="shift-notes" className="text-[11px] font-medium uppercase tracking-[0.06em] text-gray-500">
+            <Label htmlFor="shift-notes" className="text-caption2 font-medium uppercase tracking-[0.06em] text-muted-foreground">
               Notes
             </Label>
             <Textarea
@@ -244,12 +244,12 @@ export const ShiftDialog: React.FC<ShiftDialogProps> = ({
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Optional"
               rows={3}
-              className="resize-none rounded-xl border-0 bg-gray-100/80 px-3.5 py-2.5 text-[14px] text-gray-900 placeholder:text-gray-400 shadow-none focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[#007AFF]/30"
+              className="resize-none rounded-xl border-0 bg-muted/80 px-3.5 py-2.5 text-subheadline text-foreground placeholder:text-muted-foreground shadow-none focus-visible:bg-card focus-visible:ring-2 focus-visible:ring-ring/30"
             />
           </div>
 
           {error ? (
-            <p className="text-[13px] font-medium text-red-500">{error}</p>
+            <p className="text-footnote font-medium text-destructive">{error}</p>
           ) : null}
         </div>
 
@@ -261,7 +261,7 @@ export const ShiftDialog: React.FC<ShiftDialogProps> = ({
                 variant="ghost"
                 onClick={handleDelete}
                 disabled={isSubmitting}
-                className="h-10 rounded-full px-4 text-[13px] font-medium text-red-500 hover:bg-red-50 hover:text-red-600"
+                className="h-10 rounded-full px-4 text-footnote font-medium text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
                 Delete
               </Button>
@@ -273,7 +273,7 @@ export const ShiftDialog: React.FC<ShiftDialogProps> = ({
               variant="ghost"
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
-              className="h-10 rounded-full px-4 text-[13px] font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              className="h-10 rounded-full px-4 text-footnote font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               Cancel
             </Button>
@@ -281,7 +281,7 @@ export const ShiftDialog: React.FC<ShiftDialogProps> = ({
               type="button"
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="h-10 rounded-full bg-[#007AFF] px-5 text-[13px] font-semibold text-white shadow-none hover:bg-[#0064D2]"
+              className="h-10 rounded-full bg-primary px-5 text-footnote font-semibold text-primary-foreground shadow-none hover:bg-primary/90"
             >
               {mode === 'edit' ? 'Save' : 'Create'}
             </Button>

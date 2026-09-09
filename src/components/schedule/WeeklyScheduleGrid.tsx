@@ -23,9 +23,9 @@ interface WeeklyScheduleGridProps {
 }
 
 const TONE_CLASS: Record<NonNullable<WeeklyScheduleBlock['tone']>, string> = {
-  primary: 'bg-[#EAF2FF] text-[#0A3C8C] ring-1 ring-inset ring-[#D5E4FF] hover:bg-[#DDE9FF]',
-  accent: 'bg-[#E6F7EE] text-[#0F5132] ring-1 ring-inset ring-[#CDEAD9] hover:bg-[#D6F1E2]',
-  muted: 'bg-gray-100 text-gray-600 ring-1 ring-inset ring-gray-200 hover:bg-gray-150',
+  primary: 'bg-primary/10 text-primary ring-1 ring-inset ring-ring/30 hover:bg-primary/10',
+  accent: 'bg-success/10 text-success ring-1 ring-inset ring-success/30 hover:bg-success/10',
+  muted: 'bg-muted text-muted-foreground ring-1 ring-inset ring-ring hover:bg-secondary',
 }
 
 const ROW_HEIGHT_PX = 56
@@ -89,23 +89,23 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
       />
 
       {/* The seven-column time grid needs 860px to be legible, so it starts at md. */}
-      <div className="hidden overflow-x-auto rounded-3xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.08)] ring-1 ring-black/[0.04] md:block">
+      <div className="hidden overflow-x-auto rounded-3xl bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.08)] ring-1 ring-border/[0.04] md:block">
       <div className="grid min-w-[860px] grid-cols-[64px_repeat(7,minmax(140px,1fr))]">
-        <div className="px-3 py-4 text-[10px] font-medium uppercase tracking-[0.08em] text-gray-400">
+        <div className="px-3 py-4 text-caption2 font-medium uppercase tracking-[0.08em] text-muted-foreground">
           Time
         </div>
         {days.map((day) => {
           const isToday = isSameDay(day, today)
           return (
             <div key={day.toISOString()} className="px-4 py-3">
-              <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-gray-400">
+              <div className="flex items-center gap-1.5 text-caption2 font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 {format(day, 'EEE')}
-                {isToday ? <span className="h-1.5 w-1.5 rounded-full bg-[#007AFF]" /> : null}
+                {isToday ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
               </div>
               <div
                 className={cn(
-                  'mt-0.5 text-[22px] font-semibold tracking-tight',
-                  isToday ? 'text-[#007AFF]' : 'text-gray-900',
+                  'mt-0.5 text-title2 font-semibold tracking-tight',
+                  isToday ? 'text-primary' : 'text-foreground',
                 )}
               >
                 {format(day, 'd')}
@@ -114,13 +114,13 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
           )
         })}
 
-        <div className="col-span-8 h-px bg-gray-100" />
+        <div className="col-span-8 h-px bg-muted" />
 
         <div className="relative" style={{ height: totalHeightPx }}>
           {hours.map((hour) => (
             <div
               key={hour}
-              className="flex items-start justify-end pr-3 pt-1 text-[10px] font-medium tracking-tight text-gray-400"
+              className="flex items-start justify-end pr-3 pt-1 text-caption2 font-medium tracking-tight text-muted-foreground"
               style={{ height: ROW_HEIGHT_PX }}
             >
               {format(new Date().setHours(hour, 0, 0, 0), 'h a')}
@@ -136,8 +136,8 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
             <div
               key={dayKey}
               className={cn(
-                'relative border-l border-gray-100',
-                isToday && 'bg-[#F5F9FF]/50',
+                'relative border-l border-border',
+                isToday && 'bg-primary/10/50',
               )}
               style={{ height: totalHeightPx }}
             >
@@ -145,7 +145,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
                 <button
                   key={hour}
                   type="button"
-                  className="flex w-full items-start border-b border-gray-100/70 bg-transparent text-left transition-colors hover:bg-gray-50/70 focus:bg-gray-50/70 focus:outline-none"
+                  className="flex w-full items-start border-b border-border/70 bg-transparent text-left transition-colors hover:bg-muted/70 focus:bg-muted/70 focus:outline-none"
                   style={{ height: ROW_HEIGHT_PX }}
                   onClick={() => onCreate?.(day, hour)}
                   aria-label={`Add shift on ${format(day, 'PPP')} at ${hour}:00`}
@@ -164,17 +164,17 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
                     type="button"
                     onClick={() => onSelect?.(block.id)}
                     className={cn(
-                      'absolute left-1.5 right-1.5 rounded-xl px-2.5 py-1.5 text-left text-[11px] transition-all focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30',
+                      'absolute left-1.5 right-1.5 rounded-xl px-2.5 py-1.5 text-left text-caption2 transition-all focus:outline-none focus:ring-2 focus:ring-ring/30',
                       'shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)]',
                       TONE_CLASS[tone],
                     )}
                     style={{ top, height }}
                   >
-                    <div className="truncate text-[12px] font-semibold leading-tight">{block.title}</div>
+                    <div className="truncate text-caption font-semibold leading-tight">{block.title}</div>
                     {block.subtitle ? (
-                      <div className="truncate text-[10.5px] opacity-70">{block.subtitle}</div>
+                      <div className="truncate text-caption2 opacity-70">{block.subtitle}</div>
                     ) : null}
-                    <div className="truncate text-[10.5px] font-medium opacity-60">{timeLabel}</div>
+                    <div className="truncate text-caption2 font-medium opacity-60">{timeLabel}</div>
                   </button>
                 )
               })}
@@ -184,7 +184,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
       </div>
 
       {isLoading ? (
-        <div className="border-t border-gray-100 px-4 py-2 text-center text-[11px] font-medium text-gray-400">
+        <div className="border-t border-border px-4 py-2 text-center text-caption2 font-medium text-muted-foreground">
           Loading…
         </div>
       ) : null}

@@ -31,7 +31,7 @@ export const ComplianceTrendChart: React.FC<{ summary: AnalyticsSummary }> = ({ 
         config={{
           compliance: {
             label: 'Compliance %',
-            color: '#00339B',
+            color: 'hsl(var(--chart-1))',
           },
         }}
         className="h-72"
@@ -40,10 +40,10 @@ export const ComplianceTrendChart: React.FC<{ summary: AnalyticsSummary }> = ({ 
           data={data}
           margin={{ top: 24, right: 32, left: 16, bottom: 24 }}
         >
-          <CartesianGrid strokeDasharray="3 6" stroke="#d7e3f8" horizontal={true} vertical={false} />
+          <CartesianGrid strokeDasharray="3 6" stroke="hsl(var(--border))" horizontal={true} vertical={false} />
           <XAxis
             dataKey="date"
-            stroke="#94a3b8"
+            stroke="hsl(var(--muted-foreground))"
             tickLine={false}
             axisLine={false}
             dy={12}
@@ -54,7 +54,7 @@ export const ComplianceTrendChart: React.FC<{ summary: AnalyticsSummary }> = ({ 
             fontSize={12}
           />
           <YAxis
-            stroke="#94a3b8"
+            stroke="hsl(var(--muted-foreground))"
             tickLine={false}
             axisLine={false}
             width={56}
@@ -67,21 +67,21 @@ export const ComplianceTrendChart: React.FC<{ summary: AnalyticsSummary }> = ({ 
               value="%"
               position="insideLeft"
               offset={-12}
-              className="fill-slate-400 text-xs"
+              className="fill-muted-foreground text-xs"
             />
           </YAxis>
           <ChartTooltip
-            content={<ChartTooltipContent indicator="line" className="!bg-white" />}
+            content={<ChartTooltipContent indicator="line" className="!bg-card" />}
             cursor={false}
             labelFormatter={(value) => toCompactDate(String(value))}
           />
           <Line
             type="monotone"
             dataKey="compliance"
-            stroke="#00339B"
+            stroke="hsl(var(--chart-1))"
             strokeWidth={3}
-            dot={{ r: 4, fill: '#fff', stroke: '#00339B', strokeWidth: 2 }}
-            activeDot={{ r: 6, fill: '#fff', stroke: '#00339B', strokeWidth: 3 }}
+            dot={{ r: 4, fill: 'hsl(var(--card))', stroke: 'hsl(var(--chart-1))', strokeWidth: 2 }}
+            activeDot={{ r: 6, fill: 'hsl(var(--card))', stroke: 'hsl(var(--chart-1))', strokeWidth: 3 }}
           />
         </LineChart>
       </ChartContainer>

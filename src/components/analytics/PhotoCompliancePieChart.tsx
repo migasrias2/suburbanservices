@@ -15,11 +15,11 @@ const chartConfig = {
   },
   withPhoto: {
     label: 'With Photo',
-    color: '#00339B',
+    color: 'hsl(var(--chart-1))',
   },
   withoutPhoto: {
     label: 'Without Photo',
-    color: '#dbe7ff',
+    color: 'hsl(var(--muted))',
   },
 } satisfies ChartConfig
 
@@ -49,16 +49,16 @@ export const PhotoCompliancePieChart: React.FC<{ summary: AnalyticsSummary }> = 
       description="Tasks submitted with required photos"
     >
       <div className="grid gap-4">
-        <div className="flex flex-col gap-2 px-2 text-sm text-gray-600 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
-          <div className="font-semibold text-[#00339B]">{withPhotoPercent} with photos</div>
-          <div className="text-gray-500 whitespace-nowrap">{withoutPhotoPercent} missing photos</div>
+        <div className="flex flex-col gap-2 px-2 text-sm text-muted-foreground lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
+          <div className="font-semibold text-primary">{withPhotoPercent} with photos</div>
+          <div className="text-muted-foreground whitespace-nowrap">{withoutPhotoPercent} missing photos</div>
         </div>
         <ChartContainer
           config={chartConfig}
-          className="mx-auto h-[260px] w-full max-w-[320px] pb-0 [&_.recharts-pie-label-text]:fill-gray-600 [&_.recharts-pie-label-text]:font-semibold"
+          className="mx-auto h-[260px] w-full max-w-[320px] pb-0 [&_.recharts-pie-label-text]:fill-muted-foreground [&_.recharts-pie-label-text]:font-semibold"
         >
           <PieChart>
-            <ChartTooltip content={<ChartTooltipContent indicator="line" nameKey="name" hideLabel className="!bg-white" />} />
+            <ChartTooltip content={<ChartTooltipContent indicator="line" nameKey="name" hideLabel className="!bg-card" />} />
             <Pie
               data={data}
               dataKey="value"
@@ -75,12 +75,12 @@ export const PhotoCompliancePieChart: React.FC<{ summary: AnalyticsSummary }> = 
             </Pie>
           </PieChart>
         </ChartContainer>
-        <div className="flex flex-col gap-1 rounded-[24px] bg-blue-50/60 px-4 py-3 text-sm text-[#00339B]">
+        <div className="flex flex-col gap-1 rounded-[24px] bg-primary/5 px-4 py-3 text-sm text-primary">
           <div className="flex flex-wrap items-center gap-2 font-semibold">
             Coverage trend {total > 0 ? withPhotoPercent : '0%'}
             <TrendingUp className="h-4 w-4" />
           </div>
-          <div className="text-xs text-[#1f3c88]">
+          <div className="text-xs text-primary">
             Showing distribution of {total} task submissions with and without required photos for the selected period.
           </div>
         </div>

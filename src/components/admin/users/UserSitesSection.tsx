@@ -86,21 +86,21 @@ export const UserSitesSection: React.FC<UserSitesSectionProps> = ({
 
   return (
     <section>
-      <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Sites</h3>
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Sites</h3>
 
       {assigned.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-400">
+        <div className="rounded-2xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
           Not linked to any site yet.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-gray-100">
+        <div className="overflow-hidden rounded-2xl border border-border">
           {assigned.map((link, idx) => (
             <div
               key={link.customerId}
-              className={`flex items-center gap-3 px-4 py-3 ${idx > 0 ? 'border-t border-gray-50' : ''}`}
+              className={`flex items-center gap-3 px-4 py-3 ${idx > 0 ? 'border-t border-border' : ''}`}
             >
-              <Building2 className="h-4 w-4 shrink-0 text-emerald-600" />
-              <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">
+              <Building2 className="h-4 w-4 shrink-0 text-success" />
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
                 {link.customerLabel}
               </span>
               <button
@@ -110,7 +110,7 @@ export const UserSitesSection: React.FC<UserSitesSectionProps> = ({
                 onClick={() =>
                   runChange(link.customerId, link.customerLabel, 'disconnect', link.role)
                 }
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -121,21 +121,21 @@ export const UserSitesSection: React.FC<UserSitesSectionProps> = ({
 
       <div className="mt-5">
         <div className="relative mb-2">
-          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Connect a site"
-            className="h-11 rounded-2xl border-gray-200 bg-gray-50/70 pl-11"
+            className="h-11 rounded-2xl border-border bg-muted/70 pl-11"
           />
         </div>
 
         {available.length === 0 ? (
-          <p className="px-1 py-2 text-xs text-gray-400">
+          <p className="px-1 py-2 text-xs text-muted-foreground">
             {search.trim() ? 'No sites match.' : 'Linked to every site.'}
           </p>
         ) : (
-          <div className="max-h-56 overflow-y-auto rounded-2xl border border-gray-100">
+          <div className="max-h-56 overflow-y-auto rounded-2xl border border-border">
             {available.map((customer, idx) => {
               const label = customerLabel(customer)
               const isPending = pending.includes(customer.id)
@@ -145,15 +145,15 @@ export const UserSitesSection: React.FC<UserSitesSectionProps> = ({
                   type="button"
                   disabled={isPending}
                   onClick={() => runChange(customer.id, label, 'connect')}
-                  className={`flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-gray-50 disabled:opacity-40 ${
-                    idx > 0 ? 'border-t border-gray-50' : ''
+                  className={`flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-muted disabled:opacity-40 ${
+                    idx > 0 ? 'border-t border-border' : ''
                   }`}
                 >
-                  <span className="min-w-0 flex-1 truncate text-sm text-gray-700">{label}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">{label}</span>
                   {isPending ? (
-                    <Check className="h-4 w-4 shrink-0 text-gray-300" />
+                    <Check className="h-4 w-4 shrink-0 text-muted-foreground" />
                   ) : (
-                    <Plus className="h-4 w-4 shrink-0 text-gray-400" />
+                    <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
                   )}
                 </button>
               )

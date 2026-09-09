@@ -102,24 +102,24 @@ const TaskRow = ({
       style={style}
       className={cn(
         'flex items-start justify-between rounded-2xl border px-4 py-3 shadow-sm transition',
-        isActive ? 'border-emerald-100 bg-emerald-50/60' : 'border-gray-100 bg-gray-50'
+        isActive ? 'border-success/30 bg-success/5' : 'border-border bg-muted'
       )}
     >
       <div className="flex items-start gap-3">
         <button
           type="button"
-          className="mt-1 flex h-6 w-6 items-center justify-center rounded-full border border-transparent text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00339B]/40"
+          className="mt-1 flex h-6 w-6 items-center justify-center rounded-full border border-transparent text-muted-foreground hover:bg-muted hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           {...listeners}
           {...attributes}
         >
           <GripVertical className="h-4 w-4" />
         </button>
         <div className="space-y-1">
-          <p className="text-sm font-semibold text-gray-900">{task.task_description}</p>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-            {task.task_type && <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] uppercase tracking-wide text-[#00339B]">{task.task_type}</span>}
-            {task.qr_code && <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] text-gray-600">QR: {task.qr_code}</span>}
-            <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', isActive ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-200 text-gray-600')}>
+          <p className="text-sm font-semibold text-foreground">{task.task_description}</p>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            {task.task_type && <span className="rounded-full bg-card/80 px-2 py-0.5 text-caption2 uppercase tracking-wide text-primary">{task.task_type}</span>}
+            {task.qr_code && <span className="rounded-full bg-card/80 px-2 py-0.5 text-caption2 text-muted-foreground">QR: {task.qr_code}</span>}
+            <span className={cn('rounded-full px-2 py-0.5 text-caption2 font-medium', isActive ? 'bg-success/10 text-success' : 'bg-secondary text-muted-foreground')}>
               {isActive ? 'Active' : 'Inactive'}
             </span>
           </div>
@@ -127,8 +127,8 @@ const TaskRow = ({
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="rounded-full hover:bg-gray-100">
-            <MoreVertical className="h-4 w-4 text-gray-500" />
+          <Button variant="ghost" size="icon" className="rounded-full hover:bg-muted">
+            <MoreVertical className="h-4 w-4 text-muted-foreground" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-40 rounded-2xl border-0 shadow-lg">
@@ -136,7 +136,7 @@ const TaskRow = ({
             <Pencil className="h-4 w-4" />
             Edit Task
           </DropdownMenuItem>
-          <DropdownMenuItem className="gap-2 text-rose-600 focus:text-rose-600" onClick={() => onDeleteTask(task)}>
+          <DropdownMenuItem className="gap-2 text-destructive focus:text-destructive" onClick={() => onDeleteTask(task)}>
             <Trash2 className="h-4 w-4" />
             Delete Task
           </DropdownMenuItem>
@@ -186,14 +186,14 @@ export const AreaTasksTree = ({
 
   if (!tree.length) {
     return (
-      <Card className="rounded-3xl border border-dashed border-[#00339B]/20 bg-white shadow-none">
+      <Card className="rounded-3xl border border-dashed border-primary/20 bg-card shadow-none">
         <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-          <div className="h-16 w-16 rounded-full bg-[#00339B]/10 flex items-center justify-center">
-            <Plus className="h-6 w-6 text-[#00339B]" />
+          <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+            <Plus className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-[#00339B]">No tasks found</h3>
-            <p className="text-sm text-gray-500">Start by adding a task to an area.</p>
+            <h3 className="text-lg font-semibold text-primary">No tasks found</h3>
+            <p className="text-sm text-muted-foreground">Start by adding a task to an area.</p>
           </div>
         </CardContent>
       </Card>
@@ -208,8 +208,8 @@ export const AreaTasksTree = ({
     const content = (
       <div
         className={cn(
-          'rounded-3xl border bg-white shadow-sm transition-colors',
-          isExpanded ? 'border-[#00339B]/20 bg-[#f6f8ff]' : 'border-gray-100'
+          'rounded-3xl border bg-card shadow-sm transition-colors',
+          isExpanded ? 'border-primary/20 bg-primary/10' : 'border-border'
         )}
       >
         <div
@@ -222,25 +222,25 @@ export const AreaTasksTree = ({
               onToggleNode(nodeId)
             }
           }}
-          className="flex w-full items-center justify-between rounded-3xl px-6 py-5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00339B]/40"
+          className="flex w-full items-center justify-between rounded-3xl px-6 py-5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         >
           <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#00339B]/10">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
               {isExpanded ? (
-                <ChevronDown className="h-5 w-5 text-[#00339B]" />
+                <ChevronDown className="h-5 w-5 text-primary" />
               ) : (
-                <ChevronRight className="h-5 w-5 text-[#00339B]" />
+                <ChevronRight className="h-5 w-5 text-primary" />
               )}
             </div>
             <div>
-              <p className="text-base font-semibold text-gray-900">{group.customer}</p>
-              <p className="text-xs text-gray-500">{group.areas.length} area{group.areas.length === 1 ? '' : 's'}</p>
+              <p className="text-base font-semibold text-foreground">{group.customer}</p>
+              <p className="text-xs text-muted-foreground">{group.areas.length} area{group.areas.length === 1 ? '' : 's'}</p>
             </div>
           </div>
           {/* Removed pill New Task button as requested */}
         </div>
         {isExpanded && (
-          <div className="space-y-4 border-t border-gray-100 px-6 py-5">
+          <div className="space-y-4 border-t border-border px-6 py-5">
             {group.areas.length === 0 && onAddArea ? (
               <button
                 type="button"
@@ -248,7 +248,7 @@ export const AreaTasksTree = ({
                   event.stopPropagation()
                   onAddArea({ customer: group.customer })
                 }}
-                className="w-full rounded-2xl border-2 border-dotted border-gray-300 bg-white/80 px-5 py-6 text-sm font-semibold text-[#00339B] transition hover:border-[#00339B]/60 hover:bg-[#f0f4ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00339B]/40"
+                className="w-full rounded-2xl border-2 border-dotted border-border bg-card/80 px-5 py-6 text-sm font-semibold text-primary transition hover:border-primary/60 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
               >
                 <span className="inline-flex items-center gap-2">
                   <Plus className="h-4 w-4" />
@@ -274,7 +274,7 @@ export const AreaTasksTree = ({
         }}
         className="rounded-3xl"
       >
-        <div className="rounded-3xl overflow-hidden bg-white">{content}</div>
+        <div className="rounded-3xl overflow-hidden bg-card">{content}</div>
       </Swipeable>
     )
   }
@@ -299,7 +299,7 @@ export const AreaTasksTree = ({
         key={area.name}
         className={cn(
           'rounded-2xl border transition-colors',
-          isExpanded ? 'border-[#00339B]/20 bg-[#eef2ff]' : 'border-gray-100 bg-white/70'
+          isExpanded ? 'border-primary/20 bg-primary/10' : 'border-border bg-card/70'
         )}
       >
         <div
@@ -312,25 +312,25 @@ export const AreaTasksTree = ({
               onToggleNode(nodeId)
             }
           }}
-          className="flex w-full items-center justify-between rounded-2xl px-5 py-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00339B]/40"
+          className="flex w-full items-center justify-between rounded-2xl px-5 py-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#00339B]/10">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
               {isExpanded ? (
-                <ChevronDown className="h-4 w-4 text-[#00339B]" />
+                <ChevronDown className="h-4 w-4 text-primary" />
               ) : (
-                <ChevronRight className="h-4 w-4 text-[#00339B]" />
+                <ChevronRight className="h-4 w-4 text-primary" />
               )}
             </div>
             <div className="space-y-0.5">
-              <p className="text-sm font-semibold text-gray-900">{area.name}</p>
-              <p className="text-xs text-gray-500">{area.tasks.length} task{area.tasks.length === 1 ? '' : 's'}</p>
+              <p className="text-sm font-semibold text-foreground">{area.name}</p>
+              <p className="text-xs text-muted-foreground">{area.tasks.length} task{area.tasks.length === 1 ? '' : 's'}</p>
             </div>
           </div>
           {/* Removed pill Add Task button as requested */}
         </div>
         {isExpanded && (
-          <div className="space-y-3 border-t border-gray-100 bg-white px-5 py-4">
+          <div className="space-y-3 border-t border-border bg-card px-5 py-4">
             {areaTasks.length === 0 ? (
               <button
                 type="button"
@@ -338,7 +338,7 @@ export const AreaTasksTree = ({
                   event.stopPropagation()
                   onCreateTask({ customer, area: area.name })
                 }}
-                className="w-full rounded-2xl border-2 border-dotted border-gray-300 bg-white/80 px-5 py-6 text-sm font-semibold text-[#00339B] transition hover:border-[#00339B]/60 hover:bg-[#f0f4ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00339B]/40"
+                className="w-full rounded-2xl border-2 border-dotted border-border bg-card/80 px-5 py-6 text-sm font-semibold text-primary transition hover:border-primary/60 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
               >
                 <span className="inline-flex items-center gap-2">
                   <Plus className="h-4 w-4" />
@@ -361,7 +361,7 @@ export const AreaTasksTree = ({
                       event.stopPropagation()
                       onCreateTask({ customer, area: area.name })
                     }}
-                    className="mt-2 w-full rounded-xl border-2 border-dotted border-gray-300 bg-white/80 px-4 py-3 text-xs font-semibold text-[#00339B] transition hover:border-[#00339B]/60 hover:bg-[#f0f4ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00339B]/40"
+                    className="mt-2 w-full rounded-xl border-2 border-dotted border-border bg-card/80 px-4 py-3 text-xs font-semibold text-primary transition hover:border-primary/60 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                   >
                     <span className="inline-flex items-center gap-2">
                       <Plus className="h-3 w-3" />
@@ -384,7 +384,7 @@ export const AreaTasksTree = ({
         <button
           type="button"
           onClick={onAddCustomer}
-          className="mt-2 w-full rounded-3xl border-2 border-dotted border-gray-300 bg-white/80 px-6 py-6 text-sm font-semibold text-[#00339B] transition hover:border-[#00339B]/60 hover:bg-[#f6f8ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00339B]/40"
+          className="mt-2 w-full rounded-3xl border-2 border-dotted border-border bg-card/80 px-6 py-6 text-sm font-semibold text-primary transition hover:border-primary/60 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         >
           <span className="inline-flex items-center gap-2">
             <Plus className="h-4 w-4" />

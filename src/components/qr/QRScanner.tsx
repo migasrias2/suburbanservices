@@ -346,12 +346,12 @@ export const QRScanner: React.FC<QRScannerProps> = ({
 
   const getQRTypeColor = (type: QRCodeData['type']) => {
     switch (type) {
-      case 'CLOCK_IN': return 'bg-green-500'
-      case 'CLOCK_OUT': return 'bg-red-500'
-      case 'AREA': return 'bg-blue-500'
-      case 'TASK': return 'bg-yellow-500'
-      case 'FEEDBACK': return 'bg-purple-500'
-      default: return 'bg-gray-500'
+      case 'CLOCK_IN': return 'bg-success'
+      case 'CLOCK_OUT': return 'bg-destructive'
+      case 'AREA': return 'bg-primary'
+      case 'TASK': return 'bg-warning'
+      case 'FEEDBACK': return 'bg-chart-2'
+      default: return 'bg-foreground'
     }
   }
 
@@ -376,8 +376,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="text-center space-y-4">
-          <p className="text-gray-600">Camera access is required to scan QR codes</p>
-          <Button onClick={requestCameraPermission} className="w-full rounded-full text-white" style={{ backgroundColor: '#00339B' }}>
+          <p className="text-muted-foreground">Camera access is required to scan QR codes</p>
+          <Button onClick={requestCameraPermission} className="w-full rounded-full text-primary-foreground bg-primary">
             <Camera className="h-4 w-4 mr-2" />
             Enable Camera
           </Button>
@@ -390,7 +390,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     return (
       <Card className="w-full max-w-md mx-auto rounded-2xl border-0 shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-red-600">
+          <CardTitle className="flex items-center gap-2 text-destructive">
             <AlertCircle className="h-5 w-5" />
             Camera Access Denied
           </CardTitle>
@@ -402,7 +402,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
               Camera access is required to scan QR codes. Please enable camera permissions in your browser settings.
             </AlertDescription>
           </Alert>
-          <Button onClick={requestCameraPermission} className="w-full rounded-full text-white" style={{ backgroundColor: '#00339B' }}>
+          <Button onClick={requestCameraPermission} className="w-full rounded-full text-primary-foreground bg-primary">
             Try Again
           </Button>
         </CardContent>
@@ -414,16 +414,16 @@ export const QRScanner: React.FC<QRScannerProps> = ({
 
   if (clockInRequired) {
     return (
-      <Card className="w-full max-w-md mx-auto rounded-3xl border-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_20px_50px_-20px_rgba(0,0,0,0.15)]">
+      <Card className="w-full max-w-md mx-auto rounded-3xl border-0 bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04),0_20px_50px_-20px_rgba(0,0,0,0.15)]">
         <CardContent className="space-y-5 p-7 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#FFF5E0] text-[#7A4A00]">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-warning/10 text-warning">
             <Clock className="h-6 w-6" />
           </div>
           <div className="space-y-1.5">
-            <h2 className="text-[20px] font-semibold tracking-tight text-gray-900">
+            <h2 className="text-title3 font-semibold tracking-tight text-foreground">
               Clock in first
             </h2>
-            <p className="text-[13.5px] leading-snug text-gray-500">
+            <p className="text-footnote leading-snug text-muted-foreground">
               You need to clock in before scanning area or task QR codes. Tap the button
               below to clock in, then come back to scan.
             </p>
@@ -431,14 +431,14 @@ export const QRScanner: React.FC<QRScannerProps> = ({
           <div className="flex flex-col gap-2">
             <Button
               onClick={() => navigate('/clock-in')}
-              className="h-11 w-full rounded-full bg-[#007AFF] text-[14px] font-semibold text-white shadow-none hover:bg-[#0064D2]"
+              className="h-11 w-full rounded-full bg-primary text-subheadline font-semibold text-primary-foreground shadow-none hover:bg-primary/90"
             >
               Go to Clock In
             </Button>
             <Button
               variant="ghost"
               onClick={() => setClockInRequired(false)}
-              className="h-10 w-full rounded-full text-[13px] font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+              className="h-10 w-full rounded-full text-footnote font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               Cancel
             </Button>
@@ -467,7 +467,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     <div className="w-full space-y-4">
       <div className="space-y-4">
         {/* Camera View */}
-        <div className={`relative aspect-square rounded-3xl overflow-hidden border-2 ${isScanning ? 'border-blue-500 bg-gray-900' : 'border-gray-200 bg-gray-50'} transition-all duration-200`}>
+        <div className={`relative aspect-square rounded-3xl overflow-hidden border-2 ${isScanning ? 'border-primary/40 bg-foreground' : 'border-border bg-muted'} transition-all duration-200`}>
           <video
             ref={videoRef}
             className="w-full h-full object-cover"
@@ -476,12 +476,12 @@ export const QRScanner: React.FC<QRScannerProps> = ({
           />
             {isScanning && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-56 h-56 rounded-2xl border-2 border-white/70 shadow-[0_0_0_6000px_rgba(17,24,39,0.6)_inset]" />
+                <div className="w-56 h-56 rounded-2xl border-2 border-border/60 shadow-[0_0_0_6000px_rgba(17,24,39,0.6)_inset]" />
               </div>
             )}
           {wrongType && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2">
-              <div className="px-3 py-1 rounded-full bg-yellow-100 text-yellow-900 text-xs font-medium border border-yellow-300 shadow-sm">
+              <div className="px-3 py-1 rounded-full bg-warning/10 text-warning text-xs font-medium border border-warning/30 shadow-sm">
                 Wrong QR type • need {allowedTypes?.join(' / ')}
               </div>
             </div>
@@ -489,16 +489,16 @@ export const QRScanner: React.FC<QRScannerProps> = ({
           {!isScanning && !lastScan?.success && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center space-y-3">
-                <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
-                  <QrCode className="w-8 h-8" style={{ color: '#00339B' }} />
+                <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
+                  <QrCode className="w-8 h-8 text-primary" />
                 </div>
-                <p className="text-gray-600 font-medium">Hold steady and align the QR inside the frame</p>
+                <p className="text-muted-foreground font-medium">Hold steady and align the QR inside the frame</p>
               </div>
             </div>
           )}
           {lastScan?.success && (
-            <div className="absolute inset-0 flex items-center justify-center bg-green-500/10">
-              <div className="flex items-center justify-center h-24 w-24 rounded-full bg-green-100 text-green-600">
+            <div className="absolute inset-0 flex items-center justify-center bg-success/10">
+              <div className="flex items-center justify-center h-24 w-24 rounded-full bg-success/10 text-success">
                 <CheckCircle2 className="h-14 w-14 animate-[scale-in_0.4s_ease-out_forwards]" />
               </div>
             </div>
@@ -509,8 +509,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         {!isScanning ? (
           <Button 
             onClick={startScanning} 
-            className="w-full rounded-full py-6 text-lg font-semibold text-white shadow-lg transition-all duration-200"
-            style={{ backgroundColor: '#00339B' }}
+            className="w-full rounded-full py-6 text-lg font-semibold text-primary-foreground shadow-lg transition-all duration-200 bg-primary"
           >
             <Camera className="h-5 w-5 mr-3" />
             Start scanning
@@ -529,7 +528,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
           <Button
             variant="outline"
             onClick={() => setShowClockOut(true)}
-            className="w-full rounded-full py-5 text-red-600 border-red-200 hover:bg-red-50"
+            className="w-full rounded-full py-5 text-destructive border-destructive/30 hover:bg-destructive/10"
           >
             Clock Out
           </Button>

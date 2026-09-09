@@ -98,9 +98,9 @@ const LayoutShell: React.FC<Sidebar07LayoutProps> = ({ children, userType, userN
   const isActive = (path: string) => location.pathname === path
 
   return (
-    <div className="flex min-h-screen w-full bg-gray-50">
-      <Sidebar variant="sidebar" className="bg-white border-0">
-        <SidebarHeader className="bg-white border-0 px-4 pt-4 pb-2">
+    <div className="flex min-h-screen w-full bg-background">
+      <Sidebar variant="sidebar" className="bg-sidebar border-0">
+        <SidebarHeader className="bg-sidebar border-0 px-4 pt-4 pb-2">
           <div className="flex flex-col items-center text-center">
             <img
               src="/suburban_services_logo-scaled.webp"
@@ -113,7 +113,7 @@ const LayoutShell: React.FC<Sidebar07LayoutProps> = ({ children, userType, userN
         <SidebarContent className="px-4 py-1 space-y-4">
           {navigation.sections.map((section) => (
             <SidebarGroup key={section.title} className="p-0">
-              <SidebarGroupLabel className="px-3 text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-gray-400">
+              <SidebarGroupLabel className="px-3 text-caption2 font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 {section.title}
               </SidebarGroupLabel>
               <SidebarGroupContent>
@@ -127,8 +127,8 @@ const LayoutShell: React.FC<Sidebar07LayoutProps> = ({ children, userType, userN
                           asChild
                           className={`group rounded-2xl transition-all duration-200 h-11 text-sm pl-5 pr-3 ${
                             active
-                              ? 'bg-[#00339B]/5 text-[#00339B] font-semibold shadow-sm shadow-[#00339B]/10'
-                              : 'text-gray-600 hover:bg-gray-100 hover:text-[#00339B]'
+                              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold'
+                              : 'text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground'
                           }`}
                         >
                           <button
@@ -138,7 +138,9 @@ const LayoutShell: React.FC<Sidebar07LayoutProps> = ({ children, userType, userN
                           >
                             <Icon
                               className={`h-5 w-5 transition-colors duration-200 ${
-                                active ? 'text-[#00339B]' : 'text-gray-400 group-hover:text-[#00339B]'
+                                active
+                                  ? 'text-sidebar-primary'
+                                  : 'text-muted-foreground group-hover:text-sidebar-accent-foreground'
                               }`}
                             />
                             <span className="font-medium tracking-tight">{item.label}</span>
@@ -146,11 +148,11 @@ const LayoutShell: React.FC<Sidebar07LayoutProps> = ({ children, userType, userN
                         </SidebarMenuButton>
                         {item.path === ASSIST_PATH && openAssistCount > 0 && (
                           <>
-                            <SidebarMenuBadge className="bg-red-500 text-white">
+                            <SidebarMenuBadge className="bg-destructive text-destructive-foreground">
                               {openAssistCount > 9 ? '9+' : openAssistCount}
                             </SidebarMenuBadge>
                             {/* SidebarMenuBadge hides when the rail collapses to icons */}
-                            <span className="absolute right-2 top-2 hidden h-2 w-2 rounded-full bg-red-500 group-data-[collapsible=icon]:block" />
+                            <span className="absolute right-2 top-2 hidden h-2 w-2 rounded-full bg-destructive group-data-[collapsible=icon]:block" />
                           </>
                         )}
                       </SidebarMenuItem>
@@ -162,25 +164,25 @@ const LayoutShell: React.FC<Sidebar07LayoutProps> = ({ children, userType, userN
           ))}
         </SidebarContent>
 
-        <SidebarFooter className="bg-white p-2 border-0">
+        <SidebarFooter className="bg-sidebar p-2 border-0">
           <SidebarMenu>
             <SidebarMenuItem>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton
                     size="lg"
-                    className="rounded-full text-gray-700 hover:bg-gray-100 data-[state=open]:bg-gray-100 h-12"
+                    className="rounded-full text-sidebar-foreground hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent h-12"
                   >
                     <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold">
+                      <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
                         {userName.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold text-gray-900">{userName}</span>
-                      <span className="truncate text-xs text-gray-500">{userTypeLabel}</span>
+                      <span className="truncate font-semibold text-sidebar-foreground">{userName}</span>
+                      <span className="truncate text-caption text-muted-foreground">{userTypeLabel}</span>
                     </div>
-                    <ChevronDown className="ml-auto h-4 w-4 text-gray-400" />
+                    <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground" />
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -199,7 +201,7 @@ const LayoutShell: React.FC<Sidebar07LayoutProps> = ({ children, userType, userN
                   <DropdownMenuSeparator className="mx-4 my-2" />
                   <DropdownMenuItem
                     onClick={handleLogout}
-                    className="gap-2 cursor-pointer text-red-600 focus:text-red-600 rounded-full mx-2 my-1"
+                    className="gap-2 cursor-pointer text-destructive focus:text-destructive rounded-full mx-2 my-1"
                   >
                     <LogOut className="h-4 w-4" />
                     Log out
@@ -212,7 +214,7 @@ const LayoutShell: React.FC<Sidebar07LayoutProps> = ({ children, userType, userN
         <SidebarRail />
       </Sidebar>
 
-      <SidebarInset className="min-w-0 flex-1 bg-gray-50">
+      <SidebarInset className="min-w-0 flex-1 bg-background">
         <MobileTopBar
           title={pageTitle}
           userName={userName}

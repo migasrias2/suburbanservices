@@ -152,7 +152,7 @@ export default function DashboardAccessPage() {
   if (!userType || !userName) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/40 border-t-transparent" />
       </div>
     )
   }
@@ -169,33 +169,33 @@ export default function DashboardAccessPage() {
               everything when an account has no assignments at all. Removing an
               account's last assignment therefore widens its view rather than
               narrowing it, which is the opposite of what "Remove" implies. */}
-          <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="rounded-2xl bg-warning/10 px-4 py-3 text-sm text-warning">
             An account with no assignments at all currently sees every client. Removing
             someone&rsquo;s last assignment widens their view instead of narrowing it.
           </p>
         </div>
 
         {isLoading ? (
-          <div className="py-16 text-center text-sm text-gray-400">Loading…</div>
+          <div className="py-16 text-center text-sm text-muted-foreground">Loading…</div>
         ) : (
           <div className="grid gap-6 lg:grid-cols-5">
             {/* Clients */}
             <section className="lg:col-span-2">
-              <div className="mb-3 px-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              <div className="mb-3 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Clients
               </div>
               <div className="relative mb-3">
-                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={clientSearch}
                   onChange={(e) => setClientSearch(e.target.value)}
                   placeholder="Search clients"
-                  className="h-12 rounded-2xl border-gray-200 bg-white pl-11"
+                  className="h-12 rounded-2xl border-border bg-card pl-11"
                 />
               </div>
 
               {filteredCustomers.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-gray-200 bg-white/60 py-16 text-center text-sm text-gray-400">
+                <div className="rounded-3xl border border-dashed border-border bg-card/60 py-16 text-center text-sm text-muted-foreground">
                   No clients match.
                 </div>
               ) : (
@@ -209,25 +209,25 @@ export default function DashboardAccessPage() {
                         onClick={() => selectCustomer(c.id)}
                         className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition ${
                           active
-                            ? 'border-[#00339B] bg-[#00339B]/5'
-                            : 'border-gray-200 bg-white hover:bg-gray-50'
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border bg-card hover:bg-muted'
                         }`}
                       >
                         <div
                           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                            active ? 'bg-[#00339B] text-white' : 'bg-gray-100 text-gray-500'
+                            active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                           }`}
                         >
                           <Building2 className="h-4 w-4" />
                         </div>
                         <span
                           className={`truncate text-sm ${
-                            active ? 'font-semibold text-[#00339B]' : 'text-gray-800'
+                            active ? 'font-semibold text-primary' : 'text-foreground'
                           }`}
                         >
                           {customerLabel(c)}
                         </span>
-                        {active && <Check className="ml-auto h-4 w-4 shrink-0 text-[#00339B]" />}
+                        {active && <Check className="ml-auto h-4 w-4 shrink-0 text-primary" />}
                       </button>
                     )
                   })}
@@ -238,26 +238,26 @@ export default function DashboardAccessPage() {
             {/* Access for the selected client */}
             <section className="lg:col-span-3">
               {!selectedCustomer ? (
-                <div className="flex h-full min-h-[280px] items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-white/60 px-6 text-center text-sm text-gray-400">
+                <div className="flex h-full min-h-[280px] items-center justify-center rounded-3xl border border-dashed border-border bg-card/60 px-6 text-center text-sm text-muted-foreground">
                   Select a client to manage who can see its dashboard.
                 </div>
               ) : (
-                <div className="rounded-3xl border border-gray-200 bg-white p-5 sm:p-6">
+                <div className="rounded-3xl border border-border bg-card p-5 sm:p-6">
                   <div className="mb-5">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Dashboard access
                     </div>
-                    <div className="mt-1 text-lg font-semibold text-gray-900">
+                    <div className="mt-1 text-lg font-semibold text-foreground">
                       {customerLabel(selectedCustomer)}
                     </div>
                   </div>
 
                   {isLoadingAssigned ? (
-                    <div className="py-10 text-center text-sm text-gray-400">Loading…</div>
+                    <div className="py-10 text-center text-sm text-muted-foreground">Loading…</div>
                   ) : (
                     <>
                       {assigned.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-400">
+                        <div className="rounded-2xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
                           No accounts are assigned to this client.
                         </div>
                       ) : (
@@ -268,13 +268,13 @@ export default function DashboardAccessPage() {
                             return (
                               <li
                                 key={m.id}
-                                className="flex items-center gap-3 rounded-2xl border border-gray-200 px-4 py-3"
+                                className="flex items-center gap-3 rounded-2xl border border-border px-4 py-3"
                               >
                                 <div className="min-w-0 flex-1">
-                                  <div className="truncate text-sm font-medium text-gray-900">
+                                  <div className="truncate text-sm font-medium text-foreground">
                                     {managerLabel(m)}
                                   </div>
-                                  <div className="truncate text-xs text-gray-400">
+                                  <div className="truncate text-xs text-muted-foreground">
                                     {ROLE_LABEL[m.role ?? 'manager'] ?? m.role}
                                     {managerIdentifier(m) && ` · ${managerIdentifier(m)}`}
                                   </div>
@@ -284,10 +284,10 @@ export default function DashboardAccessPage() {
                                   disabled={busy}
                                   onClick={() => runAssignment(m, 'remove')}
                                   aria-label={`Remove ${managerLabel(m)}`}
-                                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
                                 >
                                   {busy ? (
-                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-transparent" />
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-transparent" />
                                   ) : (
                                     <X className="h-4 w-4" />
                                   )}
@@ -298,22 +298,22 @@ export default function DashboardAccessPage() {
                         </ul>
                       )}
 
-                      <div className="mt-7 border-t border-gray-100 pt-5">
-                        <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                      <div className="mt-7 border-t border-border pt-5">
+                        <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           Add access
                         </div>
                         <div className="relative mb-3">
-                          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                           <Input
                             value={staffSearch}
                             onChange={(e) => setStaffSearch(e.target.value)}
                             placeholder="Search accounts"
-                            className="h-12 rounded-2xl border-gray-200 bg-white pl-11"
+                            className="h-12 rounded-2xl border-border bg-card pl-11"
                           />
                         </div>
 
                         {available.length === 0 ? (
-                          <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-400">
+                          <div className="rounded-2xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
                             {staffSearch.trim()
                               ? 'No accounts match.'
                               : 'Every account already has access.'}
@@ -325,13 +325,13 @@ export default function DashboardAccessPage() {
                               return (
                                 <li
                                   key={m.id}
-                                  className="flex items-center gap-3 rounded-2xl border border-gray-200 px-4 py-3"
+                                  className="flex items-center gap-3 rounded-2xl border border-border px-4 py-3"
                                 >
                                   <div className="min-w-0 flex-1">
-                                    <div className="truncate text-sm font-medium text-gray-900">
+                                    <div className="truncate text-sm font-medium text-foreground">
                                       {managerLabel(m)}
                                     </div>
-                                    <div className="truncate text-xs text-gray-400">
+                                    <div className="truncate text-xs text-muted-foreground">
                                       {ROLE_LABEL[m.role ?? 'manager'] ?? m.role}
                                       {managerIdentifier(m) && ` · ${managerIdentifier(m)}`}
                                     </div>
@@ -341,10 +341,10 @@ export default function DashboardAccessPage() {
                                     disabled={busy}
                                     onClick={() => runAssignment(m, 'assign')}
                                     aria-label={`Grant access to ${managerLabel(m)}`}
-                                    className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#00339B] px-4 text-xs font-medium text-white transition hover:bg-[#002d7a] disabled:opacity-40"
+                                    className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-40"
                                   >
                                     {busy ? (
-                                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/50 border-t-transparent" />
+                                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground/50 border-t-transparent" />
                                     ) : (
                                       <Plus className="h-3.5 w-3.5" />
                                     )}

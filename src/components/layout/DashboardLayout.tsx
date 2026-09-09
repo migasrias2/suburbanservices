@@ -18,9 +18,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-background">
       {/* Mobile header */}
-      <div className="lg:hidden bg-white shadow-sm border-b border-gray-200 p-4">
+      <div className="lg:hidden bg-card shadow-sm border-b border-border p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
@@ -37,7 +37,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               className="h-8 w-auto"
             />
           </div>
-          <div className="text-sm font-medium text-gray-700 capitalize">
+          <div className="text-sm font-medium text-foreground capitalize">
             {userType} Portal
           </div>
         </div>
@@ -49,7 +49,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           variant="ghost"
           size="sm"
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="rounded-full p-2 bg-white/80 backdrop-blur-sm shadow-lg hover:bg-white/90"
+          className="rounded-full p-2 bg-card/80 backdrop-blur-sm shadow-lg hover:bg-card/90"
         >
           {sidebarCollapsed ? (
             <PanelLeftOpen className="h-5 w-5" />
@@ -63,7 +63,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         {/* Desktop Sidebar - Only show on desktop when not collapsed */}
         {!sidebarCollapsed && (
           <div className="hidden lg:block lg:w-80 lg:flex-shrink-0">
-            <div className="fixed top-0 left-0 h-full w-80 bg-white shadow-2xl z-40">
+            <div className="fixed top-0 left-0 h-full w-80 bg-card shadow-2xl z-40">
               <Sidebar
                 isOpen={true}
                 onClose={() => {}}

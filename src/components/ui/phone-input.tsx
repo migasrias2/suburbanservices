@@ -91,21 +91,21 @@ export function PhoneInput({
   return (
     <div className={cn("w-full", className)}>
       {label && (
-        <label htmlFor={id} className="mb-2 block text-sm font-medium text-[#0b2f6b]/80">
-          {label} {required ? <span className="text-red-500">*</span> : null}
+        <label htmlFor={id} className="mb-2 block text-subheadline font-medium text-foreground">
+          {label} {required ? <span className="text-destructive">*</span> : null}
         </label>
       )}
 
       <div
         className={cn(
-          "flex items-stretch rounded-2xl border bg-white/90 shadow-md focus-within:ring-2 focus-within:ring-[#0b2f6b]/30 transition-all duration-150 backdrop-blur",
-          error ? "border-red-300" : "border-[#0b2f6b]/20"
+          "flex items-stretch rounded-2xl border bg-card shadow-sm focus-within:ring-2 focus-within:ring-ring transition-all duration-150",
+          error ? "border-destructive" : "border-input"
         )}
       >
         {/* UK Flag + Dial Code (fixed) */}
-        <div className="h-11 rounded-l-2xl rounded-r-none border-r border-[#0b2f6b]/20 px-3 py-2 bg-[#0b2f6b]/10 flex items-center gap-1.5">
+        <div className="h-11 rounded-l-2xl rounded-r-none border-r border-input px-3 py-2 bg-muted flex items-center gap-1.5">
           <span className="text-base leading-none">{UK_FLAG}</span>
-          <span className="text-xs font-semibold text-[#0b2f6b]/90">{UK_DIAL_CODE}</span>
+          <span className="text-caption font-semibold text-foreground">{UK_DIAL_CODE}</span>
         </div>
 
         {/* Number input (national) */}
@@ -121,7 +121,7 @@ export function PhoneInput({
             required={required}
             className={cn(
               "h-11 border-0 bg-transparent px-4 py-2.5 shadow-none focus-visible:ring-0 rounded-l-none rounded-r-2xl",
-              "text-sm font-medium text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
+              "text-callout font-medium text-foreground placeholder:text-muted-foreground"
             )}
           />
         </div>
@@ -129,11 +129,11 @@ export function PhoneInput({
 
       <div className="mt-1 flex items-center gap-2">
         {helpText && !error ? (
-          <p className="text-xs text-[#0b2f6b]/60">{helpText}</p>
+          <p className="text-caption text-muted-foreground">{helpText}</p>
         ) : null}
-        {error ? <p className="text-xs text-red-600">{error}</p> : null}
+        {error ? <p className="text-caption text-destructive">{error}</p> : null}
         {!error && value && value !== UK_DIAL_CODE && (
-          <p className={cn("text-xs", isValid ? "text-green-600" : "text-amber-600")}>
+          <p className={cn("text-caption font-medium", isValid ? "text-success" : "text-warning")}>
             {isValid ? "Valid" : "Check number"}
           </p>
         )}

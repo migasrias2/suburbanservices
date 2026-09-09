@@ -499,19 +499,19 @@ export const AreaTasksPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-[32px] border border-gray-100 bg-white px-6 py-5 shadow-sm">
+      <div className="rounded-[32px] border border-border bg-card px-6 py-5 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-[#00339B]">
+            <h1 className="text-3xl font-semibold text-primary">
               Area Tasks
             </h1>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               Browse tasks per customer and area, then update as needed.
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-4 py-2">
-              <Search className="h-4 w-4 text-gray-400" aria-hidden="true" />
+            <div className="flex items-center gap-2 rounded-full border border-border bg-muted px-4 py-2">
+              <Search className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <Label htmlFor="area-task-search" className="sr-only">
                 Search
               </Label>
@@ -530,16 +530,16 @@ export const AreaTasksPage = () => {
       {tasksQuery.isLoading || !expandedInitialized ? (
         <div className="flex min-h-[400px] items-center justify-center">
           <div className="flex flex-col items-center gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-[#00339B]" />
-            <p className="text-sm text-gray-500">Loading tasks...</p>
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Loading tasks...</p>
           </div>
         </div>
       ) : tasksQuery.isError ? (
-        <div className="rounded-3xl border border-rose-200 bg-rose-50 px-6 py-8 text-center">
-          <h2 className="text-lg font-semibold text-rose-600">
+        <div className="rounded-3xl border border-destructive/30 bg-destructive/10 px-6 py-8 text-center">
+          <h2 className="text-lg font-semibold text-destructive">
             Unable to load tasks
           </h2>
-          <p className="mt-2 text-sm text-rose-500">
+          <p className="mt-2 text-sm text-destructive">
             Please refresh the page or try again later.
           </p>
         </div>
@@ -581,17 +581,17 @@ export const AreaTasksPage = () => {
       )}
 
       <Dialog open={addCustomerOpen} onOpenChange={handleCustomerDialogChange}>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-[28px] border-0 bg-white/95 p-6 shadow-[0_24px_60px_rgba(0,23,71,0.12)] backdrop-blur sm:rounded-[32px] sm:p-8">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-[28px] border-0 bg-card/95 p-6 shadow-[0_24px_60px_rgba(0,23,71,0.12)] backdrop-blur sm:rounded-[32px] sm:p-8">
           <DialogHeader className="space-y-4">
             <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#00339B]/10">
-                <UserPlus className="h-6 w-6 text-[#00339B]" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <UserPlus className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <DialogTitle className="text-2xl font-semibold text-[#00339B]">
+                <DialogTitle className="text-2xl font-semibold text-primary">
                   Add Customer
                 </DialogTitle>
-                <DialogDescription className="text-sm text-gray-500">
+                <DialogDescription className="text-sm text-muted-foreground">
                   Create a customer entry so you can assign areas and tasks to
                   it.
                 </DialogDescription>
@@ -602,7 +602,7 @@ export const AreaTasksPage = () => {
             <div className="space-y-2">
               <Label
                 htmlFor="new-customer-name"
-                className="text-sm font-semibold text-gray-700"
+                className="text-sm font-semibold text-foreground"
               >
                 Customer name
               </Label>
@@ -612,21 +612,21 @@ export const AreaTasksPage = () => {
                 onChange={(event) => setNewCustomerName(event.target.value)}
                 placeholder="e.g. Avtrade"
                 autoFocus
-                className="rounded-2xl border-gray-200 bg-gray-50/70 px-4 py-2 text-sm font-medium text-gray-700 focus-visible:ring-[#00339B]"
+                className="rounded-2xl border-border bg-muted/70 px-4 py-2 text-sm font-medium text-foreground focus-visible:ring-ring"
               />
             </div>
             <DialogFooter className="gap-2 sm:justify-end">
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-full border-gray-200 text-gray-600 hover:bg-gray-100"
+                className="rounded-full border-border text-muted-foreground hover:bg-muted"
                 onClick={() => handleCustomerDialogChange(false)}
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
-                className="rounded-full bg-[#00339B] px-6 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(0,51,155,0.18)] transition hover:bg-[#00297a]"
+                className="rounded-full bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground shadow-[0_12px_24px_rgba(0,51,155,0.18)] transition hover:bg-primary/90"
                 disabled={
                   !newCustomerName.trim() || createCustomerMutation.isPending
                 }
@@ -637,7 +637,7 @@ export const AreaTasksPage = () => {
                 <Button
                   type="button"
                   variant="secondary"
-                  className="rounded-full bg-gray-100 text-gray-700"
+                  className="rounded-full bg-muted text-foreground"
                   onClick={() => backfillMutation.mutate(newCustomerName.trim())}
                   disabled={backfillMutation.isPending}
                 >
@@ -650,17 +650,17 @@ export const AreaTasksPage = () => {
       </Dialog>
 
       <Dialog open={!!addAreaOpen} onOpenChange={(open) => { if (!open) { setAddAreaOpen(null); setNewAreaName('') }}}>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-[28px] border-0 bg-white/95 p-6 shadow-[0_24px_60px_rgba(0,23,71,0.12)] backdrop-blur sm:rounded-[32px] sm:p-8">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-[28px] border-0 bg-card/95 p-6 shadow-[0_24px_60px_rgba(0,23,71,0.12)] backdrop-blur sm:rounded-[32px] sm:p-8">
           <DialogHeader className="space-y-4">
             <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#00339B]/10">
-                <Search className="h-6 w-6 text-[#00339B]" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <Search className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <DialogTitle className="text-2xl font-semibold text-[#00339B]">
+                <DialogTitle className="text-2xl font-semibold text-primary">
                   Add Area
                 </DialogTitle>
-                <DialogDescription className="text-sm text-gray-500">
+                <DialogDescription className="text-sm text-muted-foreground">
                   Create a new area under {addAreaOpen?.customerName}.
                 </DialogDescription>
               </div>
@@ -668,14 +668,14 @@ export const AreaTasksPage = () => {
           </DialogHeader>
           <form onSubmit={(e) => { e.preventDefault(); if (!addAreaOpen) return; createAreaMutation.mutate({ customerId: addAreaOpen.customerId, name: newAreaName }) }} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="new-area-name" className="text-sm font-semibold text-gray-700">Area name</Label>
-              <Input id="new-area-name" value={newAreaName} onChange={(e) => setNewAreaName(e.target.value)} placeholder="e.g. Reception" autoFocus className="rounded-2xl border-gray-200 bg-gray-50/70 px-4 py-2 text-sm font-medium text-gray-700 focus-visible:ring-[#00339B]" />
+              <Label htmlFor="new-area-name" className="text-sm font-semibold text-foreground">Area name</Label>
+              <Input id="new-area-name" value={newAreaName} onChange={(e) => setNewAreaName(e.target.value)} placeholder="e.g. Reception" autoFocus className="rounded-2xl border-border bg-muted/70 px-4 py-2 text-sm font-medium text-foreground focus-visible:ring-ring" />
             </div>
             <DialogFooter className="gap-2 sm:justify-end">
-              <Button type="button" variant="outline" className="rounded-full border-gray-200 text-gray-600 hover:bg-gray-100" onClick={() => setAddAreaOpen(null)}>
+              <Button type="button" variant="outline" className="rounded-full border-border text-muted-foreground hover:bg-muted" onClick={() => setAddAreaOpen(null)}>
                 Cancel
               </Button>
-              <Button type="submit" className="rounded-full bg-[#00339B] px-6 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(0,51,155,0.18)] transition hover:bg-[#00297a]" disabled={!newAreaName.trim() || createAreaMutation.isPending}>
+              <Button type="submit" className="rounded-full bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground shadow-[0_12px_24px_rgba(0,51,155,0.18)] transition hover:bg-primary/90" disabled={!newAreaName.trim() || createAreaMutation.isPending}>
                 {createAreaMutation.isPending ? 'Adding…' : 'Add area'}
               </Button>
             </DialogFooter>
@@ -685,17 +685,17 @@ export const AreaTasksPage = () => {
 
       {/* Add Task Dialog - minimal, rounded, same style as Add Area */}
       <Dialog open={!!addTaskOpen} onOpenChange={(open) => { if (!open) { setAddTaskOpen(null); setNewTaskDescription('') }}}>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-[28px] border-0 bg-white/95 p-6 shadow-[0_24px_60px_rgba(0,23,71,0.12)] backdrop-blur sm:rounded-[32px] sm:p-8">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-[28px] border-0 bg-card/95 p-6 shadow-[0_24px_60px_rgba(0,23,71,0.12)] backdrop-blur sm:rounded-[32px] sm:p-8">
           <DialogHeader className="space-y-4">
             <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#00339B]/10">
-                <Search className="h-6 w-6 text-[#00339B]" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <Search className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <DialogTitle className="text-2xl font-semibold text-[#00339B]">
+                <DialogTitle className="text-2xl font-semibold text-primary">
                   Add Task
                 </DialogTitle>
-                <DialogDescription className="text-sm text-gray-500">
+                <DialogDescription className="text-sm text-muted-foreground">
                   {addTaskOpen ? `Create a new task under ${addTaskOpen.customer} • ${addTaskOpen.area}.` : 'Create a new task.'}
                 </DialogDescription>
               </div>
@@ -715,28 +715,28 @@ export const AreaTasksPage = () => {
             className="space-y-6"
           >
             <div className="space-y-2">
-              <Label htmlFor="new-task-desc" className="text-sm font-semibold text-gray-700">Task description</Label>
+              <Label htmlFor="new-task-desc" className="text-sm font-semibold text-foreground">Task description</Label>
               <Input
                 id="new-task-desc"
                 value={newTaskDescription}
                 onChange={(e) => setNewTaskDescription(e.target.value)}
                 placeholder="e.g. Vacuum and mop"
                 autoFocus
-                className="rounded-2xl border-gray-200 bg-gray-50/70 px-4 py-2 text-sm font-medium text-gray-700 focus-visible:ring-[#00339B]"
+                className="rounded-2xl border-border bg-muted/70 px-4 py-2 text-sm font-medium text-foreground focus-visible:ring-ring"
               />
             </div>
             <DialogFooter className="gap-2 sm:justify-end">
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-full border-gray-200 text-gray-600 hover:bg-gray-100"
+                className="rounded-full border-border text-muted-foreground hover:bg-muted"
                 onClick={() => setAddTaskOpen(null)}
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
-                className="rounded-full bg-[#00339B] px-6 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(0,51,155,0.18)] transition hover:bg-[#00297a]"
+                className="rounded-full bg-primary px-6 py-2 text-sm font-semibold text-primary-foreground shadow-[0_12px_24px_rgba(0,51,155,0.18)] transition hover:bg-primary/90"
                 disabled={!newTaskDescription.trim() || createMutation.isPending}
               >
                 {createMutation.isPending ? 'Adding…' : 'Add task'}
@@ -749,19 +749,19 @@ export const AreaTasksPage = () => {
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent
           side="right"
-          className="w-full max-w-xl overflow-y-auto border-0 bg-gradient-to-b from-white via-[#f5f7ff] to-white shadow-[0_20px_60px_rgba(0,23,71,0.12)]"
+          className="w-full max-w-xl overflow-y-auto border-0 bg-card shadow-[0_20px_60px_rgba(0,23,71,0.12)]"
         >
           <SheetHeader className="space-y-3">
-            <SheetTitle className="text-3xl font-semibold text-[#00339B]">
+            <SheetTitle className="text-3xl font-semibold text-primary">
               {sheetMode === "create" ? "Add Task" : "Edit Task"}
             </SheetTitle>
-            <SheetDescription className="text-base text-gray-500">
+            <SheetDescription className="text-base text-muted-foreground">
               {sheetMode === "create"
                 ? "Add a new task to a specific customer area."
                 : "Update the details for this task."}
             </SheetDescription>
           </SheetHeader>
-          <div className="mt-8 rounded-[28px] border border-white/60 bg-white p-6 shadow-[0_18px_40px_rgba(11,35,75,0.08)]">
+          <div className="mt-8 rounded-[28px] border border-border/60 bg-card p-6 shadow-[0_18px_40px_rgba(11,35,75,0.08)]">
             <AreaTaskForm
               defaultValues={editingTask ?? prefillData}
               onSubmit={handleSubmit}
@@ -773,7 +773,7 @@ export const AreaTasksPage = () => {
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-full border-rose-200 bg-white text-rose-600 hover:bg-rose-50"
+                className="rounded-full border-destructive/30 bg-card text-destructive hover:bg-destructive/10"
                 onClick={() => setPendingDelete(editingTask)}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
@@ -803,7 +803,7 @@ export const AreaTasksPage = () => {
             <AlertDialogAction
               onClick={handleDelete}
               className={cn(
-                "rounded-full bg-rose-600 hover:bg-rose-700",
+                "rounded-full bg-destructive hover:bg-destructive/90",
                 deleteMutation.isPending && "opacity-80",
               )}
               disabled={deleteMutation.isPending}

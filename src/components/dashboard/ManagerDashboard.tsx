@@ -148,34 +148,34 @@ interface BathroomAssistRequest {
 }
 
 const statusColors: Record<string, string> = {
-  clock_in: 'bg-emerald-500',
-  clock_out: 'bg-rose-500',
-  area_scan: 'bg-blue-500',
-  task_started: 'bg-amber-500',
-  task_complete: 'bg-indigo-500'
+  clock_in: 'bg-success text-success-foreground',
+  clock_out: 'bg-destructive text-destructive-foreground',
+  area_scan: 'bg-primary text-primary-foreground',
+  task_started: 'bg-warning text-warning-foreground',
+  task_complete: 'bg-primary text-primary-foreground'
 }
 
 const normalizeStatus = (status: string | null) => (status ? status.toLowerCase().replace(/\s+/g, '_') : '')
-const getStatusColor = (status: string | null) => statusColors[normalizeStatus(status)] || 'bg-gray-400'
+const getStatusColor = (status: string | null) => statusColors[normalizeStatus(status)] || 'bg-foreground text-background'
 
 type AssistStatusKey = BathroomAssistRequest['status'] | 'unknown'
 
 const assistStatusBadgeClasses: Record<AssistStatusKey, string> = {
-  pending: 'border border-amber-200 bg-amber-50 text-amber-700',
-  accepted: 'border border-blue-200 bg-blue-50 text-[#00339B]',
-  resolved: 'border border-emerald-200 bg-emerald-50 text-emerald-700',
-  escalated: 'border border-rose-200 bg-rose-50 text-rose-600',
-  cancelled: 'border border-slate-200 bg-slate-50 text-slate-500',
-  unknown: 'border border-slate-200 bg-slate-50 text-slate-500'
+  pending: 'border border-warning/30 bg-warning/10 text-warning',
+  accepted: 'border border-border bg-primary/10 text-primary',
+  resolved: 'border border-success/30 bg-success/10 text-success',
+  escalated: 'border border-destructive/30 bg-destructive/10 text-destructive',
+  cancelled: 'border border-border bg-muted text-muted-foreground',
+  unknown: 'border border-border bg-muted text-muted-foreground'
 }
 
 const assistAttentionContainerClasses: Record<AssistStatusKey, string> = {
-  pending: 'border-amber-200 bg-amber-50/60',
-  accepted: 'border-blue-200 bg-blue-50/60',
-  resolved: 'border-emerald-200 bg-emerald-50/60',
-  escalated: 'border-rose-200 bg-rose-50/60',
-  cancelled: 'border-slate-200 bg-slate-50/60',
-  unknown: 'border-slate-200 bg-slate-50/60'
+  pending: 'border-warning/30 bg-warning/5',
+  accepted: 'border-border bg-primary/5',
+  resolved: 'border-success/30 bg-success/5',
+  escalated: 'border-destructive/30 bg-destructive/5',
+  cancelled: 'border-border bg-muted/60',
+  unknown: 'border-border bg-muted/60'
 }
 
 const formatAssistStatus = (status?: BathroomAssistRequest['status'] | null) => {
@@ -1222,29 +1222,29 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     return (
       <div key={row.id} className="space-y-2">
         <div
-          className={`rounded-[28px] border border-blue-100 bg-white/80 px-6 py-5 shadow-sm transition ${
-            isCompleted ? 'cursor-pointer hover:border-blue-200 hover:bg-blue-50/70' : ''
+          className={`rounded-[28px] border border-border bg-card/80 px-6 py-5 shadow-sm transition ${
+            isCompleted ? 'cursor-pointer hover:border-border hover:bg-primary/5' : ''
           }`}
           onClick={toggleExpanded}
         >
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8aa5ff]">{siteLabel}</p>
-              <div className="flex items-center gap-6 text-sm text-[#00339B]">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary/60">{siteLabel}</p>
+              <div className="flex items-center gap-6 text-sm text-primary">
                 <div className="text-left">
                   <p className="font-semibold leading-tight">Clocked in</p>
-                  <p className="text-slate-500 leading-tight">{clockInLabel}</p>
+                  <p className="text-muted-foreground leading-tight">{clockInLabel}</p>
                 </div>
-                <ArrowRight className="h-4 w-4 text-[#8aa5ff]" />
+                <ArrowRight className="h-4 w-4 text-primary/60" />
                 <div className="text-left">
                   <p className="font-semibold leading-tight">{isCompleted ? 'Clocked out' : 'On site'}</p>
-                  <p className="text-slate-500 leading-tight">{isCompleted ? clockOutLabel : '—'}</p>
+                  <p className="text-muted-foreground leading-tight">{isCompleted ? clockOutLabel : '—'}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-xs text-slate-500">
-                <span className="font-semibold text-[#00339B]">{cleanerDisplayName}</span>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="font-semibold text-primary">{cleanerDisplayName}</span>
                 {dateLabel && (
-                  <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-[#00339B]">
+                  <span className="rounded-full border border-border bg-primary/10 px-2 py-0.5 text-caption2 font-semibold text-primary">
                     {dateLabel}
                   </span>
                 )}
@@ -1257,14 +1257,14 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                   event.stopPropagation()
                   toggleExpanded()
                 }}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-blue-200 bg-white text-[#00339B] transition hover:bg-blue-50"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-primary transition hover:bg-primary/10"
                 aria-expanded={isExpanded}
                 aria-label="Toggle attendance details"
               >
                 <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
               </button>
             ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-blue-100 bg-white text-[#8aa5ff]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-primary/60">
                 <ArrowRight className="h-4 w-4" />
               </div>
             )}
@@ -1273,33 +1273,33 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
         {isCompleted && isExpanded && (
           <div className="space-y-2 pl-4 sm:pl-8">
-            <div className="flex items-center justify-between gap-4 rounded-[24px] border border-blue-100 bg-blue-50/40 px-5 py-4">
-              <div className="flex items-center gap-4 text-sm text-[#00339B]">
+            <div className="flex items-center justify-between gap-4 rounded-[24px] border border-border bg-primary/5 px-5 py-4">
+              <div className="flex items-center gap-4 text-sm text-primary">
                 <div className="text-left">
                   <p className="font-semibold leading-tight">Clocked in</p>
-                  <p className="text-slate-500 leading-tight">{clockInLabel}</p>
+                  <p className="text-muted-foreground leading-tight">{clockInLabel}</p>
                 </div>
-                <ArrowRight className="h-4 w-4 text-[#8aa5ff]" />
+                <ArrowRight className="h-4 w-4 text-primary/60" />
                 <div className="text-left">
                   <p className="font-semibold leading-tight">On site</p>
-                  <p className="text-slate-500 leading-tight">—</p>
+                  <p className="text-muted-foreground leading-tight">—</p>
                 </div>
               </div>
-              <span className="text-xs text-slate-500">{dateLabel}</span>
+              <span className="text-xs text-muted-foreground">{dateLabel}</span>
             </div>
-            <div className="flex items-center justify-between gap-4 rounded-[24px] border border-blue-100 bg-blue-50/40 px-5 py-4">
-              <div className="flex items-center gap-4 text-sm text-[#00339B]">
+            <div className="flex items-center justify-between gap-4 rounded-[24px] border border-border bg-primary/5 px-5 py-4">
+              <div className="flex items-center gap-4 text-sm text-primary">
                 <div className="text-left">
                   <p className="font-semibold leading-tight">On site</p>
-                  <p className="text-slate-500 leading-tight">—</p>
+                  <p className="text-muted-foreground leading-tight">—</p>
                 </div>
-                <ArrowRight className="h-4 w-4 text-[#8aa5ff]" />
+                <ArrowRight className="h-4 w-4 text-primary/60" />
                 <div className="text-left">
                   <p className="font-semibold leading-tight">Clocked out</p>
-                  <p className="text-slate-500 leading-tight">{clockOutLabel}</p>
+                  <p className="text-muted-foreground leading-tight">{clockOutLabel}</p>
                 </div>
               </div>
-              <span className="text-xs text-slate-500">{dateLabel}</span>
+              <span className="text-xs text-muted-foreground">{dateLabel}</span>
             </div>
           </div>
         )}
@@ -1902,8 +1902,8 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
   if (isListLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f4f4f4]">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#00339B] border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-muted">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     )
   }
@@ -1911,14 +1911,14 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   return (
     <>
       <div className="mx-auto flex w/full max-w-7xl flex-col gap-8 px-6 pt-10 pb-24 xl:px-12">
-        <section className="rounded-[36px] border border-white/60 bg-white/80 p-6 shadow-[0_34px_90px_rgba(0,51,155,0.12)] backdrop-blur-md md:p-8">
+        <section className="rounded-[36px] border border-border/60 bg-card/80 p-6 shadow-[0_34px_90px_rgba(0,51,155,0.12)] backdrop-blur-md md:p-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex w-full items-start gap-4">
               {/* Hidden on phones: the layout's mobile top bar already carries a menu button, and two on one screen read as two different menus. */}
-              <SidebarTrigger className="mt-1 hidden h-10 w-10 shrink-0 rounded-2xl bg-white/80 text-gray-600 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-gray-900 md:flex md:h-11 md:w-11" />
+              <SidebarTrigger className="mt-1 hidden h-10 w-10 shrink-0 rounded-2xl bg-card/80 text-muted-foreground shadow-sm backdrop-blur-sm transition hover:bg-card hover:text-foreground md:flex md:h-11 md:w-11" />
               <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#8aa5ff]">Good {greetingPeriod}</p>
-                <h1 className="text-3xl font-semibold text-[#00339B] sm:text-4xl">Welcome back, {managerName}</h1>
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/60">Good {greetingPeriod}</p>
+                <h1 className="text-3xl font-semibold text-primary sm:text-4xl">Welcome back, {managerName}</h1>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3 mt-2 lg:mt-3">
@@ -1927,7 +1927,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                   <Button
                     type="button"
                     variant="ghost"
-                    className="flex items-center gap-3 rounded-full border border-blue-100 bg-white/80 px-4 py-2 text-sm font-semibold text-[#00339B] shadow-sm transition hover:bg-blue-50"
+                    className="flex items-center gap-3 rounded-full border border-border bg-card/80 px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-primary/10"
                   >
                     <CalendarDays className="h-4 w-4" />
                     <span>{selectedDateLabel}</span>
@@ -1942,13 +1942,13 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                 onClick={handleResetDate}
                 disabled={isSelectedDateToday}
                 variant="ghost"
-                className="rounded-full border border-blue-200 bg-blue-50/70 px-4 py-2 text-sm font-semibold text-[#00339B] transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-full border border-border bg-primary/5 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Today
               </Button>
             </div>
           </div>
-          <p className="mt-5 max-w-3xl text-sm text-slate-500">
+          <p className="mt-5 max-w-3xl text-sm text-muted-foreground">
             {overviewSubtitle}
           </p>
         </section>
@@ -1968,21 +1968,21 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
               <div
                 key={metric.key}
                 className={cn(
-                  "group relative overflow-hidden rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_22px_50px_rgba(0,51,155,0.08)] backdrop-blur transition hover:-translate-y-1 hover:shadow-[0_30px_70px_rgba(0,51,155,0.18)]",
-                  metric.breakdown && "cursor-help hover:border-blue-200"
+                  "group relative overflow-hidden rounded-[28px] border border-border/60 bg-card/90 p-5 shadow-[0_22px_50px_rgba(0,51,155,0.08)] backdrop-blur transition hover:-translate-y-1 hover:shadow-[0_30px_70px_rgba(0,51,155,0.18)]",
+                  metric.breakdown && "cursor-help hover:border-border"
                 )}
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-[#00339B]/10 via-[#5f80ff]/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                 <div className="relative flex flex-col gap-3">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#8aa5ff]">{metric.label}</span>
-                  <span className="text-3xl font-semibold text-[#00339B]">
+                  <span className="text-caption2 font-semibold uppercase tracking-[0.24em] text-primary/60">{metric.label}</span>
+                  <span className="text-3xl font-semibold text-primary">
                     {metric.value === undefined ? (
-                      <span className="inline-flex h-8 w-12 animate-pulse rounded-full bg-blue-100/70" />
+                      <span className="inline-flex h-8 w-12 animate-pulse rounded-full bg-primary/5" />
                     ) : (
                       displayValue
                     )}
                   </span>
-                  <span className="text-xs text-slate-500">{metric.helper}</span>
+                  <span className="text-xs text-muted-foreground">{metric.helper}</span>
                 </div>
               </div>
             )
@@ -2018,25 +2018,25 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                   <HoverCardTrigger asChild>
                     {content}
                   </HoverCardTrigger>
-                  <HoverCardContent className="w-80 rounded-[24px] border border-blue-100 bg-white/95 p-0 shadow-xl backdrop-blur-sm" align="start" side="bottom">
+                  <HoverCardContent className="w-80 rounded-[24px] border border-border bg-card/95 p-0 shadow-xl backdrop-blur-sm" align="start" side="bottom">
                     <div className="flex flex-col max-h-[400px]">
-                      <div className="sticky top-0 z-10 border-b border-blue-50 bg-white/95 px-4 py-3 backdrop-blur-sm">
-                        <h4 className="text-sm font-semibold text-[#00339B]">Hours by Site</h4>
+                      <div className="sticky top-0 z-10 border-b border-border bg-card/95 px-4 py-3 backdrop-blur-sm">
+                        <h4 className="text-sm font-semibold text-primary">Hours by Site</h4>
                       </div>
                       <div className="overflow-y-auto p-2 custom-scrollbar">
                         {hoursBreakdown.map((site) => (
-                          <div key={site.name} className="mb-2 last:mb-0 rounded-2xl border border-blue-50 bg-blue-50/30 p-3">
+                          <div key={site.name} className="mb-2 last:mb-0 rounded-2xl border border-border bg-primary/5 p-3">
                             <div className="mb-2 flex items-center justify-between">
-                              <span className="font-semibold text-[#00339B] text-sm truncate max-w-[180px]" title={site.name}>
+                              <span className="font-semibold text-primary text-sm truncate max-w-[180px]" title={site.name}>
                                 {site.name}
                               </span>
-                              <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-bold text-[#00339B]">
+                              <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
                                 {site.totalHours.toFixed(1)}h
                               </span>
                             </div>
                             <div className="space-y-1.5 pl-1">
                               {site.cleaners.map((cleaner) => (
-                                <div key={cleaner.name} className="flex items-center justify-between text-xs text-slate-600">
+                                <div key={cleaner.name} className="flex items-center justify-between text-xs text-muted-foreground">
                                   <span className="truncate max-w-[180px]" title={cleaner.name}>
                                     {cleaner.name}
                                   </span>
@@ -2058,57 +2058,57 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         </section>
 
         {isGlobalRole && (
-          <section className="rounded-[36px] border border-white/70 bg-white/85 shadow-[0_30px_80px_rgba(0,51,155,0.08)] backdrop-blur">
-            <div className="flex flex-col gap-4 border-b border-blue-100 px-8 py-6 sm:flex-row sm:items-center sm:justify-between">
+          <section className="rounded-[36px] border border-border/60 bg-card/85 shadow-[0_30px_80px_rgba(0,51,155,0.08)] backdrop-blur">
+            <div className="flex flex-col gap-4 border-b border-border px-8 py-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-[#00339B]">Cleaner activity overview</h2>
-                <p className="text-sm text-slate-500">Latest site check-ins, area scans, and task logs across all cleaners.</p>
+                <h2 className="text-xl font-semibold text-primary">Cleaner activity overview</h2>
+                <p className="text-sm text-muted-foreground">Latest site check-ins, area scans, and task logs across all cleaners.</p>
               </div>
               <Button
                 variant="ghost"
                 onClick={handleRefreshGlobalActivity}
                 disabled={isGlobalActivityLoading}
-                className="rounded-full border border-blue-100 px-6 py-2 text-sm font-semibold text-[#00339B] hover:bg-blue-50"
+                className="rounded-full border border-border px-6 py-2 text-sm font-semibold text-primary hover:bg-primary/10"
               >
                 {isGlobalActivityLoading ? 'Refreshing…' : 'Refresh'}
               </Button>
             </div>
             <div className="space-y-3 px-8 py-6">
               {isGlobalActivityLoading ? (
-                <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-6 text-center text-sm text-slate-500">
+                <div className="rounded-2xl border border-border bg-primary/5 p-6 text-center text-sm text-muted-foreground">
                   Loading recent activity…
                 </div>
               ) : globalActivityError ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-6 text-center text-sm text-rose-600">
+                <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-6 text-center text-sm text-destructive">
                   {globalActivityError}
                 </div>
               ) : globalActivityPreview.length ? (
                 globalActivityPreview.map((row) => (
                   <div
                     key={row.id}
-                    className="rounded-[24px] border border-blue-100 bg-white/95 p-4 shadow-sm shadow-blue-100/40"
+                    className="rounded-[24px] border border-border bg-card/95 p-4 shadow-sm shadow-blue-100/40"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[#00339B]">
+                    <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-primary">
                       <span className="font-semibold">{row.action || 'Activity recorded'}</span>
-                      <span className="text-xs text-[#00339B]/70">
+                      <span className="text-xs text-primary/70">
                         {row.timestamp ? format(new Date(row.timestamp), 'MMM d, yyyy • p') : '—'}
                       </span>
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#00339B]/70">
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-primary/70">
                       {row.cleaner_name ? <span className="font-semibold">{row.cleaner_name}</span> : null}
                       {row.site ? <span>• {row.site}</span> : null}
                       {row.area ? <span>• {row.area}</span> : null}
                     </div>
                     {row.detail ? (
-                      <p className="mt-2 text-xs text-slate-500">{row.detail}</p>
+                      <p className="mt-2 text-xs text-muted-foreground">{row.detail}</p>
                     ) : null}
                     {row.comments ? (
-                      <p className="mt-1 text-xs text-slate-500/80">{row.comments}</p>
+                      <p className="mt-1 text-xs text-muted-foreground/80">{row.comments}</p>
                     ) : null}
                   </div>
                 ))
               ) : (
-                <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/40 p-6 text-center text-sm text-slate-500">
+                <div className="rounded-2xl border border-dashed border-border bg-primary/5 p-6 text-center text-sm text-muted-foreground">
                   No cleaner activity recorded for this period.
                 </div>
               )}
@@ -2118,25 +2118,25 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
         {isAssistanceEnabled && (
           <section className="grid gap-6 xl:grid-cols-2">
-          <Card className="rounded-[36px] border border-white/70 bg-white/80 shadow-[0_26px_70px_rgba(0,51,155,0.1)] backdrop-blur">
+          <Card className="rounded-[36px] border border-border/60 bg-card/80 shadow-[0_26px_70px_rgba(0,51,155,0.1)] backdrop-blur">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-xl font-semibold text-[#00339B]">Assistance</CardTitle>
-              <p className="text-sm text-slate-500">
+              <CardTitle className="text-xl font-semibold text-primary">Assistance</CardTitle>
+              <p className="text-sm text-muted-foreground">
                 Monitor bathroom assist requests needing cleaner action and keep track of recent resolutions.
               </p>
             </CardHeader>
             <CardContent className="space-y-8">
               {assistRequestsError ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-6 text-center text-sm text-rose-600">
+                <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-6 text-center text-sm text-destructive">
                   {assistRequestsError}
                 </div>
               ) : (
                 <>
                   <div>
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8aa5ff]">Needs attention</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/60">Needs attention</p>
                       {assistActiveCards.length > 0 && (
-                        <span className="text-[11px] font-medium text-slate-400">{assistActiveCards.length} open</span>
+                        <span className="text-caption2 font-medium text-muted-foreground">{assistActiveCards.length} open</span>
                       )}
                     </div>
                     <div className="mt-4 space-y-3">
@@ -2152,8 +2152,8 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                             <div className="flex flex-col gap-1">
                               <div className="flex items-start justify-between gap-3">
                                 <div>
-                                  <p className="text-sm font-semibold text-[#00339B]">{assist.location}</p>
-                                  <p className="text-xs text-slate-500">{assist.customer ?? 'Unknown customer'}</p>
+                                  <p className="text-sm font-semibold text-primary">{assist.location}</p>
+                                  <p className="text-xs text-muted-foreground">{assist.customer ?? 'Unknown customer'}</p>
                                 </div>
                                 <Badge
                                   className={cn(
@@ -2165,32 +2165,32 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                                 </Badge>
                               </div>
                               {assist.issueType && (
-                                <p className="text-xs font-medium text-[#0f235f]">{assist.issueType}</p>
+                                <p className="text-xs font-medium text-primary">{assist.issueType}</p>
                               )}
                             </div>
-                            <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
-                              <span className="font-semibold text-rose-500">
+                            <div className="mt-4 flex flex-wrap items-center gap-3 text-caption2 text-muted-foreground">
+                              <span className="font-semibold text-destructive">
                                 Reported {formatDateTime(assist.reportedAt)}
                               </span>
                               {assist.acceptedAt && (
-                                <span className="font-semibold text-[#00339B]">
+                                <span className="font-semibold text-primary">
                                   Accepted {formatDateTime(assist.acceptedAt)}
                                   {assist.acceptedByName ? ` • ${assist.acceptedByName}` : ''}
                                 </span>
                               )}
                               {assist.escalatedAt && (
-                                <span className="font-semibold text-rose-600">
+                                <span className="font-semibold text-destructive">
                                   Escalated {formatDateTime(assist.escalatedAt)}
                                 </span>
                               )}
                               {!assist.acceptedAt && assist.escalateAfter && (
-                                <span className="font-medium text-amber-600">
+                                <span className="font-medium text-warning">
                                   Escalates after {formatDateTime(assist.escalateAfter)}
                                 </span>
                               )}
                             </div>
                             {(assist.notes || assist.escalationReason) && (
-                              <div className="mt-3 space-y-1 text-xs text-slate-500">
+                              <div className="mt-3 space-y-1 text-xs text-muted-foreground">
                                 {assist.notes && <p>Notes: {assist.notes}</p>}
                                 {assist.escalationReason && <p>Escalation reason: {assist.escalationReason}</p>}
                               </div>
@@ -2200,7 +2200,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                                 size="sm"
                                 variant="outline"
                                 onClick={() => resolveRequest(assist)}
-                                className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                                className="text-success hover:text-success hover:bg-success/10 border-success/30"
                               >
                                 Mark Resolved
                               </Button>
@@ -2208,7 +2208,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                           </div>
                         ))
                       ) : (
-                        <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-6 text-center text-sm text-slate-500">
+                        <div className="rounded-2xl border border-dashed border-border bg-primary/5 p-6 text-center text-sm text-muted-foreground">
                           No requests need attention right now.
                         </div>
                       )}
@@ -2217,7 +2217,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
                   <div>
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8aa5ff]">Recently resolved</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/60">Recently resolved</p>
                       {assistResolvedCards.length > 0 && (
                         <Button
                           type="button"
@@ -2225,7 +2225,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                           variant="ghost"
                           onClick={handleClearResolved}
                           disabled={isClearingResolved}
-                          className="h-8 px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 hover:text-slate-700"
+                          className="h-8 px-3 text-caption2 font-semibold uppercase tracking-[0.18em] text-muted-foreground hover:text-foreground"
                         >
                           {isClearingResolved ? 'Clearing…' : 'Clear'}
                         </Button>
@@ -2241,12 +2241,12 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                               setExpandedResolvedId((current) => (current === assist.id ? null : assist.id))
                             }
                             className={cn(
-                              'rounded-[24px] border border-blue-100 bg-blue-50/40 p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50/60',
-                              expandedResolvedId === assist.id && 'bg-white'
+                              'rounded-[24px] border border-border bg-primary/5 p-4 text-left shadow-sm transition hover:border-border hover:bg-primary/5',
+                              expandedResolvedId === assist.id && 'bg-card'
                             )}
                           >
                             <div className="flex items-center justify-between gap-3">
-                              <span className="text-sm font-semibold text-[#00339B]">{assist.location}</span>
+                              <span className="text-sm font-semibold text-primary">{assist.location}</span>
                               <Badge
                                 className={cn(
                                   'rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide',
@@ -2256,27 +2256,27 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                                 {formatAssistStatus(assist.status)}
                               </Badge>
                             </div>
-                            <p className="mt-1 text-xs text-slate-500">{assist.customer ?? 'Unknown customer'}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{assist.customer ?? 'Unknown customer'}</p>
                             {assist.issueType && (
-                              <p className="mt-2 text-xs text-[#0f235f]">{assist.issueType}</p>
+                              <p className="mt-2 text-xs text-primary">{assist.issueType}</p>
                             )}
-                            <p className="mt-3 text-[11px] text-slate-400">
+                            <p className="mt-3 text-caption2 text-muted-foreground">
                               Reported {formatDateTime(assist.reportedAt)}
                             </p>
                             {assist.resolvedAt && (
-                              <p className="text-[11px] text-emerald-600">
+                              <p className="text-caption2 text-success">
                                 Resolved {formatDateTime(assist.resolvedAt)}
                                 {assist.resolvedByName ? ` • ${assist.resolvedByName}` : ''}
                               </p>
                             )}
                             {expandedResolvedId !== assist.id && (
-                              <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                              <p className="mt-2 text-caption2 font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                                 Show more
                               </p>
                             )}
                             {expandedResolvedId === assist.id && (
-                              <div className="mt-3 rounded-2xl border border-blue-100 bg-white/80 p-3 text-xs text-slate-600">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                              <div className="mt-3 rounded-2xl border border-border bg-card/80 p-3 text-xs text-muted-foreground">
+                                <p className="text-caption2 font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                                   Issue details
                                 </p>
                                 <p className="mt-1">
@@ -2292,12 +2292,12 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                               </div>
                             )}
                             {assist.notes && expandedResolvedId !== assist.id && (
-                              <p className="mt-2 text-xs text-slate-500">Notes: {assist.notes}</p>
+                              <p className="mt-2 text-xs text-muted-foreground">Notes: {assist.notes}</p>
                             )}
                           </button>
                         ))
                       ) : (
-                        <div className="sm:col-span-2 rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-6 text-center text-sm text-slate-500">
+                        <div className="sm:col-span-2 rounded-2xl border border-dashed border-border bg-primary/5 p-6 text-center text-sm text-muted-foreground">
                           No recent resolutions yet.
                         </div>
                       )}
@@ -2312,19 +2312,19 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         )}
 
         <section className="grid gap-6 xl:grid-cols-2">
-          <Card className="rounded-[36px] border border-white/70 bg-white/85 shadow-[0_30px_80px_rgba(0,51,155,0.1)] backdrop-blur">
+          <Card className="rounded-[36px] border border-border/60 bg-card/85 shadow-[0_30px_80px_rgba(0,51,155,0.1)] backdrop-blur">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-xl font-semibold text-[#00339B]">Management</CardTitle>
-              <p className="text-sm text-slate-500">Search your roster, review submissions, and share feedback.</p>
+              <CardTitle className="text-xl font-semibold text-primary">Management</CardTitle>
+              <p className="text-sm text-muted-foreground">Search your roster, review submissions, and share feedback.</p>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center gap-2 rounded-full border border-blue-100 bg-white/80 px-4 py-2 shadow-sm">
-                <Search className="h-4 w-4 text-[#00339B]" />
+              <div className="flex items-center gap-2 rounded-full border border-border bg-card/80 px-4 py-2 shadow-sm">
+                <Search className="h-4 w-4 text-primary" />
                 <Input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search cleaners..."
-                  className="h-8 border-0 bg-transparent px-0 text-sm text-[#00339B] placeholder:text-slate-400 focus-visible:ring-0"
+                  className="h-8 border-0 bg-transparent px-0 text-sm text-primary placeholder:text-muted-foreground focus-visible:ring-0"
                 />
               </div>
               <div className="max-h-[32rem] space-y-3 overflow-y-auto pr-1">
@@ -2344,20 +2344,20 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                             handleCleanerSelect(cleaner)
                           }
                         }}
-                        className={`flex w-full cursor-pointer items-center justify-between gap-4 rounded-[24px] px-4 py-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00339B] ${
+                        className={`flex w-full cursor-pointer items-center justify-between gap-4 rounded-[24px] px-4 py-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
                           isSelected
-                            ? 'border border-blue-200 bg-blue-50 shadow-md'
-                            : 'border border-blue-100 bg-white/80 shadow-sm hover:border-blue-200 hover:bg-blue-50/70'
+                            ? 'border border-border bg-primary/10 shadow-md'
+                            : 'border border-border bg-card/80 shadow-sm hover:border-border hover:bg-primary/5'
                         }`}
                       >
-                        <span className="font-semibold text-[#00339B]">{cleaner.cleaner_name}</span>
+                        <span className="font-semibold text-primary">{cleaner.cleaner_name}</span>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8aa5ff]">cleaner</span>
+                          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/60">cleaner</span>
                           {cleaner.cleaner_id && (
                             <button
                               type="button"
                               onClick={(event) => handleCleanerDelete(event, cleaner)}
-                              className="flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-white/80 text-[#00339B] transition hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+                              className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card/80 text-primary transition hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-60"
                               aria-label={`Delete ${cleaner.cleaner_name}`}
                               disabled={deleteLoadingId === cleaner.cleaner_id}
                             >
@@ -2373,7 +2373,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                     )
                   })
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-6 text-center text-sm text-slate-500">
+                  <div className="rounded-2xl border border-dashed border-border bg-primary/5 p-6 text-center text-sm text-muted-foreground">
                     No cleaners found. Adjust your search.
                   </div>
                 )}
@@ -2382,21 +2382,21 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           </Card>
 
           {!['James Manager', 'James', 'James Spenceley'].includes(managerName) && (
-          <Card className="rounded-[36px] border border-white/70 bg-white/85 shadow-[0_30px_80px_rgba(0,51,155,0.1)] backdrop-blur">
+          <Card className="rounded-[36px] border border-border/60 bg-card/85 shadow-[0_30px_80px_rgba(0,51,155,0.1)] backdrop-blur">
             <CardHeader className="space-y-1">
-              <CardTitle className="text-xl font-semibold text-[#00339B]">Calendar</CardTitle>
-              <p className="text-sm text-slate-500">Attendance timeline for your team.</p>
+              <CardTitle className="text-xl font-semibold text-primary">Calendar</CardTitle>
+              <p className="text-sm text-muted-foreground">Attendance timeline for your team.</p>
             </CardHeader>
             <CardContent>
               <div className="max-h-[32rem] space-y-3 overflow-y-auto pr-1">
                 {isDailyAttendanceLoading ? (
                   <div className="flex justify-center py-6">
-                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#00339B] border-t-transparent" />
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                   </div>
                 ) : attendanceDisplayRows.length ? (
                   attendanceDisplayRows.map(renderAttendanceCard)
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-6 text-center text-sm text-slate-500">
+                  <div className="rounded-2xl border border-dashed border-border bg-primary/5 p-6 text-center text-sm text-muted-foreground">
                     No attendance records found for {selectedDateLabel}.
                   </div>
                 )}
@@ -2417,18 +2417,18 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           }
         }}
       >
-        <DialogContent className="max-h-[90vh] w-full max-w-5xl overflow-y-auto overscroll-contain rounded-[32px] border border-blue-100 bg-white/90 p-6 shadow-[0_45px_120px_rgba(0,51,155,0.25)]">
+        <DialogContent className="max-h-[90vh] w-full max-w-5xl overflow-y-auto overscroll-contain rounded-[32px] border border-border bg-card/90 p-6 shadow-[0_45px_120px_rgba(0,51,155,0.25)]">
           {selectedCleaner ? (
             <div className="space-y-6">
               <DialogHeader className="space-y-4 text-left">
                 <div className="flex items-start justify-between gap-4">
-                  <DialogTitle className="text-2xl font-semibold text-[#00339B]">{selectedCleaner.cleaner_name}</DialogTitle>
+                  <DialogTitle className="text-2xl font-semibold text-primary">{selectedCleaner.cleaner_name}</DialogTitle>
                   <div className="flex items-center gap-2">
-                    <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#00339B]">
+                    <span className="rounded-full border border-border bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
                       cleaner
                     </span>
                     <DialogClose
-                      className="flex h-9 w-9 items-center justify-center rounded-full border border-blue-200 bg-white text-[#00339B] transition hover:bg-blue-50"
+                      className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-primary transition hover:bg-primary/10"
                       aria-label="Close cleaner details"
                     >
                       <X className="h-4 w-4" />
@@ -2436,8 +2436,8 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                   </div>
                 </div>
                 {selectedCleaner.event_type && (
-                  <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-[#00339B]">
-                    <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 uppercase tracking-wide">
+                  <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-primary">
+                    <span className="rounded-full border border-border bg-primary/10 px-3 py-1 uppercase tracking-wide">
                       {selectedCleaner.event_type.replace(/_/g, ' ')}
                     </span>
                   </div>
@@ -2446,36 +2446,36 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
               {isDetailLoading ? (
                 <div className="flex justify-center py-16">
-                  <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#00339B] border-t-transparent" />
+                  <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                 </div>
               ) : (
                 <div className="space-y-6">
                   <div className="grid gap-5 md:grid-cols-2">
-                    <div className="rounded-[28px] border border-blue-100 bg-white/80 p-5 shadow-sm">
-                      <h3 className="text-sm font-semibold text-[#00339B]">Time & Attendance</h3>
+                    <div className="rounded-[28px] border border-border bg-card/80 p-5 shadow-sm">
+                      <h3 className="text-sm font-semibold text-primary">Time & Attendance</h3>
                       <div className="mt-4 max-h-60 space-y-3 overflow-y-auto pr-1">
                         {selectedAttendancePreview.length ? (
                           selectedAttendancePreview.map(renderAttendanceCard)
                         ) : (
-                          <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-4 text-xs text-slate-500">
+                          <div className="rounded-2xl border border-dashed border-border bg-primary/5 p-4 text-xs text-muted-foreground">
                             No attendance entries recorded.
                           </div>
                         )}
                       </div>
                     </div>
-                    <div className="rounded-[28px] border border-blue-100 bg-white/80 p-5 shadow-sm">
-                      <h3 className="text-sm font-semibold text-[#00339B]">Areas & Tasks</h3>
+                    <div className="rounded-[28px] border border-border bg-card/80 p-5 shadow-sm">
+                      <h3 className="text-sm font-semibold text-primary">Areas & Tasks</h3>
                       <div className="mt-4 max-h-60 space-y-3 overflow-y-auto pr-1">
                         {taskSummaries.length ? (
                           taskSummaries.map((task) => (
-                            <div key={task.id} className="rounded-[20px] border border-blue-100 bg-blue-50/30 p-4">
-                              <p className="text-sm font-semibold text-[#00339B]">{task.area}</p>
-                              <p className="mt-1 text-xs text-slate-500">{formatDateTime(task.timestamp)}</p>
-                              <p className="mt-1 text-xs text-slate-600">Tasks completed: {task.completed}/{task.total}</p>
+                            <div key={task.id} className="rounded-[20px] border border-border bg-primary/5 p-4">
+                              <p className="text-sm font-semibold text-primary">{task.area}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(task.timestamp)}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">Tasks completed: {task.completed}/{task.total}</p>
                             </div>
                           ))
                         ) : (
-                          <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-4 text-xs text-slate-500">
+                          <div className="rounded-2xl border border-dashed border-border bg-primary/5 p-4 text-xs text-muted-foreground">
                             No task submissions yet.
                           </div>
                         )}
@@ -2483,12 +2483,12 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                     </div>
                   </div>
 
-                  <div className="rounded-[32px] border border-blue-100 bg-white/80 p-6 shadow-sm">
-                    <h3 className="flex items-center gap-2 text-sm font-semibold text-[#00339B]">
+                  <div className="rounded-[32px] border border-border bg-card/80 p-6 shadow-sm">
+                    <h3 className="flex items-center gap-2 text-sm font-semibold text-primary">
                       <ImageIcon className="h-4 w-4" /> Task photos
                     </h3>
                     {areaPhotoGroups.length === 0 ? (
-                      <div className="mt-4 rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-6 text-xs text-slate-500">
+                      <div className="mt-4 rounded-2xl border border-dashed border-border bg-primary/5 p-6 text-xs text-muted-foreground">
                         No photos uploaded yet.
                       </div>
                     ) : (
@@ -2496,21 +2496,21 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                         {areaPhotoGroups.map((areaGroup) => {
                           const isAreaExpanded = expandedGroups[areaGroup.key] ?? true
                           return (
-                            <div key={areaGroup.key} className="rounded-[28px] border border-blue-100 bg-blue-50/20 p-5">
+                            <div key={areaGroup.key} className="rounded-[28px] border border-border bg-primary/5 p-5">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="space-y-2">
-                                  <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[#00339B]">
+                                  <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-primary">
                                     <MapPin className="h-3 w-3" />
                                     <span>{areaGroup.area}</span>
-                                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-[#00339B] shadow-sm border border-[#00339B]/20">
+                                    <span className="rounded-full bg-card px-2 py-0.5 text-caption2 font-semibold text-primary shadow-sm border border-primary/20">
                                       {areaGroup.dateLabel}
                                     </span>
                                     {areaGroup.customer && (
-                                      <span className="rounded-full bg-[#fffbeb] px-2 py-0.5 text-[10px] font-semibold text-[#1f2937]">
+                                      <span className="rounded-full bg-warning/10 px-2 py-0.5 text-caption2 font-semibold text-foreground">
                                         {areaGroup.customer}
                                       </span>
                                     )}
-                                    <span className="rounded-full bg-[#e0e7ff] px-2 py-0.5 text-[10px] font-semibold text-[#1f2937]">
+                                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-caption2 font-semibold text-foreground">
                                       {areaGroup.tasks.reduce((sum, task) => sum + task.photos.length, 0)} photos
                                     </span>
                                   </div>
@@ -2519,7 +2519,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => toggleGroup(areaGroup.key)}
-                                  className="rounded-full border border-blue-200 text-[#00339B] hover:bg-blue-100"
+                                  className="rounded-full border border-border text-primary hover:bg-primary/10"
                                   aria-label={isAreaExpanded ? 'Collapse area' : 'Expand area'}
                                 >
                                   <ChevronDown className={`h-4 w-4 transition-transform ${isAreaExpanded ? 'rotate-180' : ''}`} />
@@ -2541,7 +2541,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                                       <button
                                         key={taskKey}
                                         onClick={() => openPhotoModal(taskGroup.photos, 0, taskGroup.taskName, taskGroup.startedAt)}
-                                        className="group relative aspect-square w-full overflow-hidden rounded-[26px] border border-white/70 bg-white/70 shadow-[0_16px_34px_rgba(15,35,95,0.06)] transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_50px_rgba(15,35,95,0.12)]"
+                                        className="group relative aspect-square w-full overflow-hidden rounded-[26px] border border-border/60 bg-card/70 shadow-[0_16px_34px_rgba(15,35,95,0.06)] transition-all hover:-translate-y-0.5 hover:shadow-[0_24px_50px_rgba(15,35,95,0.12)]"
                                         aria-label={`View photo for ${taskGroup.taskName}`}
                                       >
                                         <img
@@ -2550,9 +2550,9 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                                           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
                                         />
 
-                                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0f235f]/90 via-[#0f235f]/40 to-transparent p-4 text-white">
+                                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-primary/90 via-primary/40 to-transparent p-4 text-white">
                                           <h4 className="text-sm font-semibold leading-tight line-clamp-2">{taskGroup.taskName}</h4>
-                                          <div className="mt-2 flex items-center justify-between text-[11px] text-white/80">
+                                          <div className="mt-2 flex items-center justify-between text-caption2 text-white/80">
                                             <span className="flex items-center gap-1">
                                               <Clock className="h-3 w-3" />
                                               {thumbnail.photo_timestamp ? formatDateTime(thumbnail.photo_timestamp) : 'Time not recorded'}
@@ -2572,29 +2572,29 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                     )}
                   </div>
 
-                  <div className="rounded-[28px] border border-blue-100 bg-white/80 p-5 shadow-sm">
-                    <h3 className="text-sm font-semibold text-[#00339B]">Recent activity</h3>
+                  <div className="rounded-[28px] border border-border bg-card/80 p-5 shadow-sm">
+                    <h3 className="text-sm font-semibold text-primary">Recent activity</h3>
                     <div className="mt-4 max-h-60 space-y-3 overflow-y-auto pr-1">
                       {selectedLogsPreview.length ? (
                         selectedLogsPreview.map((log) => (
                           <div
                             key={log.id}
-                            className="flex items-start gap-3 rounded-[22px] border border-blue-100 bg-blue-50/40 p-4"
+                            className="flex items-start gap-3 rounded-[22px] border border-border bg-primary/5 p-4"
                           >
                             <div
-                              className={`flex h-9 w-9 items-center justify-center rounded-xl text-[10px] font-semibold uppercase text-white ${getStatusColor(log.action)}`}
+                              className={`flex h-9 w-9 items-center justify-center rounded-xl text-caption2 font-semibold uppercase ${getStatusColor(log.action)}`}
                             >
                               {log.action.slice(0, 3).toUpperCase()}
                             </div>
                             <div>
-                              <p className="text-sm font-semibold text-[#00339B]">{log.action}</p>
-                              <p className="text-xs text-slate-500">{log.site_area || '—'}</p>
-                              <p className="mt-1 text-[11px] text-slate-400">{formatDateTime(log.timestamp)}</p>
+                              <p className="text-sm font-semibold text-primary">{log.action}</p>
+                              <p className="text-xs text-muted-foreground">{log.site_area || '—'}</p>
+                              <p className="mt-1 text-caption2 text-muted-foreground">{formatDateTime(log.timestamp)}</p>
                             </div>
                           </div>
                         ))
                       ) : (
-                        <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/30 p-4 text-xs text-slate-500">
+                        <div className="rounded-2xl border border-dashed border-border bg-primary/5 p-4 text-xs text-muted-foreground">
                           No recent actions recorded.
                         </div>
                       )}
@@ -2604,59 +2604,59 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
               )}
             </div>
           ) : (
-            <div className="py-12 text-center text-sm text-slate-500">Select a cleaner from the management list to view details.</div>
+            <div className="py-12 text-center text-sm text-muted-foreground">Select a cleaner from the management list to view details.</div>
           )}
         </DialogContent>
       </Dialog>
 
       {currentPhoto && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-6 animate-in fade-in duration-200">
-            <div className="relative w-full max-w-4xl rounded-[32px] border border-[#d9e3ff] bg-[#f6f8ff] shadow-[0_35px_80px_rgba(0,0,0,0.25)] p-6 sm:p-8">
+            <div className="relative w-full max-w-4xl rounded-[32px] border border-border bg-primary/10 shadow-[0_35px_80px_rgba(0,0,0,0.25)] p-6 sm:p-8">
               <button
                 type="button"
                 onClick={closePhotoModal}
-                className="absolute -right-3 -top-3 z-30 rounded-full border border-[#d9e3ff] bg-white p-2 shadow-sm hover:bg-gray-50"
+                className="absolute -right-3 -top-3 z-30 rounded-full border border-border bg-card p-2 shadow-sm hover:bg-muted"
                 aria-label="Close photo viewer"
               >
-                <X className="h-5 w-5 text-gray-600" />
+                <X className="h-5 w-5 text-muted-foreground" />
               </button>
 
-              <div className="relative overflow-hidden rounded-[24px] border border-[#d9e3ff] bg-white">
+              <div className="relative overflow-hidden rounded-[24px] border border-border bg-card">
                 <img src={currentPhoto.photo_data} alt="task" className="w-full max-h-[68vh] object-contain" />
 
                 <button
                   type="button"
                   onClick={() => goToPhoto(-1)}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full border border-[#d9e3ff] bg-white p-3 shadow-sm transition hover:bg-gray-50"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full border border-border bg-card p-3 shadow-sm transition hover:bg-muted"
                   aria-label="Previous photo"
                 >
-                  <ChevronLeft className="h-5 w-5 text-gray-600" />
+                  <ChevronLeft className="h-5 w-5 text-muted-foreground" />
                 </button>
 
                 <button
                   type="button"
                   onClick={() => goToPhoto(1)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full border border-[#d9e3ff] bg-white p-3 shadow-sm transition hover:bg-gray-50"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full border border-border bg-card p-3 shadow-sm transition hover:bg-muted"
                   aria-label="Next photo"
                 >
-                  <ChevronRight className="h-5 w-5 text-gray-600" />
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
                 </button>
 
-                <div className="absolute top-5 left-5 flex items-center gap-2 rounded-full border border-[#d9e3ff] bg-white px-3 py-1 text-xs font-semibold text-gray-700 shadow-sm">
-                  <ImageIcon className="h-4 w-4 text-[#00339B]" />
+                <div className="absolute top-5 left-5 flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-foreground shadow-sm">
+                  <ImageIcon className="h-4 w-4 text-primary" />
                   <span>{activePhotoIndex !== null ? `${activePhotoIndex + 1}/${photoList.length}` : ''}</span>
                 </div>
 
                 <div className="absolute bottom-7 left-1/2 -translate-x-1/2">
-                  <div className="flex flex-col items-center gap-3 rounded-full border border-[#d9e3ff] bg-white px-6 py-3 shadow-sm sm:flex-row sm:flex-nowrap sm:items-center sm:gap-6">
+                  <div className="flex flex-col items-center gap-3 rounded-full border border-border bg-card px-6 py-3 shadow-sm sm:flex-row sm:flex-nowrap sm:items-center sm:gap-6">
                     {photoTaskName && (
-                      <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                        <ImageIcon className="h-4 w-4 text-[#00339B]" />
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <ImageIcon className="h-4 w-4 text-primary" />
                         <span className="whitespace-nowrap">{photoTaskName}</span>
                       </div>
                     )}
-                    <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                      <Clock className="h-4 w-4 text-[#00339B]" />
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <Clock className="h-4 w-4 text-primary" />
                       {formatDateTime(photoTaskDate || currentPhoto.photo_timestamp)}
                     </div>
                     <div className="flex items-center gap-2">
@@ -2666,8 +2666,8 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                         onClick={() => currentPhoto && handleFeedback(currentPhoto, 'up')}
                         className={`rounded-full gap-2 px-5 font-semibold transition ${
                           feedbackForPhoto === 'up'
-                            ? 'bg-[#00339B] text-white hover:bg-[#00297a]'
-                            : 'border border-[#00339B] bg-white text-[#00339B] hover:bg-[#00339B]/10'
+                            ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                            : 'border border-primary bg-card text-primary hover:bg-primary/10'
                         }`}
                       >
                         <ThumbsUp className="h-4 w-4" />
@@ -2679,8 +2679,8 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                         onClick={() => currentPhoto && handleFeedback(currentPhoto, 'down')}
                         className={`rounded-full gap-2 px-5 font-semibold transition ${
                           feedbackForPhoto === 'down'
-                            ? 'bg-rose-600 text-white hover:bg-rose-700'
-                            : 'border border-rose-500 bg-white text-rose-600 hover:bg-rose-50'
+                            ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                            : 'border border-destructive/40 bg-card text-destructive hover:bg-destructive/10'
                         }`}
                       >
                         <ThumbsDown className="h-4 w-4" />
@@ -2689,7 +2689,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                     </div>
                   </div>
                   {isSavingFeedback && (
-                    <div className="mt-2 text-center text-[11px] text-gray-500">Saving feedback...</div>
+                    <div className="mt-2 text-center text-caption2 text-muted-foreground">Saving feedback...</div>
                   )}
                 </div>
               </div>

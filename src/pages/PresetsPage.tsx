@@ -168,7 +168,7 @@ export default function PresetsPage() {
   if (!userType || !userName) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/40 border-t-transparent" />
       </div>
     )
   }
@@ -184,7 +184,7 @@ export default function PresetsPage() {
               actions={
                 <Button
                   onClick={openNew}
-                  className="h-11 rounded-full bg-[#00339B] px-6 text-white hover:bg-[#002d7a]"
+                  className="h-11 rounded-full bg-primary px-6 text-primary-foreground hover:bg-primary/90"
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   New preset
@@ -193,11 +193,11 @@ export default function PresetsPage() {
             />
 
             {isLoading ? (
-              <div className="py-16 text-center text-sm text-gray-400">Loading…</div>
+              <div className="py-16 text-center text-sm text-muted-foreground">Loading…</div>
             ) : presets.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-gray-200 bg-white/60 py-20 text-center">
-                <Layers className="mx-auto mb-3 h-8 w-8 text-gray-300" />
-                <p className="text-gray-500">No presets yet. Create one to speed up new customer setup.</p>
+              <div className="rounded-3xl border border-dashed border-border bg-card/60 py-20 text-center">
+                <Layers className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+                <p className="text-muted-foreground">No presets yet. Create one to speed up new customer setup.</p>
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
@@ -206,26 +206,26 @@ export default function PresetsPage() {
                     key={p.id}
                     type="button"
                     onClick={() => openEdit(p)}
-                    className="group rounded-2xl border border-gray-200 bg-white p-6 text-left transition hover:border-[#00339B]"
+                    className="group rounded-2xl border border-border bg-card p-6 text-left transition hover:border-primary"
                   >
                     <div className="mb-3 flex items-start justify-between">
-                      <h3 className="text-lg font-semibold text-gray-900">{p.name}</h3>
-                      <span className="text-xs text-gray-400">{p.items.length} area{p.items.length === 1 ? '' : 's'}</span>
+                      <h3 className="text-lg font-semibold text-foreground">{p.name}</h3>
+                      <span className="text-xs text-muted-foreground">{p.items.length} area{p.items.length === 1 ? '' : 's'}</span>
                     </div>
                     <div className="space-y-1">
                       {p.items.slice(0, 5).map((it, i) => (
-                        <div key={i} className="text-sm text-gray-500 truncate">
+                        <div key={i} className="text-sm text-muted-foreground truncate">
                           {it.name}
                           {it.tasks && it.tasks.length > 0 && (
                             <>
-                              {' '}<span className="text-gray-300">·</span>{' '}
+                              {' '}<span className="text-muted-foreground">·</span>{' '}
                               {it.tasks.length} task{it.tasks.length === 1 ? '' : 's'}
                             </>
                           )}
                         </div>
                       ))}
                       {p.items.length > 5 && (
-                        <div className="text-xs text-gray-400">+ {p.items.length - 5} more</div>
+                        <div className="text-xs text-muted-foreground">+ {p.items.length - 5} more</div>
                       )}
                     </div>
                   </button>
@@ -234,9 +234,9 @@ export default function PresetsPage() {
             )}
           </>
         ) : (
-          <div className="rounded-3xl bg-white p-8 shadow-sm sm:p-10">
+          <div className="rounded-3xl bg-card p-8 shadow-sm sm:p-10">
             <div className="mb-6 flex items-center justify-between">
-              <Button variant="ghost" onClick={cancel} className="rounded-full text-gray-500">
+              <Button variant="ghost" onClick={cancel} className="rounded-full text-muted-foreground">
                 <ChevronLeft className="mr-1 h-4 w-4" />
                 Back
               </Button>
@@ -247,7 +247,7 @@ export default function PresetsPage() {
                     const found = presets.find((p) => p.id === draft.id)
                     if (found) remove(found)
                   }}
-                  className="rounded-full text-red-600 hover:bg-red-50"
+                  className="rounded-full text-destructive hover:bg-destructive/10"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
@@ -256,38 +256,38 @@ export default function PresetsPage() {
             </div>
 
             <div className="mb-6 space-y-2">
-              <Label className="text-sm font-medium text-gray-700">Preset name</Label>
+              <Label className="text-sm font-medium text-foreground">Preset name</Label>
               <Input
                 value={draft.name}
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                 placeholder="e.g. Office building"
                 autoFocus
-                className="h-14 rounded-2xl border-gray-200 bg-gray-50/70 px-5 text-lg"
+                className="h-14 rounded-2xl border-border bg-muted/70 px-5 text-lg"
               />
             </div>
 
             <div className="mb-6 space-y-2">
               {draft.items.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-gray-200 py-10 text-center text-sm text-gray-400">
+                <div className="rounded-2xl border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
                   No areas yet.
                 </div>
               ) : (
                 draft.items.map((it, idx) => {
                   const isOpen = expanded === idx
                   return (
-                    <div key={idx} className="overflow-hidden rounded-xl bg-gray-50">
+                    <div key={idx} className="overflow-hidden rounded-xl bg-muted">
                       <button
                         type="button"
                         onClick={() => setExpanded(isOpen ? null : idx)}
-                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-gray-100"
+                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-muted"
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           <ChevronDown
-                            className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-0' : '-rotate-90'}`}
+                            className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? 'rotate-0' : '-rotate-90'}`}
                           />
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-base font-medium text-gray-900">{it.name}</div>
-                            <div className="text-xs text-gray-500">
+                            <div className="truncate text-base font-medium text-foreground">{it.name}</div>
+                            <div className="text-xs text-muted-foreground">
                               {it.tasks.length} task{it.tasks.length === 1 ? '' : 's'}
                             </div>
                           </div>
@@ -305,33 +305,33 @@ export default function PresetsPage() {
                               removeRow(idx)
                             }
                           }}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition hover:bg-white hover:text-red-600"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-card hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
                         </span>
                       </button>
                       {isOpen && (
-                        <div className="border-t border-gray-200 bg-white p-4 space-y-4">
+                        <div className="border-t border-border bg-card p-4 space-y-4">
                           <div className="space-y-2">
-                            <Label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                               Tasks
                             </Label>
                             <div className="space-y-1.5">
                               {it.tasks.length === 0 ? (
-                                <div className="rounded-lg bg-gray-50 py-4 text-center text-xs text-gray-400">
+                                <div className="rounded-lg bg-muted py-4 text-center text-xs text-muted-foreground">
                                   No tasks yet.
                                 </div>
                               ) : (
                                 it.tasks.map((task, ti) => (
                                   <div
                                     key={ti}
-                                    className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-800"
+                                    className="flex items-center justify-between gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-foreground"
                                   >
                                     <span className="min-w-0 flex-1 truncate">{task}</span>
                                     <button
                                       type="button"
                                       onClick={() => removeTaskFromItem(idx, ti)}
-                                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-white hover:text-red-600"
+                                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-card hover:text-destructive"
                                     >
                                       <X className="h-3.5 w-3.5" />
                                     </button>
@@ -352,12 +352,12 @@ export default function PresetsPage() {
                                   }
                                 }}
                                 placeholder="Add a task"
-                                className="h-10 flex-1 rounded-xl border-gray-200 bg-gray-50/70 px-3 text-sm"
+                                className="h-10 flex-1 rounded-xl border-border bg-muted/70 px-3 text-sm"
                               />
                               <Button
                                 onClick={() => addTaskToItem(idx)}
                                 disabled={!(taskDrafts[idx] ?? '').trim()}
-                                className="h-10 rounded-xl bg-[#00339B] px-4 text-sm text-white hover:bg-[#002d7a] disabled:bg-gray-200 disabled:text-gray-400"
+                                className="h-10 rounded-xl bg-primary px-4 text-sm text-primary-foreground hover:bg-primary/90 disabled:bg-secondary disabled:text-muted-foreground"
                               >
                                 Add
                               </Button>
@@ -371,7 +371,7 @@ export default function PresetsPage() {
               )}
             </div>
 
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 space-y-4">
+            <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
               <Input
                 value={newRowName}
                 onChange={(e) => setNewRowName(e.target.value)}
@@ -382,16 +382,16 @@ export default function PresetsPage() {
                     addRow()
                   }
                 }}
-                className="h-11 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
+                className="h-11 rounded-2xl border-border bg-muted/70 px-4"
               />
-              <Button onClick={addRow} disabled={!newRowName.trim()} className="w-full rounded-full bg-[#00339B] py-5 text-white hover:bg-[#002d7a] disabled:bg-gray-200 disabled:text-gray-400">
+              <Button onClick={addRow} disabled={!newRowName.trim()} className="w-full rounded-full bg-primary py-5 text-primary-foreground hover:bg-primary/90 disabled:bg-secondary disabled:text-muted-foreground">
                 <Plus className="mr-2 h-4 w-4" />
                 Add area
               </Button>
             </div>
 
             <div className="mt-8 flex justify-end">
-              <Button onClick={save} disabled={isSaving} className="rounded-full bg-[#00339B] px-7 py-5 text-white hover:bg-[#002d7a]">
+              <Button onClick={save} disabled={isSaving} className="rounded-full bg-primary px-7 py-5 text-primary-foreground hover:bg-primary/90">
                 <Save className="mr-2 h-4 w-4" />
                 {isSaving ? 'Saving…' : 'Save preset'}
               </Button>

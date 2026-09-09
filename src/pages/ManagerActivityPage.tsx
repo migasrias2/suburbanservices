@@ -142,8 +142,8 @@ export default function ManagerActivityPage() {
   const tableContent = useMemo(() => {
     if (isLoading) {
       return (
-        <div className="flex flex-col items-center justify-center py-12 text-center text-sm text-gray-500">
-          <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-[#00339B] border-t-transparent" />
+        <div className="flex flex-col items-center justify-center py-12 text-center text-sm text-muted-foreground">
+          <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           <p>Loading the latest cleaner history…</p>
         </div>
       )
@@ -152,7 +152,7 @@ export default function ManagerActivityPage() {
     if (error) {
       return (
         <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-          <p className="text-sm text-gray-600">{error}</p>
+          <p className="text-sm text-muted-foreground">{error}</p>
           <Button onClick={handleRefresh} disabled={isRefreshing} variant="gradient" className="px-6 py-2">
             Try again
           </Button>
@@ -163,11 +163,11 @@ export default function ManagerActivityPage() {
     if (!activity.length) {
       return (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#E0ECFF] text-[#00339B] shadow-inner">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary shadow-inner">
             📸
           </div>
-          <h3 className="text-lg font-semibold text-[#1F2937]">No task or photo activity yet</h3>
-          <p className="mt-1 max-w-sm text-sm text-gray-500">
+          <h3 className="text-lg font-semibold text-foreground">No task or photo activity yet</h3>
+          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
             When cleaners submit areas or upload photos, they will appear here automatically after a refresh.
           </p>
         </div>
@@ -175,16 +175,16 @@ export default function ManagerActivityPage() {
     }
 
     return (
-      <div className="overflow-hidden rounded-3xl border border-white/60 bg-white/80 shadow-[0_24px_60px_rgba(15,35,95,0.08)] backdrop-blur">
+      <div className="overflow-hidden rounded-3xl border border-border/60 bg-card/80 shadow-[0_24px_60px_rgba(15,35,95,0.08)] backdrop-blur">
         <Table className="text-sm">
-          <TableHeader className="bg-gradient-to-r from-white via-[#E0ECFF] to-white">
+          <TableHeader className="bg-card">
             <TableRow className="border-transparent">
-              <TableHead className="w-[110px] text-xs font-semibold uppercase tracking-wide text-gray-500">Photo</TableHead>
-              <TableHead className="text-xs font-semibold uppercase tracking-wide text-gray-500">Cleaner</TableHead>
-              <TableHead className="text-xs font-semibold uppercase tracking-wide text-gray-500">Activity</TableHead>
-              <TableHead className="text-xs font-semibold uppercase tracking-wide text-gray-500">Location</TableHead>
-              <TableHead className="text-xs font-semibold uppercase tracking-wide text-gray-500">Tasks</TableHead>
-              <TableHead className="text-xs font-semibold uppercase tracking-wide text-gray-500">Completed</TableHead>
+              <TableHead className="w-[110px] text-xs font-semibold uppercase tracking-wide text-muted-foreground">Photo</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cleaner</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Activity</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Location</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tasks</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Completed</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -192,8 +192,8 @@ export default function ManagerActivityPage() {
               <TableRow
                 key={row.id}
                 className={cn(
-                  "border-transparent bg-white/75 transition-all hover:bg-[#E0ECFF]/60",
-                  "text-gray-700"
+                  "border-transparent bg-card/75 transition-all hover:bg-primary/10/60",
+                  "text-foreground"
                 )}
               >
                 <TableCell
@@ -209,49 +209,49 @@ export default function ManagerActivityPage() {
                   }}
                 >
                   {row.photo_url ? (
-                    <div className="h-16 w-16 overflow-hidden rounded-2xl border border-[#9DB8FF] bg-[#E0ECFF]/70 shadow-sm">
+                    <div className="h-16 w-16 overflow-hidden rounded-2xl border border-border bg-primary/10/70 shadow-sm">
                       <img src={row.photo_url} alt="Task preview" className="h-full w-full object-cover" />
                     </div>
                   ) : (
-                    <span className="text-xs text-gray-400">No photo</span>
+                    <span className="text-xs text-muted-foreground">No photo</span>
                   )}
                 </TableCell>
-                <TableCell className="text-sm font-semibold text-gray-900">
+                <TableCell className="text-sm font-semibold text-foreground">
                   <div className="flex flex-col">
                     <span>{row.cleaner_name || "Cleaner"}</span>
                     {row.cleaner_id && (
-                      <span className="text-[11px] uppercase tracking-wide text-gray-400">{row.cleaner_id}</span>
+                      <span className="text-caption2 uppercase tracking-wide text-muted-foreground">{row.cleaner_id}</span>
                     )}
                   </div>
                 </TableCell>
                 <TableCell>
-                  <span className="inline-flex rounded-full bg-[#E0ECFF] px-3 py-1 text-xs font-semibold text-[#00339B] shadow-sm">
+                  <span className="inline-flex rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary shadow-sm">
                     {row.action}
                   </span>
                   {(row.detail || row.comments) && (
-                    <div className="mt-2 space-y-1 text-xs text-gray-500">
-                      {row.detail && <p className="text-gray-600">{row.detail}</p>}
-                      {row.comments && <p className="text-gray-500">{row.comments}</p>}
+                    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                      {row.detail && <p className="text-muted-foreground">{row.detail}</p>}
+                      {row.comments && <p className="text-muted-foreground">{row.comments}</p>}
                     </div>
                   )}
                 </TableCell>
-                <TableCell className="max-w-[220px] text-sm text-gray-600">
+                <TableCell className="max-w-[220px] text-sm text-muted-foreground">
                   {row.site && (
-                    <p className="font-medium text-gray-900">{row.site}</p>
+                    <p className="font-medium text-foreground">{row.site}</p>
                   )}
                   {row.area && (
                     <p className={cn(row.site ? "mt-1" : undefined)}>{row.area}</p>
                   )}
-                  {!row.site && !row.area && <span className="text-xs uppercase tracking-wide text-gray-400">—</span>}
+                  {!row.site && !row.area && <span className="text-xs uppercase tracking-wide text-muted-foreground">—</span>}
                 </TableCell>
-                <TableCell className="text-sm text-gray-600">
+                <TableCell className="text-sm text-muted-foreground">
                   {(() => {
                     const totalTasks = typeof row.total_task_count === "number" ? row.total_task_count : null
                     const completedTasks = typeof row.completed_task_count === "number" ? row.completed_task_count : null
                     const hasTaskData = (totalTasks !== null && totalTasks > 0) || (completedTasks !== null && completedTasks > 0)
 
                     if (!hasTaskData) {
-                      return row.entry_type === "task" ? <span className="text-xs text-gray-400">No tasks logged</span> : <span className="text-xs text-gray-400">—</span>
+                      return row.entry_type === "task" ? <span className="text-xs text-muted-foreground">No tasks logged</span> : <span className="text-xs text-muted-foreground">—</span>
                     }
 
                     const resolvedTotal = totalTasks ?? completedTasks ?? 0
@@ -261,15 +261,15 @@ export default function ManagerActivityPage() {
                     return (
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-gray-900">{resolvedCompleted}</span>
-                          <span className="text-xs uppercase tracking-wide text-gray-400">of</span>
-                          <span className="text-sm font-semibold text-gray-900">{resolvedTotal}</span>
-                          <span className="text-xs uppercase tracking-wide text-gray-400">tasks</span>
+                          <span className="text-sm font-semibold text-foreground">{resolvedCompleted}</span>
+                          <span className="text-xs uppercase tracking-wide text-muted-foreground">of</span>
+                          <span className="text-sm font-semibold text-foreground">{resolvedTotal}</span>
+                          <span className="text-xs uppercase tracking-wide text-muted-foreground">tasks</span>
                         </div>
                         {resolvedTotal > 0 && (
-                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
                             <div
-                              className="h-full rounded-full bg-[#00339B]/80 transition-all"
+                              className="h-full rounded-full bg-primary/80 transition-all"
                               style={{ width: `${progress}%` }}
                             />
                           </div>
@@ -278,7 +278,7 @@ export default function ManagerActivityPage() {
                     )
                   })()}
                 </TableCell>
-                <TableCell className="text-sm text-gray-500">{formatDateTime(row.timestamp)}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{formatDateTime(row.timestamp)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -289,8 +289,8 @@ export default function ManagerActivityPage() {
 
   if (!managerId || !managerName) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-white via-[#FFF9C4] to-[#FFE27A]">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#00339B] border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-warning/10">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     )
   }
@@ -306,7 +306,7 @@ export default function ManagerActivityPage() {
           >
             <div
               className={cn(
-                "pointer-events-none overflow-hidden rounded-[32px] border border-white/90 bg-white/98 shadow-[0_30px_80px_rgba(15,35,95,0.25)] transition-transform duration-200 ease-out",
+                "pointer-events-none overflow-hidden rounded-[32px] border border-border bg-card shadow-[0_30px_80px_rgba(15,35,95,0.25)] transition-transform duration-200 ease-out",
                 isPreviewVisible ? "scale-100 opacity-100" : "scale-90 opacity-0"
               )}
             >
@@ -321,19 +321,19 @@ export default function ManagerActivityPage() {
     <Sidebar07Layout userType={role} userName={managerName}>
       <div className="space-y-8">
         <div className="text-left">
-          <h1 className="text-3xl font-semibold text-[#141414]">Recent Cleaner Activity</h1>
-          <p className="mt-2 text-sm text-gray-500">
+          <h1 className="text-3xl font-semibold text-foreground">Recent Cleaner Activity</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
             {role === "ops_manager"
               ? "Review the latest area submissions and task photos from every cleaner in the operation."
               : "Review the latest area submissions and task photos from the cleaners assigned to you."}
           </p>
         </div>
 
-        <Card className="rounded-3xl border border-white/60 bg-white/70 shadow-[0_18px_40px_rgba(15,35,95,0.08)] backdrop-blur">
+        <Card className="rounded-3xl border border-border/60 bg-card/70 shadow-[0_18px_40px_rgba(15,35,95,0.08)] backdrop-blur">
           <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <CardTitle className="text-lg font-semibold text-gray-900">Recent updates</CardTitle>
-              <p className="text-sm text-gray-500">Review the latest area submissions and task photos from your cleaners.</p>
+              <CardTitle className="text-lg font-semibold text-foreground">Recent updates</CardTitle>
+              <p className="text-sm text-muted-foreground">Review the latest area submissions and task photos from your cleaners.</p>
             </div>
             <Button
               onClick={handleRefresh}

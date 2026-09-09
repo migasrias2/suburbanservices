@@ -116,11 +116,11 @@ export const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
         if (!open) onClose()
       }}
     >
-      {/* bg-white, not the sheet default: tailwind.config.ts maps `background` to
+      {/* bg-card, not the sheet default: tailwind.config.ts maps `background` to
           hsl(var(--background)), and this project never defines that variable, so
           `bg-background` resolves to transparent and the page shows through. */}
-      <SheetContent className="flex w-full flex-col gap-0 bg-white p-0 sm:max-w-md">
-        <SheetHeader className="space-y-0 border-b border-gray-100 p-6 text-left">
+      <SheetContent className="flex w-full flex-col gap-0 bg-card p-0 sm:max-w-md">
+        <SheetHeader className="space-y-0 border-b border-border p-6 text-left">
           <div className="flex items-center gap-4 pr-8">
             <div
               className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-semibold ${AVATAR_BG[user.role]}`}
@@ -128,17 +128,17 @@ export const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
               {initials(user)}
             </div>
             <div className="min-w-0 flex-1">
-              <SheetTitle className="truncate text-xl font-semibold text-gray-900">
+              <SheetTitle className="truncate text-xl font-semibold text-foreground">
                 {fullName(user)}
               </SheetTitle>
-              <SheetDescription className="truncate text-sm text-gray-500">
+              <SheetDescription className="truncate text-sm text-muted-foreground">
                 {ROLE_LABEL[user.role]}
                 {user.identifier ? ` · ${user.identifier}` : ''}
               </SheetDescription>
             </div>
           </div>
           {!user.is_active && (
-            <div className="mt-4 rounded-full bg-gray-100 px-3 py-1 text-center text-xs font-medium text-gray-500">
+            <div className="mt-4 rounded-full bg-muted px-3 py-1 text-center text-xs font-medium text-muted-foreground">
               Deactivated — cannot log in
             </div>
           )}
@@ -146,26 +146,26 @@ export const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
 
         <div className="flex-1 space-y-8 overflow-y-auto p-6">
           <section>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               Details
             </h3>
             {isEditing ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-700">First name</Label>
+                    <Label className="text-sm font-medium text-foreground">First name</Label>
                     <Input
                       value={editFirst}
                       onChange={(e) => setEditFirst(e.target.value)}
-                      className="h-11 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
+                      className="h-11 rounded-2xl border-border bg-muted/70 px-4"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-700">Last name</Label>
+                    <Label className="text-sm font-medium text-foreground">Last name</Label>
                     <Input
                       value={editLast}
                       onChange={(e) => setEditLast(e.target.value)}
-                      className="h-11 rounded-2xl border-gray-200 bg-gray-50/70 px-4"
+                      className="h-11 rounded-2xl border-border bg-muted/70 px-4"
                     />
                   </div>
                 </div>
@@ -173,14 +173,14 @@ export const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
                   <Button
                     variant="ghost"
                     onClick={() => setIsEditing(false)}
-                    className="rounded-full text-gray-600"
+                    className="rounded-full text-muted-foreground"
                   >
                     Cancel
                   </Button>
                   <Button
                     onClick={saveName}
                     disabled={isSaving}
-                    className="rounded-full bg-[#00339B] px-6 text-white hover:bg-[#002d7a]"
+                    className="rounded-full bg-primary px-6 text-primary-foreground hover:bg-primary/90"
                   >
                     <Save className="mr-2 h-4 w-4" />
                     {isSaving ? 'Saving…' : 'Save'}
@@ -188,7 +188,7 @@ export const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
                 </div>
               </div>
             ) : (
-              <dl className="overflow-hidden rounded-2xl border border-gray-100">
+              <dl className="overflow-hidden rounded-2xl border border-border">
                 <DetailRow
                   label={user.role === 'cleaner' || user.role === 'manager' ? 'Mobile' : 'Username'}
                   value={user.identifier ?? '—'}
@@ -211,20 +211,20 @@ export const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
             />
           ) : (
             <section>
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Sites
               </h3>
-              <div className="flex items-start gap-3 rounded-2xl bg-gray-50 px-4 py-4 text-sm text-gray-600">
-                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#00339B]" />
+              <div className="flex items-start gap-3 rounded-2xl bg-muted px-4 py-4 text-sm text-muted-foreground">
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                 <span>Admins already see every site, so there is nothing to link.</span>
               </div>
             </section>
           )}
         </div>
 
-        <div className="border-t border-gray-100 p-6">
+        <div className="border-t border-border p-6">
           {confirmingRemove && (
-            <p className="mb-4 text-sm leading-relaxed text-gray-600">
+            <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
               {fullName(user)} won't be able to log in. Their manager assignments and site links
               will be removed.
             </p>
@@ -234,7 +234,7 @@ export const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
               <Button
                 variant="ghost"
                 onClick={() => setIsEditing(true)}
-                className="rounded-full text-gray-600 hover:bg-gray-100"
+                className="rounded-full text-muted-foreground hover:bg-muted"
               >
                 <Pencil className="mr-2 h-4 w-4" />
                 Rename
@@ -247,7 +247,7 @@ export const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
                     <Button
                       variant="ghost"
                       onClick={() => setConfirmingRemove(false)}
-                      className="rounded-full text-gray-600"
+                      className="rounded-full text-muted-foreground"
                     >
                       <X className="mr-2 h-4 w-4" />
                       Cancel
@@ -255,7 +255,7 @@ export const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
                     <Button
                       onClick={remove}
                       disabled={isRemoving}
-                      className="rounded-full bg-red-600 px-5 text-white hover:bg-red-700"
+                      className="rounded-full bg-destructive px-5 text-destructive-foreground hover:bg-destructive/90"
                     >
                       {isRemoving ? 'Deactivating…' : 'Confirm'}
                     </Button>
@@ -264,7 +264,7 @@ export const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
                   <Button
                     variant="ghost"
                     onClick={() => setConfirmingRemove(true)}
-                    className="rounded-full text-gray-500 hover:bg-red-50 hover:text-red-600"
+                    className="rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
                     Deactivate
@@ -280,8 +280,8 @@ export const UserDetailPanel: React.FC<UserDetailPanelProps> = ({
 }
 
 const DetailRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="flex items-center justify-between gap-4 border-b border-gray-50 px-4 py-3 last:border-b-0">
-    <dt className="text-sm text-gray-500">{label}</dt>
-    <dd className="min-w-0 truncate text-sm font-medium text-gray-900">{value}</dd>
+  <div className="flex items-center justify-between gap-4 border-b border-border px-4 py-3 last:border-b-0">
+    <dt className="text-sm text-muted-foreground">{label}</dt>
+    <dd className="min-w-0 truncate text-sm font-medium text-foreground">{value}</dd>
   </div>
 )

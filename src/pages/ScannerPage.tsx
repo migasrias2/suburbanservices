@@ -31,8 +31,8 @@ export default function ScannerPage() {
 
   if (!userType || !userId || !userName) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
+      <div className="flex justify-center items-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary/40 border-t-transparent"></div>
       </div>
     )
   }
@@ -53,14 +53,14 @@ export default function ScannerPage() {
           {/* Header */}
           <div className="text-center space-y-3">
             <div className="flex justify-center">
-              <div className="p-4 rounded-2xl bg-blue-100">
-                <Camera className="h-8 w-8 text-blue-600" />
+              <div className="p-4 rounded-2xl bg-primary/10">
+                <Camera className="h-8 w-8 text-primary" />
               </div>
             </div>
-            <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+            <h1 className="text-3xl lg:text-4xl font-bold text-primary">
               QR Code Scanner
             </h1>
-            <p className="text-gray-600 text-lg">Scan QR codes to track your cleaning activities</p>
+            <p className="text-muted-foreground text-lg">Scan QR codes to track your cleaning activities</p>
           </div>
 
           {/* Scanner Card */}
@@ -80,23 +80,23 @@ export default function ScannerPage() {
           {/* Instructions */}
           <Card className="card-modern border-0 shadow-lg">
             <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">How to Scan</h3>
-              <div className="space-y-3 text-gray-600">
+              <h3 className="text-lg font-semibold text-foreground mb-4">How to Scan</h3>
+              <div className="space-y-3 text-muted-foreground">
                 <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-blue-600 text-sm font-medium">1</span>
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-primary text-sm font-medium">1</span>
                   </div>
                   <p>Position the QR code within the scanner frame</p>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-blue-600 text-sm font-medium">2</span>
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-primary text-sm font-medium">2</span>
                   </div>
                   <p>Keep your device steady until the code is detected</p>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-blue-600 text-sm font-medium">3</span>
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-primary text-sm font-medium">3</span>
                   </div>
                   <p>Wait for confirmation that your activity has been logged</p>
                 </div>

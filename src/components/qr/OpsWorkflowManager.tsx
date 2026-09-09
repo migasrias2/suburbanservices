@@ -269,17 +269,17 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
     return (
       <div key={slot} className="space-y-3">
         <div className="flex items-center justify-between">
-          <Badge className="px-3 py-1 text-xs font-semibold" style={{ backgroundColor: '#00339B' }}>
+          <Badge className="px-3 py-1 text-xs font-semibold bg-primary">
             Photo {slot}
           </Badge>
           {captured && (
-            <span className="text-[11px] text-slate-500">
+            <span className="text-caption2 text-muted-foreground">
               Captured {new Date(captured.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
         </div>
         <div
-          className="relative rounded-3xl border-2 border-dashed border-blue-200 bg-blue-50/60 overflow-hidden"
+          className="relative rounded-3xl border-2 border-dashed border-border bg-primary/5 overflow-hidden"
           style={{ aspectRatio: '4 / 3' }}
         >
           {isActive ? (
@@ -290,14 +290,14 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={stopCamera}
-                  className="h-12 w-12 rounded-full border border-white/40 bg-white/90 text-[#00339B] shadow"
+                  className="h-12 w-12 rounded-full border border-border/40 bg-card/90 text-primary shadow"
                   aria-label="Cancel"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
                 <Button
                   onClick={captureFromCamera}
-                  className="h-14 w-14 rounded-full bg-white text-[#00339B] shadow"
+                  className="h-14 w-14 rounded-full bg-card text-primary shadow"
                   aria-label="Capture photo"
                 >
                   <Camera className="h-5 w-5" />
@@ -312,7 +312,7 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={() => removePhoto(slot)}
-                  className="h-11 w-11 rounded-full border border-white/40 bg-white/90 text-[#00339B] shadow"
+                  className="h-11 w-11 rounded-full border border-border/40 bg-card/90 text-primary shadow"
                   aria-label="Remove photo"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -321,7 +321,7 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={() => startCamera(slot)}
-                  className="h-11 w-11 rounded-full border border-white/40 bg-white/90 text-[#00339B] shadow"
+                  className="h-11 w-11 rounded-full border border-border/40 bg-card/90 text-primary shadow"
                   aria-label="Retake photo"
                 >
                   <RotateCcw className="h-4 w-4" />
@@ -329,11 +329,11 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
               </div>
             </div>
           ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-[#00339B]">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-primary">
               <div className="flex gap-3">
                 <Button
                   onClick={() => startCamera(slot)}
-                  className="flex items-center gap-2 rounded-full bg-white px-5 py-2 text-sm font-semibold shadow"
+                  className="flex items-center gap-2 rounded-full bg-card px-5 py-2 text-sm font-semibold shadow"
                 >
                   <Camera className="h-4 w-4" />
                   Take photo
@@ -341,13 +341,13 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
                 <Button
                   variant="outline"
                   onClick={() => handleFileUpload(slot)}
-                  className="flex items-center gap-2 rounded-full border-[#00339B]/20 bg-white/80 px-5 py-2 text-sm font-semibold text-[#00339B] shadow"
+                  className="flex items-center gap-2 rounded-full border-primary/20 bg-card/80 px-5 py-2 text-sm font-semibold text-primary shadow"
                 >
                   <Folder className="h-4 w-4" />
                   Upload
                 </Button>
               </div>
-              <p className="text-xs text-slate-500">Capture a clear view of the inspection point.</p>
+              <p className="text-xs text-muted-foreground">Capture a clear view of the inspection point.</p>
             </div>
           )}
         </div>
@@ -359,24 +359,24 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
     return (
       <div className="w-full max-w-lg mx-auto space-y-6 px-4 sm:px-0">
         <div className="text-center space-y-4">
-          <div className="w-14 h-14 sm:w-20 sm:h-20 mx-auto bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
-            <CheckCircle2 className="w-7 h-7 sm:w-10 sm:h-10 text-white" />
+          <div className="w-14 h-14 sm:w-20 sm:h-20 mx-auto bg-primary rounded-full flex items-center justify-center shadow-lg">
+            <CheckCircle2 className="w-7 h-7 sm:w-10 sm:h-10 text-primary-foreground" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Welcome back, {cleanerName}!</h1>
-            <p className="text-sm sm:text-lg text-gray-600">You're clocked in and ready to inspect this site.</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Welcome back, {cleanerName}!</h1>
+            <p className="text-sm sm:text-lg text-muted-foreground">You're clocked in and ready to inspect this site.</p>
           </div>
         </div>
 
-        <Card className="rounded-3xl border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100">
+        <Card className="rounded-3xl border-0 shadow-lg bg-background">
           <CardContent className="p-5 sm:p-6 space-y-4">
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="w-9 h-9 sm:w-12 sm:h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <Clock className="w-4 h-4 sm:w-6 sm:h-6" style={{ color: '#00339B' }} />
+              <div className="w-9 h-9 sm:w-12 sm:h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-primary" />
               </div>
               <div>
-                <p className="text-xs sm:text-sm font-medium text-gray-500">Clocked in at</p>
-                <p className="text-base sm:text-xl font-bold" style={{ color: '#00339B' }}>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Clocked in at</p>
+                <p className="text-base sm:text-xl font-bold text-primary">
                   {formattedClockIn}
                 </p>
               </div>
@@ -384,23 +384,23 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
 
             {siteName && (
               <div className="flex items-center gap-3 sm:gap-4">
-                <div className="w-9 h-9 sm:w-12 sm:h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <MapPin className="w-4 h-4 sm:w-6 sm:h-6" style={{ color: '#00339B' }} />
+                <div className="w-9 h-9 sm:w-12 sm:h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                  <MapPin className="w-4 h-4 sm:w-6 sm:h-6 text-primary" />
                 </div>
                 <div>
-                  <p className="text-xs sm:text-sm font-medium text-gray-500">Site</p>
-                  <p className="text-sm sm:text-lg font-semibold" style={{ color: '#00339B' }}>{siteName}</p>
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Site</p>
+                  <p className="text-sm sm:text-lg font-semibold text-primary">{siteName}</p>
                 </div>
               </div>
             )}
 
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="w-9 h-9 sm:w-12 sm:h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <Calendar className="w-4 h-4 sm:w-6 sm:h-6" style={{ color: '#00339B' }} />
+              <div className="w-9 h-9 sm:w-12 sm:h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                <Calendar className="w-4 h-4 sm:w-6 sm:h-6 text-primary" />
               </div>
               <div>
-                <p className="text-xs sm:text-sm font-medium text-gray-500">Date</p>
-                <p className="text-sm sm:text-lg font-semibold" style={{ color: '#00339B' }}>{formattedDate}</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Date</p>
+                <p className="text-sm sm:text-lg font-semibold text-primary">{formattedDate}</p>
               </div>
             </div>
           </CardContent>
@@ -409,17 +409,16 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
         <Card className="rounded-3xl border-0 shadow-lg">
           <CardHeader className="text-center space-y-2">
             <CardTitle className="text-lg">Inspection Checklist</CardTitle>
-            <p className="text-sm text-gray-600">Capture three site photos to complete your inspection.</p>
+            <p className="text-sm text-muted-foreground">Capture three site photos to complete your inspection.</p>
           </CardHeader>
           <CardContent className="p-6">
             <Button
               onClick={() => setCurrentStep('photos')}
-              className="w-full rounded-full py-4 text-lg font-semibold text-white shadow-lg transition-all duration-200"
-              style={{ backgroundColor: '#00339B' }}
+              className="w-full rounded-full py-4 text-lg font-semibold text-primary-foreground shadow-lg transition-all duration-200 bg-primary"
             >
               Start Site Inspection
             </Button>
-            <p className="mt-3 text-xs text-center text-gray-500">
+            <p className="mt-3 text-xs text-center text-muted-foreground">
               You can clock out at any time once your inspection photos are submitted.
             </p>
           </CardContent>
@@ -440,23 +439,23 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
         />
 
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center">
-            <Camera className="w-8 h-8" style={{ color: '#00339B' }} />
+          <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
+            <Camera className="w-8 h-8 text-primary" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-gray-900">Capture Inspection Photos</h1>
-            <p className="text-gray-600">Take three photos that best represent the site condition right now.</p>
+            <h1 className="text-2xl font-bold text-foreground">Capture Inspection Photos</h1>
+            <p className="text-muted-foreground">Take three photos that best represent the site condition right now.</p>
           </div>
         </div>
 
-        <Card className="rounded-3xl border-0 shadow-lg bg-white/90">
+        <Card className="rounded-3xl border-0 shadow-lg bg-card/90">
           <CardContent className="p-6 space-y-6">
             <div className="grid gap-5">
               {Array.from({ length: REQUIRED_PHOTO_COUNT }, (_, index) => renderPhotoSlot(index + 1))}
             </div>
 
             {error && (
-              <div className="rounded-2xl border border-red-200 bg-red-50/70 p-4 text-sm text-red-600">
+              <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
                 {error}
               </div>
             )}
@@ -465,12 +464,11 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
               <Button
                 onClick={handleSubmit}
                 disabled={!hasAllPhotos || isSubmitting}
-                className="flex-1 rounded-full py-3 text-white"
-                style={{ backgroundColor: '#00339B' }}
+                className="flex-1 rounded-full py-3 text-primary-foreground bg-primary"
               >
                 {isSubmitting ? (
                   <span className="flex items-center gap-2">
-                    <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span className="h-4 w-4 border-2 border-border border-t-transparent rounded-full animate-spin" />
                     Submitting…
                   </span>
                 ) : (
@@ -483,13 +481,13 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
               <Button
                 variant="outline"
                 onClick={() => setCurrentStep('clock_out')}
-                className="flex-1 rounded-full border-red-200 text-red-600 hover:bg-red-50"
+                className="flex-1 rounded-full border-destructive/30 text-destructive hover:bg-destructive/10"
               >
                 <Clock className="h-4 w-4 mr-2" />
                 Clock Out
               </Button>
             </div>
-            <p className="text-xs text-center text-gray-500">All three photos are required to complete the inspection.</p>
+            <p className="text-xs text-center text-muted-foreground">All three photos are required to complete the inspection.</p>
           </CardContent>
         </Card>
       </div>
@@ -500,28 +498,28 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
     return (
       <div className="w-full max-w-lg mx-auto space-y-6 px-4 sm:px-0">
         <div className="text-center space-y-4">
-          <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
-            <Check className="w-10 h-10 text-white" />
+          <div className="w-20 h-20 mx-auto bg-primary rounded-full flex items-center justify-center shadow-lg">
+            <Check className="w-10 h-10 text-primary-foreground" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold" style={{ color: '#00339B' }}>Inspection Submitted</h1>
-            <p className="text-gray-600">Great work! Your site photos are stored safely.</p>
+            <h1 className="text-2xl font-bold text-primary">Inspection Submitted</h1>
+            <p className="text-muted-foreground">Great work! Your site photos are stored safely.</p>
           </div>
         </div>
 
-        <Card className="rounded-3xl border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100">
+        <Card className="rounded-3xl border-0 shadow-lg bg-background">
           <CardContent className="p-6 space-y-4">
             {siteName && (
-              <div className="flex items-center justify-between text-sm text-[#00339B]">
+              <div className="flex items-center justify-between text-sm text-primary">
                 <span className="font-medium">Site</span>
                 <span>{siteName}</span>
               </div>
             )}
-            <div className="flex items-center justify-between text-sm text-[#00339B]">
+            <div className="flex items-center justify-between text-sm text-primary">
               <span className="font-medium">Photos captured</span>
               <span>{photosSorted.length}</span>
             </div>
-            <div className="flex items-center justify-between text-sm text-[#00339B]">
+            <div className="flex items-center justify-between text-sm text-primary">
               <span className="font-medium">Submitted at</span>
               <span>{submittedAt ? new Date(submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--'}</span>
             </div>
@@ -535,8 +533,7 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
           <CardContent className="p-6 space-y-4">
             <Button
               onClick={() => setCurrentStep('clock_out')}
-              className="w-full rounded-full py-4 text-lg font-semibold text-white shadow-lg"
-              style={{ backgroundColor: '#00339B' }}
+              className="w-full rounded-full py-4 text-lg font-semibold text-primary-foreground shadow-lg bg-primary"
             >
               <Clock className="w-5 h-5 mr-3" />
               Finish & Clock Out
@@ -544,7 +541,7 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
             <Button
               variant="outline"
               onClick={handleReset}
-              className="w-full rounded-full py-4 text-lg font-semibold text-[#00339B] border-[#00339B]/30"
+              className="w-full rounded-full py-4 text-lg font-semibold text-primary border-primary/30"
             >
               <RotateCcw className="w-5 h-5 mr-3" />
               Retake Photos
@@ -552,7 +549,7 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
             <Button
               variant="ghost"
               onClick={() => setCurrentStep('photos')}
-              className="w-full rounded-full py-3 text-sm text-gray-500"
+              className="w-full rounded-full py-3 text-sm text-muted-foreground"
             >
               <ArrowLeft className="w-4 h-4 mr-2" /> Back to Inspection
             </Button>

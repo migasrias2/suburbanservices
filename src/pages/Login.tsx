@@ -103,11 +103,8 @@ export default function Login() {
       }}
     >
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 bg-gradient-to-b from-background/95 via-background/55 to-[hsl(220_60%_10%/0.88)]"
         aria-hidden="true"
-        style={{
-          background: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(0,27,68,0.7) 100%)'
-        }}
       />
       <div className="relative z-10 w-full max-w-sm space-y-8">
         {/* Header */}
@@ -123,16 +120,16 @@ export default function Login() {
         {notice && (
           <div
             role="status"
-            className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm font-medium text-amber-900"
+            className="rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-center text-subheadline font-medium text-foreground"
           >
             {notice}
           </div>
         )}
 
         {/* Auth Card */}
-        <Card className="rounded-3xl border border-white/30 bg-white/90 backdrop-blur-xl shadow-2xl shadow-blue-950/30">
+        <Card className="glass rounded-3xl shadow-xl">
           <CardContent className="p-8 sm:p-10">
-            <p className="mb-6 text-center text-sm font-medium text-[#0b2f6b]/60">
+            <p className="mb-6 text-center text-subheadline font-medium text-muted-foreground">
               Sign in with your existing credentials.
             </p>
 
@@ -144,30 +141,30 @@ export default function Login() {
               }}
               className="w-full"
             >
-              <TabsList className="grid w-full grid-cols-4 rounded-2xl p-1 mb-6 bg-[#0b2f6b]/8 backdrop-blur border border-[#0b2f6b]/20">
+              <TabsList className="grid w-full grid-cols-4 rounded-2xl p-1 mb-6 bg-muted/80 backdrop-blur border border-border">
                 <TabsTrigger 
                   value="cleaner" 
-                  className="rounded-xl text-sm font-medium py-2.5 px-3 text-[#0b2f6b]/80 transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0b2f6b] data-[state=active]:to-[#021540] data-[state=active]:text-white data-[state=active]:shadow-lg"
+                  className="min-h-[44px] rounded-xl text-subheadline font-medium py-2.5 px-3 text-muted-foreground transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
                 >
                   <Users className="h-4 w-4 mr-1.5" />
                   Cleaner
                 </TabsTrigger>
                 <TabsTrigger 
                   value="manager" 
-                  className="rounded-xl text-sm font-medium py-2.5 px-3 text-[#0b2f6b]/80 transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0b2f6b] data-[state=active]:to-[#021540] data-[state=active]:text-white data-[state=active]:shadow-lg"
+                  className="min-h-[44px] rounded-xl text-subheadline font-medium py-2.5 px-3 text-muted-foreground transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
                 >
                   <UserCheck className="h-4 w-4 mr-1.5" />
                   Manager
                 </TabsTrigger>
                 <TabsTrigger 
                   value="ops_manager" 
-                  className="rounded-xl text-sm font-medium py-2.5 px-3 text-[#0b2f6b]/80 transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0b2f6b] data-[state=active]:to-[#021540] data-[state=active]:text-white data-[state=active]:shadow-lg"
+                  className="min-h-[44px] rounded-xl text-subheadline font-medium py-2.5 px-3 text-muted-foreground transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
                 >
                   Ops
                 </TabsTrigger>
                 <TabsTrigger 
                   value="admin" 
-                  className="rounded-xl text-sm font-medium py-2.5 px-3 text-[#0b2f6b]/80 transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0b2f6b] data-[state=active]:to-[#021540] data-[state=active]:text-white data-[state=active]:shadow-lg"
+                  className="min-h-[44px] rounded-xl text-subheadline font-medium py-2.5 px-3 text-muted-foreground transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
                 >
                   <Shield className="h-4 w-4 mr-1.5" />
                   Admin
@@ -186,7 +183,7 @@ export default function Login() {
                       required
                     />
                     <div className="space-y-2">
-                      <Label htmlFor="password" className="text-[#0b2f6b]/80 font-medium text-sm">Password</Label>
+                      <Label htmlFor="password" className="text-foreground font-medium text-subheadline">Password</Label>
                       <div className="relative">
                         <Input
                           id="password"
@@ -194,14 +191,14 @@ export default function Login() {
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           placeholder="Enter your password"
-                          className="rounded-xl border-[#0b2f6b]/20 bg-white/90 focus:border-[#0b2f6b]/40 focus:ring-2 focus:ring-[#0b2f6b]/30 h-11 pr-12 text-sm text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
+                          className="rounded-xl border-input bg-card/90 h-11 pr-12 text-callout text-foreground placeholder:text-muted-foreground"
                           required
                         />
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-[#0b2f6b]/40 hover:text-[#0b2f6b]"
+                          className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-muted-foreground hover:text-foreground"
                           onClick={() => setShowPassword(!showPassword)}
                         >
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -210,7 +207,7 @@ export default function Login() {
                     </div>
                     <Button 
                       type="submit" 
-                      className="w-full h-11 rounded-xl bg-gradient-to-r from-[#0b2f6b] to-[#021540] hover:from-[#07204a] hover:to-[#010a27] text-white font-semibold shadow-lg shadow-[#0b2f6b]/30 transition-all duration-200" 
+                      className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm transition-all duration-200 hover:opacity-90 active:scale-[0.99]" 
                       disabled={loading}
                     >
                       {loading ? 'Signing in...' : 'Sign in as Cleaner'}
@@ -229,7 +226,7 @@ export default function Login() {
                     required
                   />
                   <div className="space-y-2">
-                    <Label htmlFor="password-mgr" className="text-[#0b2f6b]/80 font-medium text-sm">Password</Label>
+                    <Label htmlFor="password-mgr" className="text-foreground font-medium text-subheadline">Password</Label>
                     <div className="relative">
                       <Input
                         id="password-mgr"
@@ -237,14 +234,14 @@ export default function Login() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="Enter your password"
-                        className="rounded-xl border-[#0b2f6b]/20 bg-white/90 focus:border-[#0b2f6b]/40 focus:ring-2 focus:ring-[#0b2f6b]/30 h-11 pr-12 text-sm text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
+                        className="rounded-xl border-input bg-card/90 h-11 pr-12 text-callout text-foreground placeholder:text-muted-foreground"
                         required
                       />
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-[#0b2f6b]/40 hover:text-[#0b2f6b]"
+                        className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-muted-foreground hover:text-foreground"
                         onClick={() => setShowPassword(!showPassword)}
                       >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -253,32 +250,32 @@ export default function Login() {
                   </div>
                   <Button 
                     type="submit" 
-                    className="w-full h-11 rounded-xl bg-gradient-to-r from-[#0b2f6b] to-[#021540] hover:from-[#07204a] hover:to-[#010a27] text-white font-semibold shadow-lg shadow-[#0b2f6b]/30 transition-all duration-200" 
+                    className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm transition-all duration-200 hover:opacity-90 active:scale-[0.99]" 
                     disabled={loading}
                   >
                     {loading ? 'Signing in...' : 'Sign in as Manager'}
                   </Button>
                 </form>
-                <p className="mt-4 text-xs text-center text-[#0b2f6b]/60">Manager accounts are provisioned by administrators.</p>
+                <p className="mt-4 text-caption text-center text-muted-foreground">Manager accounts are provisioned by administrators.</p>
                 {/* Quick access removed */}
               </TabsContent>
 
               <TabsContent value="ops_manager" className="mt-0">
                 <form onSubmit={handleLogin} className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="username-ops" className="text-[#0b2f6b]/80 font-medium text-sm">Username</Label>
+                    <Label htmlFor="username-ops" className="text-foreground font-medium text-subheadline">Username</Label>
                     <Input
                       id="username-ops"
                       type="text"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       placeholder="Enter your username"
-                      className="rounded-xl border-[#0b2f6b]/20 bg-white/90 focus:border-[#0b2f6b]/40 focus:ring-2 focus:ring-[#0b2f6b]/30 h-11 text-sm text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
+                      className="rounded-xl border-input bg-card/90 h-11 text-callout text-foreground placeholder:text-muted-foreground"
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="password-ops" className="text-[#0b2f6b]/80 font-medium text-sm">Password</Label>
+                    <Label htmlFor="password-ops" className="text-foreground font-medium text-subheadline">Password</Label>
                     <div className="relative">
                       <Input
                         id="password-ops"
@@ -286,14 +283,14 @@ export default function Login() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="Enter your password"
-                        className="rounded-xl border-[#0b2f6b]/20 bg-white/90 focus:border-[#0b2f6b]/40 focus:ring-2 focus:ring-[#0b2f6b]/30 h-11 pr-12 text-sm text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
+                        className="rounded-xl border-input bg-card/90 h-11 pr-12 text-callout text-foreground placeholder:text-muted-foreground"
                         required
                       />
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-[#0b2f6b]/40 hover:text-[#0b2f6b]"
+                        className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-muted-foreground hover:text-foreground"
                         onClick={() => setShowPassword(!showPassword)}
                       >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -302,31 +299,31 @@ export default function Login() {
                   </div>
                   <Button 
                     type="submit" 
-                    className="w-full h-11 rounded-xl bg-gradient-to-r from-[#0b2f6b] to-[#021540] hover:from-[#07204a] hover:to-[#010a27] text-white font-semibold shadow-lg shadow-[#0b2f6b]/30 transition-all duration-200" 
+                    className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm transition-all duration-200 hover:opacity-90 active:scale-[0.99]" 
                     disabled={loading}
                   >
                     {loading ? 'Signing in...' : 'Sign in as Ops'}
                   </Button>
                 </form>
-                <p className="mt-4 text-xs text-center text-[#0b2f6b]/60">Operations manager access is assigned by administrators.</p>
+                <p className="mt-4 text-caption text-center text-muted-foreground">Operations manager access is assigned by administrators.</p>
               </TabsContent>
 
               <TabsContent value="admin" className="mt-0">
                 <form onSubmit={handleLogin} className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="username-admin" className="text-[#0b2f6b]/80 font-medium text-sm">Username</Label>
+                    <Label htmlFor="username-admin" className="text-foreground font-medium text-subheadline">Username</Label>
                     <Input
                       id="username-admin"
                       type="text"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       placeholder="Enter your username"
-                      className="rounded-xl border-[#0b2f6b]/20 bg-white/90 focus:border-[#0b2f6b]/40 focus:ring-2 focus:ring-[#0b2f6b]/30 h-11 text-sm text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
+                      className="rounded-xl border-input bg-card/90 h-11 text-callout text-foreground placeholder:text-muted-foreground"
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="password-admin" className="text-[#0b2f6b]/80 font-medium text-sm">Password</Label>
+                    <Label htmlFor="password-admin" className="text-foreground font-medium text-subheadline">Password</Label>
                     <div className="relative">
                       <Input
                         id="password-admin"
@@ -334,14 +331,14 @@ export default function Login() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="Enter your password"
-                        className="rounded-xl border-[#0b2f6b]/20 bg-white/90 focus:border-[#0b2f6b]/40 focus:ring-2 focus:ring-[#0b2f6b]/30 h-11 pr-12 text-sm text-[#0b2f6b] placeholder:text-[#0b2f6b]/40"
+                        className="rounded-xl border-input bg-card/90 h-11 pr-12 text-callout text-foreground placeholder:text-muted-foreground"
                         required
                       />
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-[#0b2f6b]/40 hover:text-[#0b2f6b]"
+                        className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent text-muted-foreground hover:text-foreground"
                         onClick={() => setShowPassword(!showPassword)}
                       >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -350,22 +347,22 @@ export default function Login() {
                   </div>
                   <Button 
                     type="submit" 
-                    className="w-full h-11 rounded-xl bg-gradient-to-r from-[#0b2f6b] to-[#021540] hover:from-[#07204a] hover:to-[#010a27] text-white font-semibold shadow-lg shadow-[#0b2f6b]/30 transition-all duration-200" 
+                    className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold shadow-sm transition-all duration-200 hover:opacity-90 active:scale-[0.99]" 
                     disabled={loading}
                   >
                     {loading ? 'Signing in...' : 'Sign in as Admin'}
                   </Button>
                 </form>
-                <p className="mt-4 text-xs text-center text-[#0b2f6b]/60">Admin access is managed centrally. Please contact system support for assistance.</p>
+                <p className="mt-4 text-caption text-center text-muted-foreground">Admin access is managed centrally. Please contact system support for assistance.</p>
               </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
 
         {/* Footer */}
-        <div className="text-center text-xs text-blue-100/80 space-y-2">
+        <div className="text-center text-caption text-white/80 space-y-2">
           <p className="font-semibold">QR Code Application v1.0</p>
-          <p className="flex items-center justify-center gap-2 text-blue-100/70">
+          <p className="flex items-center justify-center gap-2 text-white/70">
             <span>Real-time tracking</span>
             <span>•</span>
             <span>GPS enabled</span>

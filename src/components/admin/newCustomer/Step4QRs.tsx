@@ -81,20 +81,20 @@ export const Step4QRs: React.FC<Step4Props> = ({ state, totalSteps, onUpdate, on
     >
       <div className="space-y-6">
         {qrPack.length === 0 ? (
-          <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center">
-            <div className="mx-auto mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100">
-              <QrCode className="h-7 w-7 text-gray-700" />
+          <div className="rounded-2xl border border-border bg-card p-8 text-center">
+            <div className="mx-auto mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+              <QrCode className="h-7 w-7 text-foreground" />
             </div>
-            <p className="mb-2 text-base font-medium text-gray-900">
+            <p className="mb-2 text-base font-medium text-foreground">
               Ready to generate {3 + state.areas.length} QR codes
             </p>
-            <p className="mb-6 text-sm text-gray-500">
+            <p className="mb-6 text-sm text-muted-foreground">
               Clock In · Clock Out · Feedback{state.areas.length > 0 && ` · ${state.areas.length} area${state.areas.length === 1 ? '' : 's'}`}
             </p>
             <Button
               onClick={handleGenerate}
               disabled={isGenerating}
-              className="rounded-full bg-[#00339B] px-8 py-5 text-base font-medium text-white hover:bg-[#002d7a]"
+              className="rounded-full bg-primary px-8 py-5 text-base font-medium text-primary-foreground hover:bg-primary/90"
             >
               {isGenerating
                 ? progress
@@ -111,12 +111,12 @@ export const Step4QRs: React.FC<Step4Props> = ({ state, totalSteps, onUpdate, on
                   key={item.payloadId}
                   type="button"
                   onClick={() => downloadOne(item)}
-                  className="group flex flex-col items-center rounded-2xl border border-gray-200 bg-white p-4 transition hover:border-[#00339B]"
+                  className="group flex flex-col items-center rounded-2xl border border-border bg-card p-4 transition hover:border-primary"
                 >
                   <img src={item.dataUrl} alt={item.label} className="h-32 w-32" />
                   <div className="mt-3 w-full text-center">
-                    <div className="text-sm font-medium text-gray-900 truncate">{item.label}</div>
-                    <div className="text-xs text-gray-400 group-hover:text-[#00339B]">
+                    <div className="text-sm font-medium text-foreground truncate">{item.label}</div>
+                    <div className="text-xs text-muted-foreground group-hover:text-primary">
                       Click to download
                     </div>
                   </div>
@@ -126,7 +126,7 @@ export const Step4QRs: React.FC<Step4Props> = ({ state, totalSteps, onUpdate, on
             <Button
               onClick={downloadAll}
               variant="outline"
-              className="w-full rounded-full border-gray-200 py-5 text-base text-gray-700 hover:bg-gray-50"
+              className="w-full rounded-full border-border py-5 text-base text-foreground hover:bg-muted"
             >
               <Download className="mr-2 h-4 w-4" />
               Download all

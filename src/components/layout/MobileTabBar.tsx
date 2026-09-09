@@ -27,7 +27,7 @@ export const MobileTabBar: React.FC<MobileTabBarProps> = ({ tabs, badgeCount = 0
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-100 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
+      className="glass-thin fixed inset-x-0 bottom-0 z-30 border-x-0 border-b-0 border-t border-border pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       <div className="flex items-stretch">
         {visible.map((item) => {
@@ -43,19 +43,19 @@ export const MobileTabBar: React.FC<MobileTabBarProps> = ({ tabs, badgeCount = 0
                 if (location.pathname !== item.path) navigate(item.path)
               }}
               className={cn(
-                'relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 py-2 transition active:bg-gray-50',
-                active ? 'text-[#00339B]' : 'text-gray-400',
+                'relative flex min-h-[49px] min-w-0 flex-1 flex-col items-center justify-center gap-1 py-2 transition active:bg-accent',
+                active ? 'text-primary' : 'text-muted-foreground',
               )}
             >
               <span className="relative">
                 <Icon className="h-[22px] w-[22px]" strokeWidth={active ? 2.4 : 1.9} />
                 {showBadge && (
-                  <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+                  <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-caption2 font-semibold text-destructive-foreground">
                     {badgeCount > 9 ? '9+' : badgeCount}
                   </span>
                 )}
               </span>
-              <span className="max-w-full truncate px-0.5 text-[10px] font-medium tracking-tight">
+              <span className="max-w-full truncate px-0.5 text-caption2 font-medium tracking-tight">
                 {item.shortLabel ?? item.label}
               </span>
             </button>
@@ -65,10 +65,10 @@ export const MobileTabBar: React.FC<MobileTabBarProps> = ({ tabs, badgeCount = 0
         <button
           type="button"
           onClick={() => setOpenMobile(true)}
-          className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 py-2 text-gray-400 transition active:bg-gray-50"
+          className="flex min-h-[49px] min-w-0 flex-1 flex-col items-center justify-center gap-1 py-2 text-muted-foreground transition active:bg-accent"
         >
           <MoreHorizontal className="h-[22px] w-[22px]" strokeWidth={1.9} />
-          <span className="text-[10px] font-medium tracking-tight">More</span>
+          <span className="text-caption2 font-medium tracking-tight">More</span>
         </button>
       </div>
     </nav>

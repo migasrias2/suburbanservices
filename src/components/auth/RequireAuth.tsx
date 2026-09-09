@@ -21,7 +21,7 @@ const DEACTIVATED_NOTICE = 'This account has been deactivated. Please contact an
 
 const Spinner = () => (
   <div className="flex min-h-screen items-center justify-center">
-    <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+    <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/40 border-t-transparent" />
   </div>
 )
 
@@ -97,11 +97,11 @@ export function RequireAuth({ children, roles }: RequireAuthProps) {
   if (roleStatus === 'error') {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
-        <p className="text-base font-medium text-gray-900">Couldn't verify your access</p>
-        <p className="max-w-sm text-sm text-gray-500">
+        <p className="text-base font-medium text-foreground">Couldn't verify your access</p>
+        <p className="max-w-sm text-sm text-muted-foreground">
           We couldn't reach the server to confirm your permissions. You are still signed in.
         </p>
-        <Button onClick={retryRoleCheck} className="rounded-full bg-[#00339B] px-6 text-white hover:bg-[#002d7a]">
+        <Button onClick={retryRoleCheck} className="rounded-full bg-primary px-6 text-primary-foreground hover:bg-primary/90">
           Try again
         </Button>
       </div>

@@ -38,8 +38,8 @@ export default function QRGeneratorPage() {
 
   if (!userType || !userId || !userName) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/40 border-t-transparent" />
       </div>
     )
   }
@@ -48,11 +48,11 @@ export default function QRGeneratorPage() {
     <Sidebar07Layout userType={userType} userName={userName}>
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-3xl font-semibold text-gray-900 sm:text-4xl">QR Codes</h1>
+          <h1 className="text-3xl font-semibold text-foreground sm:text-4xl">QR Codes</h1>
           {lastCreated && (
             <Button
               onClick={() => navigate('/qr-library')}
-              className="rounded-full bg-[#00339B] px-6 text-white shadow-md"
+              className="rounded-full bg-primary px-6 text-primary-foreground shadow-md"
             >
               Library
             </Button>
@@ -67,7 +67,7 @@ export default function QRGeneratorPage() {
 
           <Card className="border-0 shadow-xl rounded-3xl">
             <CardHeader>
-              <CardTitle className="text-xl font-semibold text-gray-900">
+              <CardTitle className="text-xl font-semibold text-foreground">
                 Test QR
               </CardTitle>
             </CardHeader>
@@ -81,18 +81,18 @@ export default function QRGeneratorPage() {
                 onScanError={() => setLastScan(null)}
               />
 
-              <Separator className="bg-gray-100" />
+              <Separator className="bg-muted" />
 
               {lastScan ? (
                 <div className="space-y-4">
-                  <Alert className="rounded-2xl border-green-200 bg-green-50">
+                  <Alert className="rounded-2xl border-success/30 bg-success/10">
                     <AlertDescription>
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2">
-                          <Badge className="rounded-full bg-green-600 text-white">{lastScan.type}</Badge>
-                          <span className="text-sm font-semibold text-green-900">Scan successful</span>
+                          <Badge className="rounded-full bg-success text-success-foreground">{lastScan.type}</Badge>
+                          <span className="text-sm font-semibold text-success">Scan successful</span>
                         </div>
-                        <div className="grid gap-2 text-sm text-green-800">
+                        <div className="grid gap-2 text-sm text-success">
                           {lastScan.customerName && <p><strong>Customer:</strong> {lastScan.customerName}</p>}
                           {lastScan.metadata?.siteName && <p><strong>Site:</strong> {lastScan.metadata.siteName}</p>}
                           {lastScan.metadata?.areaName && <p><strong>Area:</strong> {lastScan.metadata.areaName}</p>}
@@ -104,8 +104,8 @@ export default function QRGeneratorPage() {
                   </Alert>
                 </div>
               ) : (
-                <Alert className="rounded-2xl border-blue-100 bg-blue-50">
-                  <AlertDescription className="text-sm text-blue-800">
+                <Alert className="rounded-2xl border-border bg-primary/10">
+                  <AlertDescription className="text-sm text-primary">
                     Align a QR within the scanner frame to preview its payload before rolling it out to cleaners.
                   </AlertDescription>
                 </Alert>

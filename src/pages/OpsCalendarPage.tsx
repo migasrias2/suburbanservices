@@ -48,7 +48,7 @@ const getWeekRange = (anchor: Date) => {
 }
 
 const fieldClass =
-  'h-11 rounded-xl border-0 bg-gray-100/80 px-3.5 text-[14px] text-gray-900 placeholder:text-gray-400 shadow-none focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[#007AFF]/30'
+  'h-11 rounded-xl border-0 bg-muted/80 px-3.5 text-subheadline text-foreground placeholder:text-muted-foreground shadow-none focus-visible:bg-card focus-visible:ring-2 focus-visible:ring-ring/30'
 
 const OpsCalendarPage: React.FC = () => {
   const navigate = useNavigate()
@@ -237,42 +237,42 @@ const OpsCalendarPage: React.FC = () => {
 
   if (!opsManagerName) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-white">
-        <div className="h-9 w-9 animate-spin rounded-full border-2 border-gray-200 border-t-[#007AFF]" />
+      <div className="flex min-h-screen items-center justify-center bg-card">
+        <div className="h-9 w-9 animate-spin rounded-full border-2 border-border border-t-primary" />
       </div>
     )
   }
 
   return (
     <Sidebar07Layout userType="ops_manager" userName={opsManagerName}>
-      <div className="min-h-screen bg-[#FAFAFA]">
+      <div className="min-h-screen bg-muted">
         <div className="mx-auto flex max-w-[1400px] flex-col gap-6 px-5 py-8 sm:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-gray-400">Calendar</p>
-              <h1 className="mt-1 text-[28px] font-semibold tracking-tight text-gray-900">
+              <p className="text-caption2 font-medium uppercase tracking-[0.08em] text-muted-foreground">Calendar</p>
+              <h1 className="mt-1 text-title1 font-semibold tracking-tight text-foreground">
                 {format(weekStart, 'MMMM yyyy')}
               </h1>
-              <p className="mt-0.5 text-[13px] text-gray-500">
+              <p className="mt-0.5 text-footnote text-muted-foreground">
                 {format(weekStart, 'MMM d')} – {format(weekEnd, 'MMM d')}
               </p>
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 rounded-full bg-white p-1 ring-1 ring-black/[0.04] shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+              <div className="flex items-center gap-1 rounded-full bg-card p-1 ring-1 ring-border/[0.04] shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setWeekAnchor((prev) => addWeeks(prev, -1))}
                   aria-label="Previous week"
-                  className="h-8 w-8 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                  className="h-8 w-8 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="ghost"
                   onClick={() => setWeekAnchor(new Date())}
-                  className="h-8 rounded-full px-3 text-[12px] font-medium text-gray-700 hover:bg-gray-100"
+                  className="h-8 rounded-full px-3 text-caption font-medium text-foreground hover:bg-muted"
                 >
                   Today
                 </Button>
@@ -281,14 +281,14 @@ const OpsCalendarPage: React.FC = () => {
                   size="icon"
                   onClick={() => setWeekAnchor((prev) => addWeeks(prev, 1))}
                   aria-label="Next week"
-                  className="h-8 w-8 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                  className="h-8 w-8 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
               <Button
                 onClick={() => openCreateVisit()}
-                className="h-10 rounded-full bg-[#007AFF] px-4 text-[13px] font-semibold text-white shadow-none hover:bg-[#0064D2]"
+                className="h-10 rounded-full bg-primary px-4 text-footnote font-semibold text-primary-foreground shadow-none hover:bg-primary/90"
               >
                 <Plus className="mr-1 h-4 w-4" />
                 New visit
@@ -296,17 +296,17 @@ const OpsCalendarPage: React.FC = () => {
             </div>
           </div>
 
-          <section className="rounded-3xl bg-white p-5 ring-1 ring-black/[0.04] shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-16px_rgba(0,0,0,0.08)]">
+          <section className="rounded-3xl bg-card p-5 ring-1 ring-border/[0.04] shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-16px_rgba(0,0,0,0.08)]">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-gray-400">
+                <p className="text-caption2 font-medium uppercase tracking-[0.08em] text-muted-foreground">
                   Site visits
                 </p>
-                <h2 className="text-[16px] font-semibold tracking-tight text-gray-900">
+                <h2 className="text-callout font-semibold tracking-tight text-foreground">
                   This week
                 </h2>
               </div>
-              <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-600">
+              <span className="rounded-full bg-muted px-2.5 py-1 text-caption2 font-medium text-muted-foreground">
                 {visits.length}
               </span>
             </div>
@@ -321,7 +321,7 @@ const OpsCalendarPage: React.FC = () => {
                     key={key}
                     className={cn(
                       'group relative flex min-h-[110px] flex-col gap-1.5 rounded-2xl p-2.5 transition-colors',
-                      isToday ? 'bg-[#F5F9FF]' : 'bg-gray-50/60 hover:bg-gray-100/60',
+                      isToday ? 'bg-primary/10' : 'bg-muted/60 hover:bg-muted/60',
                     )}
                   >
                     <button
@@ -330,19 +330,19 @@ const OpsCalendarPage: React.FC = () => {
                       className="flex items-center justify-between text-left"
                     >
                       <div>
-                        <div className="text-[10px] font-medium uppercase tracking-[0.08em] text-gray-400">
+                        <div className="text-caption2 font-medium uppercase tracking-[0.08em] text-muted-foreground">
                           {format(day, 'EEE')}
                         </div>
                         <div
                           className={cn(
                             'text-[18px] font-semibold tracking-tight',
-                            isToday ? 'text-[#007AFF]' : 'text-gray-900',
+                            isToday ? 'text-primary' : 'text-foreground',
                           )}
                         >
                           {format(day, 'd')}
                         </div>
                       </div>
-                      <Plus className="h-3.5 w-3.5 text-gray-300 opacity-0 transition-opacity group-hover:opacity-100" />
+                      <Plus className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                     </button>
 
                     <div className="flex flex-col gap-1">
@@ -352,10 +352,10 @@ const OpsCalendarPage: React.FC = () => {
                           <div
                             key={visit.id}
                             className={cn(
-                              'flex items-center justify-between gap-1 rounded-xl px-2 py-1.5 text-[11px] ring-1 ring-inset',
+                              'flex items-center justify-between gap-1 rounded-xl px-2 py-1.5 text-caption2 ring-1 ring-inset',
                               visited
-                                ? 'bg-[#E6F7EE] text-[#0F5132] ring-[#CDEAD9]'
-                                : 'bg-[#FFF5E0] text-[#7A4A00] ring-[#FFE4A8]',
+                                ? 'bg-success/10 text-success ring-success/30'
+                                : 'bg-warning/10 text-warning ring-warning/30',
                             )}
                           >
                             <span className="truncate font-medium">{visit.siteName}</span>
@@ -366,7 +366,7 @@ const OpsCalendarPage: React.FC = () => {
                                   onClick={() => handleMarkVisited(visit)}
                                   disabled={isUpdatingVisit === visit.id}
                                   aria-label="Mark visited"
-                                  className="rounded-full p-0.5 hover:bg-white/60"
+                                  className="rounded-full p-0.5 hover:bg-card/60"
                                 >
                                   <Check className="h-3 w-3" />
                                 </button>
@@ -376,7 +376,7 @@ const OpsCalendarPage: React.FC = () => {
                                 onClick={() => handleDeleteVisit(visit)}
                                 disabled={isUpdatingVisit === visit.id}
                                 aria-label="Delete visit"
-                                className="rounded-full p-0.5 hover:bg-white/60"
+                                className="rounded-full p-0.5 hover:bg-card/60"
                               >
                                 <Trash2 className="h-3 w-3" />
                               </button>
@@ -394,20 +394,20 @@ const OpsCalendarPage: React.FC = () => {
           <section>
             <div className="mb-3 flex items-center justify-between px-1">
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-gray-400">
+                <p className="text-caption2 font-medium uppercase tracking-[0.08em] text-muted-foreground">
                   Cleaner shifts
                 </p>
-                <h2 className="text-[16px] font-semibold tracking-tight text-gray-900">
+                <h2 className="text-callout font-semibold tracking-tight text-foreground">
                   In your scope
                 </h2>
               </div>
-              <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-600">
+              <span className="rounded-full bg-muted px-2.5 py-1 text-caption2 font-medium text-muted-foreground">
                 {shifts.length}
               </span>
             </div>
 
             {scopedCustomerIds && scopedCustomerIds.length === 0 ? (
-              <div className="rounded-3xl bg-white p-8 text-center text-[13px] text-gray-400 ring-1 ring-black/[0.04]">
+              <div className="rounded-3xl bg-card p-8 text-center text-footnote text-muted-foreground ring-1 ring-border/[0.04]">
                 No customers assigned to your scope yet.
               </div>
             ) : (
@@ -422,19 +422,19 @@ const OpsCalendarPage: React.FC = () => {
       </div>
 
       <Dialog open={isVisitDialogOpen} onOpenChange={setIsVisitDialogOpen}>
-        <DialogContent className="max-h-[90dvh] max-w-[440px] overflow-y-auto rounded-3xl border-0 bg-white p-5 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.25)] sm:p-7">
+        <DialogContent className="max-h-[90dvh] max-w-[440px] overflow-y-auto rounded-3xl border-0 bg-card p-5 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.25)] sm:p-7">
           <DialogHeader className="space-y-1.5">
-            <DialogTitle className="text-[22px] font-semibold tracking-tight text-gray-900">
+            <DialogTitle className="text-title2 font-semibold tracking-tight text-foreground">
               New site visit
             </DialogTitle>
-            <DialogDescription className="text-[13px] text-gray-500">
+            <DialogDescription className="text-footnote text-muted-foreground">
               Schedule a visit to a customer site.
             </DialogDescription>
           </DialogHeader>
 
           <div className="mt-5 space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-[11px] font-medium uppercase tracking-[0.06em] text-gray-500">
+              <Label className="text-caption2 font-medium uppercase tracking-[0.06em] text-muted-foreground">
                 Site
               </Label>
               <Select
@@ -444,7 +444,7 @@ const OpsCalendarPage: React.FC = () => {
                 <SelectTrigger className={fieldClass}>
                   <SelectValue placeholder="Pick a site" />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl border border-gray-100 bg-white shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]">
+                <SelectContent className="rounded-xl border border-border bg-card shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]">
                   {sites.map((s) => (
                     <SelectItem key={s.id ?? s.customerName} value={s.id ?? s.customerName}>
                       {s.customerName}
@@ -455,7 +455,7 @@ const OpsCalendarPage: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-[11px] font-medium uppercase tracking-[0.06em] text-gray-500">
+              <Label className="text-caption2 font-medium uppercase tracking-[0.06em] text-muted-foreground">
                 Date
               </Label>
               <Input
@@ -467,7 +467,7 @@ const OpsCalendarPage: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-[11px] font-medium uppercase tracking-[0.06em] text-gray-500">
+              <Label className="text-caption2 font-medium uppercase tracking-[0.06em] text-muted-foreground">
                 Notes
               </Label>
               <Textarea
@@ -475,7 +475,7 @@ const OpsCalendarPage: React.FC = () => {
                 onChange={(e) => setVisitForm((p) => ({ ...p, notes: e.target.value }))}
                 placeholder="Optional"
                 rows={3}
-                className="resize-none rounded-xl border-0 bg-gray-100/80 px-3.5 py-2.5 text-[14px] text-gray-900 placeholder:text-gray-400 shadow-none focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[#007AFF]/30"
+                className="resize-none rounded-xl border-0 bg-muted/80 px-3.5 py-2.5 text-subheadline text-foreground placeholder:text-muted-foreground shadow-none focus-visible:bg-card focus-visible:ring-2 focus-visible:ring-ring/30"
               />
             </div>
           </div>
@@ -486,7 +486,7 @@ const OpsCalendarPage: React.FC = () => {
               variant="ghost"
               onClick={() => setIsVisitDialogOpen(false)}
               disabled={isSubmittingVisit}
-              className="h-10 rounded-full px-4 text-[13px] font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              className="h-10 rounded-full px-4 text-footnote font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               Cancel
             </Button>
@@ -494,7 +494,7 @@ const OpsCalendarPage: React.FC = () => {
               type="button"
               onClick={handleSubmitVisit}
               disabled={isSubmittingVisit}
-              className="h-10 rounded-full bg-[#007AFF] px-5 text-[13px] font-semibold text-white shadow-none hover:bg-[#0064D2]"
+              className="h-10 rounded-full bg-primary px-5 text-footnote font-semibold text-primary-foreground shadow-none hover:bg-primary/90"
             >
               Schedule
             </Button>

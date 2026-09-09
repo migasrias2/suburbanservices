@@ -13,9 +13,9 @@ interface MobileDayScheduleProps {
 }
 
 const TONE_CLASS: Record<NonNullable<WeeklyScheduleBlock['tone']>, string> = {
-  primary: 'border-l-[#007AFF] bg-[#F5F9FF]',
-  accent: 'border-l-[#10B981] bg-[#F2FBF6]',
-  muted: 'border-l-gray-300 bg-gray-50',
+  primary: 'border-l-primary bg-primary/10',
+  accent: 'border-l-success bg-success/10',
+  muted: 'border-l-gray-300 bg-muted',
 }
 
 const dayKeyOf = (date: Date) => format(date, 'yyyy-MM-dd')
@@ -88,17 +88,17 @@ export const MobileDaySchedule: React.FC<MobileDayScheduleProps> = ({
               aria-pressed={active}
               className={cn(
                 'flex flex-col items-center gap-0.5 rounded-2xl px-0.5 py-2.5 transition',
-                active ? 'bg-[#00339B] text-white' : 'bg-white text-gray-500 ring-1 ring-black/[0.04]',
+                active ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground ring-1 ring-border/[0.04]',
               )}
             >
-              <span className="text-[10px] font-medium uppercase tracking-[0.06em] opacity-70">
+              <span className="text-caption2 font-medium uppercase tracking-[0.06em] opacity-70">
                 {format(day, 'EEE')}
               </span>
               <span
                 className={cn(
                   'text-[19px] font-semibold leading-none',
-                  !active && isToday && 'text-[#007AFF]',
-                  !active && !isToday && 'text-gray-900',
+                  !active && isToday && 'text-primary',
+                  !active && !isToday && 'text-foreground',
                 )}
               >
                 {format(day, 'd')}
@@ -106,7 +106,7 @@ export const MobileDaySchedule: React.FC<MobileDayScheduleProps> = ({
               <span
                 className={cn(
                   'h-1.5 w-1.5 rounded-full',
-                  count > 0 ? (active ? 'bg-white' : 'bg-[#007AFF]') : 'bg-transparent',
+                  count > 0 ? (active ? 'bg-card' : 'bg-primary') : 'bg-transparent',
                 )}
               />
             </button>
@@ -114,18 +114,18 @@ export const MobileDaySchedule: React.FC<MobileDayScheduleProps> = ({
         })}
       </div>
 
-      <div className="rounded-3xl bg-white p-3 ring-1 ring-black/[0.04]">
+      <div className="rounded-3xl bg-card p-3 ring-1 ring-border/[0.04]">
         <div className="flex items-center justify-between px-1 pb-2">
-          <span className="text-[13px] font-semibold text-gray-900">
+          <span className="text-footnote font-semibold text-foreground">
             {format(selectedDay, 'EEEE d MMM')}
           </span>
-          <span className="text-[11px] font-medium text-gray-400">
+          <span className="text-caption2 font-medium text-muted-foreground">
             {isLoading ? 'Loading…' : `${dayBlocks.length} shift${dayBlocks.length === 1 ? '' : 's'}`}
           </span>
         </div>
 
         {dayBlocks.length === 0 ? (
-          <p className="px-1 py-8 text-center text-[13px] text-gray-400">
+          <p className="px-1 py-8 text-center text-footnote text-muted-foreground">
             {isLoading ? '' : 'Nothing scheduled.'}
           </p>
         ) : (
@@ -144,19 +144,19 @@ export const MobileDaySchedule: React.FC<MobileDayScheduleProps> = ({
                     )}
                   >
                     <div className="w-[58px] shrink-0">
-                      <div className="text-[13px] font-semibold tabular-nums text-gray-900">
+                      <div className="text-footnote font-semibold tabular-nums text-foreground">
                         {format(start, 'HH:mm')}
                       </div>
-                      <div className="text-[11px] tabular-nums text-gray-400">
+                      <div className="text-caption2 tabular-nums text-muted-foreground">
                         {format(end, 'HH:mm')}
                       </div>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[14px] font-medium text-gray-900">
+                      <div className="truncate text-subheadline font-medium text-foreground">
                         {block.title}
                       </div>
                       {block.subtitle ? (
-                        <div className="truncate text-[12px] text-gray-500">{block.subtitle}</div>
+                        <div className="truncate text-caption text-muted-foreground">{block.subtitle}</div>
                       ) : null}
                     </div>
                   </button>
@@ -170,7 +170,7 @@ export const MobileDaySchedule: React.FC<MobileDayScheduleProps> = ({
           <button
             type="button"
             onClick={() => onCreate(selectedDay, DEFAULT_NEW_SHIFT_HOUR)}
-            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-gray-200 py-3 text-[13px] font-medium text-gray-500 transition active:bg-gray-50"
+            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border py-3 text-footnote font-medium text-muted-foreground transition active:bg-muted"
           >
             <Plus className="h-4 w-4" />
             Add shift on {format(selectedDay, 'EEE d')}

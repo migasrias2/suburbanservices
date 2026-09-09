@@ -93,17 +93,17 @@ const CleanerSchedulePage: React.FC = () => {
           <div className="flex items-baseline gap-2">
             <span
               className={cn(
-                'text-[22px] font-semibold tracking-tight',
-                isToday ? 'text-[#007AFF]' : 'text-gray-900',
+                'text-title2 font-semibold tracking-tight',
+                isToday ? 'text-primary' : 'text-foreground',
               )}
             >
               {format(day, 'd')}
             </span>
-            <span className="text-[12px] font-medium uppercase tracking-[0.08em] text-gray-400">
+            <span className="text-caption font-medium uppercase tracking-[0.08em] text-muted-foreground">
               {format(day, 'EEEE')}
             </span>
             {isToday ? (
-              <span className="rounded-full bg-[#007AFF]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#007AFF]">
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-caption2 font-semibold uppercase tracking-wider text-primary">
                 Today
               </span>
             ) : null}
@@ -111,7 +111,7 @@ const CleanerSchedulePage: React.FC = () => {
         </div>
 
         {items.length === 0 ? (
-          <div className="rounded-2xl bg-white/60 px-4 py-3 text-[13px] text-gray-400 ring-1 ring-black/[0.03]">
+          <div className="rounded-2xl bg-card/60 px-4 py-3 text-footnote text-muted-foreground ring-1 ring-border/[0.03]">
             No shifts
           </div>
         ) : (
@@ -123,23 +123,23 @@ const CleanerSchedulePage: React.FC = () => {
               return (
                 <div
                   key={shift.id}
-                  className="rounded-2xl bg-white p-4 ring-1 ring-black/[0.04] shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-16px_rgba(0,0,0,0.1)]"
+                  className="rounded-2xl bg-card p-4 ring-1 ring-border/[0.04] shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-16px_rgba(0,0,0,0.1)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-[17px] font-semibold tracking-tight text-gray-900">
+                      <div className="text-body font-semibold tracking-tight text-foreground">
                         {format(start, 'h:mm')} – {format(end, 'h:mm a')}
                       </div>
                       {location ? (
-                        <div className="mt-0.5 truncate text-[13px] text-gray-500">{location}</div>
+                        <div className="mt-0.5 truncate text-footnote text-muted-foreground">{location}</div>
                       ) : null}
                     </div>
-                    <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-600">
+                    <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-caption2 font-medium text-muted-foreground">
                       {formatDuration(start, end)}
                     </span>
                   </div>
                   {shift.notes ? (
-                    <p className="mt-3 whitespace-pre-wrap text-[12.5px] leading-snug text-gray-500">
+                    <p className="mt-3 whitespace-pre-wrap text-caption leading-snug text-muted-foreground">
                       {shift.notes}
                     </p>
                   ) : null}
@@ -154,8 +154,8 @@ const CleanerSchedulePage: React.FC = () => {
 
   if (!userName) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-white">
-        <div className="h-9 w-9 animate-spin rounded-full border-2 border-gray-200 border-t-[#007AFF]" />
+      <div className="flex min-h-screen items-center justify-center bg-card">
+        <div className="h-9 w-9 animate-spin rounded-full border-2 border-border border-t-primary" />
       </div>
     )
   }
@@ -167,21 +167,21 @@ const CleanerSchedulePage: React.FC = () => {
 
   return (
     <Sidebar07Layout userType="cleaner" userName={userName}>
-      <div className="min-h-screen bg-[#FAFAFA]">
+      <div className="min-h-screen bg-muted">
         <div className="mx-auto flex max-w-[640px] flex-col gap-6 px-5 py-8">
           <header>
-            <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-gray-400">
+            <p className="text-caption2 font-medium uppercase tracking-[0.08em] text-muted-foreground">
               Schedule
             </p>
-            <h1 className="mt-1 text-[28px] font-semibold tracking-tight text-gray-900">
+            <h1 className="mt-1 text-title1 font-semibold tracking-tight text-foreground">
               My Schedule
             </h1>
-            <p className="mt-0.5 text-[13px] text-gray-500">
+            <p className="mt-0.5 text-footnote text-muted-foreground">
               {format(activeRange.start, 'MMM d')} – {format(activeRange.end, 'MMM d')}
             </p>
           </header>
 
-          <div className="inline-flex w-full max-w-[280px] rounded-full bg-gray-100/80 p-1">
+          <div className="inline-flex w-full max-w-[280px] rounded-full bg-muted/80 p-1">
             {[
               { key: 'this', label: 'This week', count: thisWeekShifts.length },
               { key: 'next', label: 'Next week', count: nextWeekShifts.length },
@@ -193,14 +193,14 @@ const CleanerSchedulePage: React.FC = () => {
                   type="button"
                   onClick={() => setActiveTab(tab.key as 'this' | 'next')}
                   className={cn(
-                    'flex-1 rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition-all',
+                    'flex-1 rounded-full px-3 py-1.5 text-caption font-semibold transition-all',
                     active
-                      ? 'bg-white text-gray-900 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
-                      : 'text-gray-500 hover:text-gray-700',
+                      ? 'bg-card text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.06),0_2px_6px_-2px_rgba(0,0,0,0.06)]'
+                      : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
                   {tab.label}
-                  <span className={cn('ml-1.5 text-[11px]', active ? 'text-gray-400' : 'text-gray-400')}>
+                  <span className={cn('ml-1.5 text-caption2', active ? 'text-muted-foreground' : 'text-muted-foreground')}>
                     {tab.count}
                   </span>
                 </button>
@@ -210,7 +210,7 @@ const CleanerSchedulePage: React.FC = () => {
 
           <div className="space-y-6">
             {isLoading ? (
-              <div className="rounded-2xl bg-white/60 px-4 py-6 text-center text-[13px] text-gray-400 ring-1 ring-black/[0.03]">
+              <div className="rounded-2xl bg-card/60 px-4 py-6 text-center text-footnote text-muted-foreground ring-1 ring-border/[0.03]">
                 Loading…
               </div>
             ) : (

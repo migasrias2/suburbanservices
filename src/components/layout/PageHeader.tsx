@@ -28,13 +28,13 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
         {/* Hidden on phones — the mobile top bar already names the page. */}
-        <h1 className="hidden text-3xl font-semibold tracking-tight text-gray-900 md:block lg:text-4xl">
+        <h1 className="hidden text-title1 font-semibold text-foreground md:block lg:text-large-title">
           {title}
         </h1>
         {/* Also hidden on phones: with the title gone this is a lone paragraph
             of boilerplate pushing the actual content below the fold. */}
         {description ? (
-          <p className="hidden text-gray-500 md:mt-2 md:block md:text-base">{description}</p>
+          <p className="hidden text-muted-foreground md:mt-2 md:block md:text-callout">{description}</p>
         ) : null}
       </div>
       {actions ? (
