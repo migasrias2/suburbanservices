@@ -1,6 +1,7 @@
 /* Font is wired through --font-sans below; swapping families is a one-line change.
-   HIG > Typography: "avoid Ultralight, Thin, and Light font weights" — we load 400-700 only. */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+   Actor ships a single face (400 Regular, latin), so there is no weight axis to
+   request. Heavier weights in the UI are synthesised by the browser. */
+@import url('https://fonts.googleapis.com/css2?family=Actor&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -22,7 +23,7 @@
   :root {
     /* Single swap point for the typeface. The stack falls back to the real
        system font (SF Pro on Apple platforms) before any generic. */
-    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    --font-sans: 'Actor', -apple-system, BlinkMacSystemFont, 'Segoe UI',
       system-ui, sans-serif;
 
     /* Surfaces — Apple's layered background model: a recessive page ground with
@@ -187,7 +188,6 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     text-rendering: optimizeLegibility;
   }
 
