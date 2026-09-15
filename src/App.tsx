@@ -46,7 +46,7 @@ const App = () => (
           <Route path="/cleaner-dashboard" element={<RequireAuth roles={["cleaner"]}><CleanerHomePage /></RequireAuth>} />
           <Route path="/cleaner-assistance" element={<RequireAuth roles={["cleaner"]}><CleanerDashboardPage /></RequireAuth>} />
           <Route path="/my-schedule" element={<RequireAuth roles={["cleaner"]}><CleanerSchedulePage /></RequireAuth>} />
-          <Route path="/clock-in" element={<RequireAuth roles={["cleaner"]}><ClockInPage /></RequireAuth>} />
+          <Route path="/clock-in" element={<RequireAuth roles={["cleaner", "ops_manager"]}><ClockInPage /></RequireAuth>} />
           <Route path="/chat" element={<RequireAuth><ChatPage /></RequireAuth>} />
           <Route path="/scanner" element={<RequireAuth roles={["cleaner"]}><ScannerPage /></RequireAuth>} />
           <Route path="/history" element={<RequireAuth><HistoryPage /></RequireAuth>} />

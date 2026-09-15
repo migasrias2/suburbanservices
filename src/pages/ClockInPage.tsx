@@ -186,7 +186,10 @@ export default function ClockInPage() {
   const handleSummaryDone = () => {
     setCurrentPhase('clock_in')
     localStorage.setItem('currentClockInPhase', 'clock_in')
-    navigate('/cleaner-dashboard')
+    // Ops managers use this page too, and /cleaner-dashboard is gated to
+    // cleaners -- sending them there makes RequireAuth bounce them onward, so
+    // their shift ends on a redirect through a page they are not allowed to see.
+    navigate(userType === 'ops_manager' ? '/ops-dashboard' : '/cleaner-dashboard')
   }
 
   const handleBackToClockIn = () => {
