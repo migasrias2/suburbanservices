@@ -100,6 +100,9 @@ export async function loadLiveDashboard(): Promise<LiveDashboardData> {
   const attendanceQuery = supabase
     .from('time_attendance')
     .select('id, cleaner_id, cleaner_uuid, cleaner_name, customer_name, site_name, clock_in, clock_out, needs_review, review_reason, auto_closed_at')
+    // Ops managers clock in through the same flow; their site visits are not
+    // cleaning shifts and must not land in cleaner hours or headcount.
+    .eq('worker_role', 'cleaner')
     .gte('clock_in', dayStart)
     .lte('clock_in', dayEnd)
     .order('clock_in', { ascending: false })

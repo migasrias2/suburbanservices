@@ -376,6 +376,9 @@ export async function fetchDashboardSnapshot({
   const attendanceQuery = supabase
     .from('time_attendance')
     .select('id, cleaner_id, cleaner_uuid, cleaner_name, customer_name, site_name, clock_in, clock_out')
+    // Ops managers clock in through the same flow; their site visits are not
+    // cleaning shifts and must not land in cleaner hours or headcount.
+    .eq('worker_role', 'cleaner')
     .gte('clock_in', start)
     .lte('clock_in', end)
 
@@ -530,6 +533,9 @@ export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAna
   const attendanceQuery = supabase
     .from('time_attendance')
     .select('id, cleaner_id, cleaner_uuid, cleaner_name, customer_name, site_name, clock_in, clock_out')
+    // Ops managers clock in through the same flow; their site visits are not
+    // cleaning shifts and must not land in cleaner hours or headcount.
+    .eq('worker_role', 'cleaner')
     .gte('clock_in', range.start)
     .lte('clock_in', range.end)
 

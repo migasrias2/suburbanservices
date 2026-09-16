@@ -1,7 +1,7 @@
 import QRCode from 'qrcode'
 import { supabase } from './supabase'
 import { v4 as uuidv4, validate as uuidValidate } from 'uuid'
-import { getStoredCleanerName, normalizeCleanerName, normalizeCleanerNumericId } from '../lib/identity'
+import { getStoredCleanerName, getStoredWorkerRole, normalizeCleanerName, normalizeCleanerNumericId } from '../lib/identity'
 import { autoLinkCleanerToCustomer } from './managerService'
 import { uploadTaskPhoto } from './photoStorageService'
 
@@ -1346,7 +1346,10 @@ export class QRService {
             clock_in_gps_lat: location?.latitude ?? null,
             clock_in_gps_lng: location?.longitude ?? null,
             cleaner_mobile: localStorage.getItem('userMobile') || '',
-            notes: location ? 'Clock-in via QR' : 'Clock-in via QR (no location)'
+            notes: location ? 'Clock-in via QR' : 'Clock-in via QR (no location)',
+            // An ops manager's site visit is not a cleaning shift. Untagged, it
+            // would count as one everywhere hours and headcount are reported.
+            worker_role: getStoredWorkerRole()
           })
 
         if (attendanceError) {
