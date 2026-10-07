@@ -55,6 +55,8 @@ export type ActiveAssist = {
   acceptedByName: string | null
   escalatedAt: string | null
   escalateAfter: string | null
+  beforeMedia: unknown
+  afterMedia: unknown
 }
 
 export type ResolvedAssist = {
@@ -68,6 +70,8 @@ export type ResolvedAssist = {
   reportedAt: string
   resolvedAt: string | null
   resolvedByName: string | null
+  beforeMedia: unknown
+  afterMedia: unknown
 }
 
 export type LiveDashboardData = {
@@ -226,6 +230,8 @@ export async function loadLiveDashboard(): Promise<LiveDashboardData> {
     reportedAt: row.reported_at,
     resolvedAt: row.resolved_at ?? null,
     resolvedByName: row.resolved_by_name ?? null,
+    beforeMedia: row.before_media ?? null,
+    afterMedia: row.after_media ?? null,
   }))
 
   const needsAttention: ActiveAssist[] = (activeRaw ?? [])
@@ -244,6 +250,8 @@ export async function loadLiveDashboard(): Promise<LiveDashboardData> {
       acceptedByName: row.accepted_by_name ?? null,
       escalatedAt: row.escalated_at ?? null,
       escalateAfter: row.escalate_after ?? null,
+      beforeMedia: row.before_media ?? null,
+      afterMedia: row.after_media ?? null,
     }))
 
   return {

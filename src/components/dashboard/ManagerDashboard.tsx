@@ -33,6 +33,7 @@ import { Calendar } from '../ui/calendar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '../ui/dialog'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { toast } from '@/hooks/use-toast'
+import { AssistPhotoStrip } from './AssistPhotoStrip'
 
 interface ManagerDashboardProps {
   managerId: string
@@ -143,8 +144,9 @@ interface BathroomAssistRequest {
   materials_used: string | null
   resolved_by_name: string | null
   accepted_by_name: string | null
-  before_media: string[] | null
-  after_media: string[] | null
+  issue_description?: string | null
+  before_media: unknown
+  after_media: unknown
 }
 
 const statusColors: Record<string, string> = {
@@ -1495,8 +1497,11 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         acceptedByName: request.accepted_by_name,
         status: request.status,
         issueType: request.issue_type,
+        issueDescription: request.issue_description,
         notes: request.notes,
         materials: request.materials_used,
+        beforeMedia: request.before_media,
+        afterMedia: request.after_media,
         escalatedAt: request.escalated_at,
         escalationReason: request.escalation_reason,
         escalateAfter: request.escalate_after
@@ -1517,7 +1522,9 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
         issueType: request.issue_type,
         issueDescription: request.issue_description,
         notes: request.notes,
-        materials: request.materials_used
+        materials: request.materials_used,
+        beforeMedia: request.before_media,
+        afterMedia: request.after_media
       })),
     [assistResolvedRequests]
   )
@@ -2167,7 +2174,11 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                               {assist.issueType && (
                                 <p className="text-xs font-medium text-primary">{assist.issueType}</p>
                               )}
+                              {assist.issueDescription && (
+                                <p className="text-xs text-muted-foreground">{assist.issueDescription}</p>
+                              )}
                             </div>
+                            <AssistPhotoStrip beforeMedia={assist.beforeMedia} afterMedia={assist.afterMedia} />
                             <div className="mt-4 flex flex-wrap items-center gap-3 text-caption2 text-muted-foreground">
                               <span className="font-semibold text-destructive">
                                 Reported {formatDateTime(assist.reportedAt)}
@@ -2289,6 +2300,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                                 </p>
                                 {assist.notes && <p className="mt-1">Notes: {assist.notes}</p>}
                                 {assist.materials && <p className="mt-1">Materials: {assist.materials}</p>}
+                                <AssistPhotoStrip beforeMedia={assist.beforeMedia} afterMedia={assist.afterMedia} />
                               </div>
                             )}
                             {assist.notes && expandedResolvedId !== assist.id && (

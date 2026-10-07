@@ -237,8 +237,9 @@ const BathroomAssistReportPage: React.FC = () => {
           source: 'public_form',
           query: Object.fromEntries(params.entries()),
           browser: typeof navigator !== 'undefined' ? navigator.userAgent : undefined
-        },
-        escalateAfter: new Date(Date.now() + 15 * 60 * 1000).toISOString()
+        }
+        // No escalateAfter: the client asked on 2026-10-07 for requests to stop
+        // auto-escalating. Requests stay pending until someone resolves them.
       })
 
       setSubmittedRequestId(record.id)

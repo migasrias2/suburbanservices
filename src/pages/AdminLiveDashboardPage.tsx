@@ -15,6 +15,7 @@ import {
   type ActiveAssist,
 } from '@/services/adminDashboardService'
 import { AssistRequestService } from '@/services/assistRequestService'
+import { AssistPhotoStrip } from '@/components/dashboard/AssistPhotoStrip'
 
 const REFRESH_MS = 30_000
 
@@ -426,6 +427,10 @@ export default function AdminLiveDashboardPage() {
                         {assist.issueType && (
                           <p className="mt-2 text-xs font-medium text-primary">{assist.issueType}</p>
                         )}
+                        {assist.issueDescription && (
+                          <p className="mt-1 text-xs text-muted-foreground">{assist.issueDescription}</p>
+                        )}
+                        <AssistPhotoStrip beforeMedia={assist.beforeMedia} afterMedia={assist.afterMedia} />
                         <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-caption2 text-muted-foreground">
                           <span className="font-semibold text-destructive">
                             Reported {formatDateTime(assist.reportedAt)}
@@ -530,6 +535,7 @@ export default function AdminLiveDashboardPage() {
                                 : 'Description: Not provided'}
                             </p>
                             {assist.notes && <p className="mt-1">Notes: {assist.notes}</p>}
+                            <AssistPhotoStrip beforeMedia={assist.beforeMedia} afterMedia={assist.afterMedia} />
                           </div>
                         )}
                       </button>
