@@ -17,7 +17,9 @@ export type AttendanceShift = {
 
 /** A shift payroll must look at before paying it. */
 export type ReviewShift = AttendanceShift & {
+  /** When clockOutMissing, this is an estimate from the last activity, not confirmed hours. */
   durationHours: number | null
+  clockOutMissing: boolean
 }
 
 export type ActiveCleaner = {
@@ -125,7 +127,7 @@ export async function loadLiveDashboard(): Promise<LiveDashboardData> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
   const reviewQuery = supabase
     .from('time_attendance')
-    .select('id, cleaner_id, cleaner_uuid, cleaner_name, customer_name, site_name, clock_in, clock_out, needs_review, review_reason, auto_closed_at')
+    .select('id, cleaner_id, cleaner_uuid, cleaner_name, customer_name, site_name, clock_in, clock_out, needs_review, review_reason, auto_closed_at, clock_out_missing')
     .eq('needs_review', true)
     .gte('clock_in', thirtyDaysAgo)
     .order('clock_in', { ascending: false })
@@ -162,6 +164,7 @@ export async function loadLiveDashboard(): Promise<LiveDashboardData> {
   const reviewQueue: ReviewShift[] = (reviewRes.data ?? []).map((row: any) => {
     const clockIn = row.clock_in ?? null
     const clockOut = row.clock_out ?? null
+    const clockOutMissing = row.clock_out_missing === true
     const durationHours =
       clockIn && clockOut
         ? Math.round(((new Date(clockOut).getTime() - new Date(clockIn).getTime()) / 3600000) * 10) / 10
@@ -178,6 +181,7 @@ export async function loadLiveDashboard(): Promise<LiveDashboardData> {
       reviewReason: row.review_reason ?? null,
       autoClosedAt: row.auto_closed_at ?? null,
       durationHours,
+      clockOutMissing,
     }
   })
 

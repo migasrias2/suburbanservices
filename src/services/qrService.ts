@@ -4,6 +4,8 @@ import { v4 as uuidv4, validate as uuidValidate } from 'uuid'
 import { getStoredCleanerName, getStoredWorkerRole, normalizeCleanerName, normalizeCleanerNumericId } from '../lib/identity'
 import { autoLinkCleanerToCustomer } from './managerService'
 import { uploadTaskPhoto } from './photoStorageService'
+import { pickSiteLabel } from '../lib/siteLabel'
+import { reportClockFailure } from './clockFailureService'
 
 export type AreaType = 
   | 'BATHROOMS_ABLUTIONS'
@@ -715,17 +717,17 @@ export class QRService {
     return null
   }
 
+  /** The site name a shift is filed under. Customer names are kept as typed; QR area names are tidied. */
   private static deriveSiteLabel(qrData: QRCodeData, siteId?: string) {
-    const metadataSite = this.normalizeLabel(qrData.metadata?.siteName ?? qrData.metadata?.areaName)
-    if (metadataSite) return metadataSite
-
-    const customerName = this.normalizeLabel(qrData.customerName)
-    if (customerName) return customerName
-
-    const fallback = this.normalizeLabel(siteId)
-    if (fallback) return fallback
-
-    return 'Site'
+    const fromQr = this.normalizeLabel(qrData.metadata?.siteName) || this.normalizeLabel(qrData.metadata?.areaName)
+    const label = pickSiteLabel({
+      siteName: this.normalizeLabel(qrData.metadata?.siteName),
+      areaName: this.normalizeLabel(qrData.metadata?.areaName),
+      customerName: this.normalizeLabel(qrData.customerName),
+      siteId: this.normalizeLabel(siteId),
+    })
+    if (label === fromQr) return this.prettifySiteLabel(label) || label
+    return label
   }
 
   private static deriveCustomerLabel(qrData: QRCodeData, siteLabel: string) {
@@ -1162,16 +1164,36 @@ export class QRService {
    * Process QR code scan and log to database
    */
   static async processQRScan(
-    qrData: QRCodeData, 
-    cleanerId: string, 
+    qrData: QRCodeData,
+    cleanerId: string,
+    cleanerName: string,
+    location?: { latitude: number; longitude: number }
+  ): Promise<{success: boolean, message?: string}> {
+    const result = await this.runQRScan(qrData, cleanerId, cleanerName, location)
+    const type = this.normalizeQrType(qrData.type)
+    if (!result.success && (type === 'CLOCK_IN' || type === 'CLOCK_OUT')) {
+      void reportClockFailure({
+        eventType: type === 'CLOCK_IN' ? 'clock_in' : 'clock_out',
+        reason: result.message || 'Clock scan failed with no message',
+        cleanerName: getStoredCleanerName() || cleanerName,
+        qrCodeId: qrData.id,
+        customerName: qrData.customerName ?? null,
+        hasLocation: Boolean(location),
+      })
+    }
+    return result
+  }
+
+  private static async runQRScan(
+    qrData: QRCodeData,
+    cleanerId: string,
     cleanerName: string,
     location?: { latitude: number; longitude: number }
   ): Promise<{success: boolean, message?: string}> {
     try {
       let action = ''
       let siteArea = ''
-      const siteLabelRaw = this.deriveSiteLabel(qrData, qrData.siteId)
-      const siteLabel = this.prettifySiteLabel(siteLabelRaw) || siteLabelRaw || 'Site'
+      const siteLabel = this.deriveSiteLabel(qrData, qrData.siteId)
       const customerLabel = this.deriveCustomerLabel(qrData, siteLabel)
       const normalizedType = this.normalizeQrType(qrData.type) ?? 'AREA'
       const clockInReference = this.resolveClockInReference(qrData)
@@ -1325,8 +1347,7 @@ export class QRService {
       const rawCleanerName = getStoredCleanerName()
       const cleanerName = normalizeCleanerName(rawCleanerName)
       const currentTime = new Date().toISOString()
-      const siteLabelRaw = this.deriveSiteLabel(qrData, siteId)
-      const siteLabel = this.prettifySiteLabel(siteLabelRaw) || siteLabelRaw || 'Site'
+      const siteLabel = this.deriveSiteLabel(qrData, siteId)
       const customerLabel = this.deriveCustomerLabel(qrData, siteLabel)
       const trimmedCleanerId = cleanerId ? cleanerId.toString().trim() : null
       const numericCleanerId = trimmedCleanerId ? normalizeCleanerNumericId(trimmedCleanerId) : null
@@ -1710,8 +1731,7 @@ export class QRService {
     action: string,
     location?: { latitude: number; longitude: number }
   ) {
-    const siteLabelRaw = this.deriveSiteLabel(qrData, qrData.siteId)
-    const siteLabel = this.prettifySiteLabel(siteLabelRaw) || siteLabelRaw || 'Site'
+    const siteLabel = this.deriveSiteLabel(qrData, qrData.siteId)
     const customerLabel = this.deriveCustomerLabel(qrData, siteLabel)
     const areaLabel = this.prettifySiteLabel(qrData.metadata?.areaName) || siteLabel
     const { error } = await supabase

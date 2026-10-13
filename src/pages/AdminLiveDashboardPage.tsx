@@ -16,6 +16,9 @@ import {
 } from '@/services/adminDashboardService'
 import { AssistRequestService } from '@/services/assistRequestService'
 import { AssistPhotoStrip } from '@/components/dashboard/AssistPhotoStrip'
+import { ShiftReviewQueue } from '@/components/dashboard/ShiftReviewQueue'
+import { ClockProblemsList } from '@/components/dashboard/ClockProblemsList'
+import { loadClockFailures, type ClockFailureEntry } from '@/services/shiftReviewService'
 
 const REFRESH_MS = 30_000
 
@@ -87,6 +90,7 @@ export default function AdminLiveDashboardPage() {
   const [photoDayFilter, setPhotoDayFilter] = useState<string>('all')
   const [loadedPhotoData, setLoadedPhotoData] = useState<Record<number, string>>({})
   const [loadingDay, setLoadingDay] = useState<string | null>(null)
+  const [clockFailures, setClockFailures] = useState<ClockFailureEntry[]>([])
 
   useEffect(() => {
     const storedType = localStorage.getItem('userType')
@@ -124,8 +128,9 @@ export default function AdminLiveDashboardPage() {
 
   const refresh = async () => {
     try {
-      const next = await loadLiveDashboard()
+      const [next, failures] = await Promise.all([loadLiveDashboard(), loadClockFailures()])
       setData(next)
+      setClockFailures(failures)
     } catch (err: any) {
       toast({ title: 'Could not load dashboard', description: err?.message ?? 'Unknown error', variant: 'destructive' })
     } finally {
@@ -252,54 +257,9 @@ export default function AdminLiveDashboardPage() {
           <div className="py-16 text-center text-sm text-muted-foreground">Loading…</div>
         ) : (
           <div className="space-y-8">
-            {data?.reviewQueue.length ? (
-              <section>
-                <div className="mb-3 flex items-baseline justify-between px-1">
-                  <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-warning">
-                    Shifts to check before payroll
-                  </h2>
-                  <span className="text-xs font-medium text-muted-foreground">{data.reviewQueue.length}</span>
-                </div>
-                <div className="overflow-hidden rounded-3xl border border-warning/30 bg-warning/5">
-                  {data.reviewQueue.slice(0, 8).map((s, idx) => (
-                    <div
-                      key={s.id}
-                      className={`flex items-start justify-between gap-3 px-4 py-4 sm:gap-4 sm:px-5 ${idx > 0 ? 'border-t border-warning/30' : ''}`}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-base font-medium text-foreground">{s.cleanerName ?? 'Unknown'}</span>
-                          {s.autoClosedAt ? (
-                            <span className="shrink-0 rounded-full bg-warning/5 px-2 py-0.5 text-caption2 font-semibold uppercase tracking-wider text-warning">
-                              Auto-closed
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="truncate text-xs text-muted-foreground">
-                          {[s.customerName, s.siteName].filter(Boolean).join(' · ') || 'Site unknown'}
-                          {' · '}
-                          {formatDateTime(s.clockIn)}
-                        </div>
-                        {s.reviewReason ? (
-                          <p className="mt-1 text-xs leading-snug text-warning">{s.reviewReason}</p>
-                        ) : null}
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <div className="text-base font-semibold tabular-nums text-warning">
-                          {s.durationHours != null ? `${s.durationHours}h` : '—'}
-                        </div>
-                        <div className="text-caption2 uppercase tracking-wider text-muted-foreground">recorded</div>
-                      </div>
-                    </div>
-                  ))}
-                  {data.reviewQueue.length > 8 ? (
-                    <div className="border-t border-warning/30 px-5 py-3 text-xs text-warning">
-                      + {data.reviewQueue.length - 8} more in the last 30 days
-                    </div>
-                  ) : null}
-                </div>
-              </section>
-            ) : null}
+            <ShiftReviewQueue shifts={data?.reviewQueue ?? []} onChanged={refresh} />
+
+            <ClockProblemsList failures={clockFailures} />
 
             <section>
               <div className="mb-3 flex items-baseline justify-between px-1">

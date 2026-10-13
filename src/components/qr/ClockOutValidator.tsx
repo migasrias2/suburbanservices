@@ -5,6 +5,7 @@ import { QRService, QRCodeData } from '../../services/qrService'
 import { clearDraft } from '../../lib/offlineStore'
 import { normalizeCleanerName } from '../../lib/identity'
 import { supabase } from '../../services/supabase'
+import { reportClockFailure } from '../../services/clockFailureService'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Alert, AlertDescription } from '../ui/alert'
@@ -34,6 +35,22 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
   } | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
+  // The camera callback fires several times a second; one record per reason is enough.
+  const lastReportRef = useRef<{ reason: string; at: number } | null>(null)
+
+  const reportFailure = (reason: string, qrData?: QRCodeData) => {
+    const now = Date.now()
+    const last = lastReportRef.current
+    if (last && last.reason === reason && now - last.at < 30_000) return
+    lastReportRef.current = { reason, at: now }
+    void reportClockFailure({
+      eventType: 'clock_out',
+      reason,
+      cleanerName,
+      qrCodeId: qrData?.id ?? null,
+      customerName: qrData?.customerName ?? null,
+    })
+  }
 
   useEffect(() => {
     return () => {
@@ -54,6 +71,7 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
       console.error('Camera permission denied:', err)
       setHasPermission(false)
       setError('Camera access is required to scan QR codes.')
+      reportFailure('Camera permission denied')
     }
   }
 
@@ -76,6 +94,7 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
                 valid: false,
                 message: 'Invalid QR code format'
               })
+              reportFailure('Scanned a code that is not a valid QR format')
               return
             }
 
@@ -113,6 +132,7 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
                 valid: false,
                 message: 'This is not a valid clock out QR code'
               })
+              reportFailure(`Scanned a ${normalizedType ?? 'unknown'} code instead of a clock-out code`, qrData)
               return
             }
 
@@ -149,6 +169,7 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
     } catch (err) {
       console.error('Error starting QR scanner:', err)
       setError('Failed to start camera. Please check your camera permissions.')
+      reportFailure(`Camera did not start: ${err instanceof Error ? err.message : String(err)}`)
       setIsScanning(false)
     }
   }
@@ -229,6 +250,7 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
     } catch (err) {
       console.error('Error during clock out:', err)
       setError('An error occurred while clocking out.')
+      reportFailure(`Clock-out threw: ${err instanceof Error ? err.message : String(err)}`, validationResult.qrData)
     } finally {
       setIsProcessing(false)
     }
