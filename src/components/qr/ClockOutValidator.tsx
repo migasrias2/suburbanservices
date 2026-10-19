@@ -16,13 +16,16 @@ interface ClockOutValidatorProps {
   cleanerName: string
   onClockOutSuccess?: () => void
   onCancel?: () => void
+  // A Clock Out code already scanned on another screen: clock out with it straight away
+  pendingQrData?: QRCodeData | null
 }
 
 export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
   cleanerId,
   cleanerName,
   onClockOutSuccess,
-  onCancel
+  onCancel,
+  pendingQrData
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [qrScanner, setQrScanner] = useState<QrScanner | null>(null)
@@ -34,7 +37,10 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
     qrData?: QRCodeData
   } | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null)
+  const [hasPermission, setHasPermission] = useState<boolean | null>(pendingQrData ? true : null)
+  // The scan callback is built once, so state read inside it is frozen; refs are not.
+  const scannerRef = useRef<QrScanner | null>(null)
+  const submittingRef = useRef(false)
   // The camera callback fires several times a second; one record per reason is enough.
   const lastReportRef = useRef<{ reason: string; at: number } | null>(null)
 
@@ -139,14 +145,17 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
             // Additional validation logic can be added here
             // For example, checking if the location matches, time constraints, etc.
             
+            const clockOutData = normalizedType ? { ...qrData, type: normalizedType } : qrData
             setValidationResult({
               valid: true,
-              message: 'Valid clock out QR code detected',
-              qrData: normalizedType ? { ...qrData, type: normalizedType } : qrData
+              message: 'Clock Out code found. Clocking you out…',
+              qrData: clockOutData
             })
-
-            // Stop scanning after successful validation
             stopScanning()
+            // Clock out on the scan itself. It used to wait for a separate
+            // "Confirm Clock Out" tap; a cleaner who saw the green VALID badge
+            // and put the phone away was never clocked out, and nothing was logged.
+            void submitClockOut(clockOutData)
 
           } catch (err) {
             console.error('Error processing QR scan:', err)
@@ -164,6 +173,7 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
       )
 
       await scanner.start()
+      scannerRef.current = scanner
       setQrScanner(scanner)
       
     } catch (err) {
@@ -175,8 +185,10 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
   }
 
   const stopScanning = () => {
-    if (qrScanner) {
-      qrScanner.stop()
+    const scanner = scannerRef.current ?? qrScanner
+    if (scanner) {
+      scanner.stop()
+      scannerRef.current = null
       setQrScanner(null)
     }
     setIsScanning(false)
@@ -184,7 +196,13 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
 
   const handleClockOut = async () => {
     if (!validationResult?.valid || !validationResult.qrData) return
+    await submitClockOut(validationResult.qrData)
+  }
 
+  const submitClockOut = async (clockOutData: QRCodeData) => {
+    if (submittingRef.current) return
+    submittingRef.current = true
+    let succeeded = false
     setIsProcessing(true)
     setError(null)
 
@@ -211,13 +229,14 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
 
       // Process the clock out
       const result = await QRService.processQRScan(
-        validationResult.qrData,
+        clockOutData,
         cleanerId,
         cleanerName,
         location
       )
 
       if (result.success) {
+        succeeded = true
         // Finalize and clear any persisted drafts so we don't auto-resume tasks
         try { await QRService.finalizeRemoteDraft(cleanerId) } catch {}
         try { await clearDraft() } catch {}
@@ -250,11 +269,26 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
     } catch (err) {
       console.error('Error during clock out:', err)
       setError('An error occurred while clocking out.')
-      reportFailure(`Clock-out threw: ${err instanceof Error ? err.message : String(err)}`, validationResult.qrData)
+      reportFailure(`Clock-out threw: ${err instanceof Error ? err.message : String(err)}`, clockOutData)
     } finally {
+      // Stay locked after a success: a straggling scan callback must not
+      // clock out a second time. Only a failure may be retried.
+      if (!succeeded) submittingRef.current = false
       setIsProcessing(false)
     }
   }
+
+  useEffect(() => {
+    if (!pendingQrData) return
+    setValidationResult({
+      valid: true,
+      message: 'Clock Out code found. Clocking you out…',
+      qrData: pendingQrData
+    })
+    void submitClockOut(pendingQrData)
+    // Run once for the code handed over on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   if (hasPermission === null) {
     return (
@@ -426,7 +460,7 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
                   ) : (
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-5 h-5" />
-                      Confirm Clock Out
+                      {error ? 'Try Clock Out Again' : 'Clock Out'}
                     </div>
                   )}
                 </Button>

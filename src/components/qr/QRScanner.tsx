@@ -5,6 +5,8 @@ import QrScanner from 'qr-scanner'
 import { QRService, QRCodeData } from '../../services/qrService'
 import { ClockOutValidator } from './ClockOutValidator'
 import { hasOpenClockInToday } from '../../services/attendanceService'
+import { reportClockFailure } from '../../services/clockFailureService'
+import { describeWrongQrType, isClockCode } from '../../lib/wrongQrType'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Alert, AlertDescription } from '../ui/alert'
@@ -22,6 +24,8 @@ interface QRScannerProps {
   onClockOutSuccess?: () => void
   // When true, bypass logging and return the raw QR payload for admin testing
   previewMode?: boolean
+  // Offer a real code of a disallowed type to the parent; return true if it took it
+  onWrongType?: (data: QRCodeData) => boolean
 }
 
 export const QRScanner: React.FC<QRScannerProps> = ({
@@ -32,7 +36,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   allowedTypes,
   showClockOutOption,
   onClockOutSuccess,
-  previewMode = false
+  previewMode = false,
+  onWrongType
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [qrScanner, setQrScanner] = useState<QrScanner | null>(null)
@@ -49,6 +54,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   const [isProcessing, setIsProcessing] = useState(false)
   const processingRef = useRef(false)
   const lastScanCodeRef = useRef<{ code: string; time: number } | null>(null)
+  // One failure record per code per 30s; the camera decodes several times a second.
+  const wrongTypeReportRef = useRef<{ key: string; at: number } | null>(null)
   const [wrongType, setWrongType] = useState<QRCodeData['type'] | null>(null)
   const [showClockOut, setShowClockOut] = useState(false)
   const [hasHandledSuccess, setHasHandledSuccess] = useState(false)
@@ -56,9 +63,16 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   const navigate = useNavigate()
   const [clockInRequired, setClockInRequired] = useState(false)
 
+  // The decode callback is created once in startScanning, so it only ever saw
+  // the qrScanner state from before the scanner existed (null): stopping from
+  // inside it did nothing and the camera kept firing. The ref is always current.
+  const scannerRef = useRef<QrScanner | null>(null)
+
   const stopScanning = useCallback(() => {
-    if (qrScanner) {
-      qrScanner.stop()
+    const scanner = scannerRef.current ?? qrScanner
+    if (scanner) {
+      scanner.stop()
+      scannerRef.current = null
       setQrScanner(null)
     }
     setIsScanning(false)
@@ -223,10 +237,31 @@ export const QRScanner: React.FC<QRScannerProps> = ({
 
             // Enforce type restrictions after canonical resolution.
             if (allowedTypes && !allowedTypes.includes(qrData.type)) {
-              setWrongType(qrData.type)
-              setTimeout(() => setWrongType(null), 1200)
+              // Let this code be retried after ~1.5s instead of swallowing it
+              // for 10s (a dead scanner), without re-running on every frame.
+              lastScanCodeRef.current = { code: result.data, time: now - 10000 + 1500 }
               processingRef.current = false
               setIsProcessing(false)
+              if (onWrongType?.(qrData)) {
+                stopScanning()
+                return
+              }
+              setWrongType(qrData.type)
+              setTimeout(() => setWrongType(null), 4000)
+              const lastReport = wrongTypeReportRef.current
+              const reportKey = `${qrData.type}:${qrData.id}`
+              const recentlyReported =
+                lastReport && lastReport.key === reportKey && now - lastReport.at < 30_000
+              if (!previewMode && isClockCode(qrData.type) && !recentlyReported) {
+                wrongTypeReportRef.current = { key: reportKey, at: now }
+                void reportClockFailure({
+                  eventType: qrData.type === 'CLOCK_IN' ? 'clock_in' : 'clock_out',
+                  reason: `Scanned on the wrong screen: ${describeWrongQrType(qrData.type, allowedTypes)}`,
+                  cleanerName,
+                  qrCodeId: qrData.id,
+                  customerName: qrData.customerName ?? null,
+                })
+              }
               return
             }
 
@@ -335,6 +370,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
       )
 
       await scanner.start()
+      scannerRef.current = scanner
       setQrScanner(scanner)
       
     } catch (err) {
@@ -482,7 +518,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
           {wrongType && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2">
               <div className="px-3 py-1 rounded-full bg-warning/10 text-warning text-xs font-medium border border-warning/30 shadow-sm">
-                Wrong QR type • need {allowedTypes?.join(' / ')}
+                {describeWrongQrType(wrongType, allowedTypes ?? [])}
               </div>
             </div>
           )}

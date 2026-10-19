@@ -44,6 +44,7 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
   const [completedAreas, setCompletedAreas] = useState<CompletedArea[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [initialTaskState, setInitialTaskState] = useState<any | null>(null)
+  const [pendingClockOut, setPendingClockOut] = useState<QRCodeData | null>(null)
   const getStoredSiteName = useCallback(() => {
     if (typeof window === 'undefined') return undefined
     return localStorage.getItem('currentSiteName') || undefined
@@ -172,7 +173,17 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
   }
 
   const handleClockOutStart = () => {
+    setPendingClockOut(null)
     setCurrentStep('clock_out')
+  }
+
+  // Scanning the Clock Out code from the area scanner used to be rejected as
+  // the wrong type and record nothing; treat it as what the cleaner meant.
+  const handleNonAreaScan = (qrData: QRCodeData): boolean => {
+    if (QRService.normalizeQrType(qrData.type) !== 'CLOCK_OUT') return false
+    setPendingClockOut({ ...qrData, type: 'CLOCK_OUT' })
+    setCurrentStep('clock_out')
+    return true
   }
 
   const handleClockOutSuccess = () => {
@@ -343,6 +354,7 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
             cleanerId={cleanerId}
             cleanerName={cleanerName}
             onScanSuccess={handleAreaScan}
+            onWrongType={handleNonAreaScan}
             allowedTypes={['AREA']}
           />
         </div>
@@ -498,7 +510,11 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
           cleanerId={cleanerId}
           cleanerName={cleanerName}
           onClockOutSuccess={handleClockOutSuccess}
-          onCancel={() => setCurrentStep('next_action')}
+          onCancel={() => {
+            setPendingClockOut(null)
+            setCurrentStep('next_action')
+          }}
+          pendingQrData={pendingClockOut}
         />
       </div>
     )
