@@ -203,6 +203,8 @@ create index if not exists clock_event_failures_created_at_idx
   on public.clock_event_failures (created_at desc);
 
 alter table public.clock_event_failures enable row level security;
+revoke all on public.clock_event_failures from anon;
+grant select, insert on public.clock_event_failures to authenticated;
 
 drop policy if exists "Staff record own clock failures" on public.clock_event_failures;
 create policy "Staff record own clock failures" on public.clock_event_failures
