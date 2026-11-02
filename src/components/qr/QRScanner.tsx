@@ -1,7 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Camera, QrCode, AlertCircle, CheckCircle2, Clock } from 'lucide-react'
+import { Camera, QrCode, AlertCircle, CheckCircle2, Clock, SwitchCamera } from 'lucide-react'
 import QrScanner from 'qr-scanner'
+import {
+  activeCameraId,
+  applyContinuousFocus,
+  nextCameraId,
+  pickScanCamera,
+  SCAN_CAMERA_STORAGE_KEY,
+  type CameraOption,
+} from '@/lib/cameraChoice'
 import { QRService, QRCodeData } from '../../services/qrService'
 import { ClockOutValidator } from './ClockOutValidator'
 import { hasOpenClockInToday } from '../../services/attendanceService'
@@ -62,6 +70,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   const handledSuccessRef = useRef(false)
   const navigate = useNavigate()
   const [clockInRequired, setClockInRequired] = useState(false)
+  const [cameras, setCameras] = useState<CameraOption[]>([])
+  const [cameraId, setCameraId] = useState<string | null>(null)
 
   // The decode callback is created once in startScanning, so it only ever saw
   // the qrScanner state from before the scanner existed (null): stopping from
@@ -154,6 +164,20 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         qrScanner.destroy()
         setQrScanner(null)
       }
+
+      // Labels are only readable once camera permission is granted, which the
+      // permission screen above guarantees before this button exists.
+      const availableCameras = await QrScanner.listCameras(true).catch(() => [] as CameraOption[])
+      const rememberedCamera = (() => {
+        try {
+          return localStorage.getItem(SCAN_CAMERA_STORAGE_KEY)
+        } catch {
+          return null
+        }
+      })()
+      const chosenCamera = pickScanCamera(availableCameras, rememberedCamera)
+      setCameras(availableCameras)
+      setCameraId(chosenCamera)
 
       const scanner = new QrScanner(
         videoRef.current,
@@ -366,10 +390,14 @@ export const QRScanner: React.FC<QRScannerProps> = ({
           returnDetailedScanResult: true,
           highlightScanRegion: true,
           highlightCodeOutline: true,
+          preferredCamera: chosenCamera ?? 'environment',
         }
       )
 
       await scanner.start()
+      await applyContinuousFocus(videoRef.current)
+      // When the browser chose, "switch" has to start from what it chose.
+      setCameraId(activeCameraId(videoRef.current) ?? chosenCamera)
       scannerRef.current = scanner
       setQrScanner(scanner)
       
@@ -377,6 +405,27 @@ export const QRScanner: React.FC<QRScannerProps> = ({
       console.error('Error starting QR scanner:', err)
       setError('Failed to start camera. Please check your camera permissions.')
       setIsScanning(false)
+    }
+  }
+
+  // Way out for any phone whose first-choice lens still can't read the code:
+  // cycle through the cameras, and remember the one that was picked.
+  const switchCamera = async () => {
+    const scanner = scannerRef.current
+    const next = nextCameraId(cameras, cameraId)
+    if (!scanner || !next) return
+    try {
+      await scanner.setCamera(next)
+      await applyContinuousFocus(videoRef.current)
+      setCameraId(next)
+      try {
+        localStorage.setItem(SCAN_CAMERA_STORAGE_KEY, next)
+      } catch {
+        // Not remembering the choice is fine; it still applies now.
+      }
+    } catch (err) {
+      console.error('Failed to switch camera:', err)
+      setError('Could not switch camera. Try stopping and starting the scan again.')
     }
   }
 
@@ -551,13 +600,25 @@ export const QRScanner: React.FC<QRScannerProps> = ({
             Start scanning
           </Button>
         ) : (
-          <Button 
-            onClick={stopScanning} 
-            variant="destructive" 
-            className="w-full rounded-full py-6 text-lg font-semibold"
-          >
-            Stop Scanning
-          </Button>
+          <>
+            {cameras.length > 1 && (
+              <Button
+                variant="outline"
+                onClick={switchCamera}
+                className="w-full rounded-full py-5 font-semibold"
+              >
+                <SwitchCamera className="h-5 w-5 mr-3" />
+                Not scanning? Switch camera
+              </Button>
+            )}
+            <Button 
+              onClick={stopScanning} 
+              variant="destructive" 
+              className="w-full rounded-full py-6 text-lg font-semibold"
+            >
+              Stop Scanning
+            </Button>
+          </>
         )}
 
         {showClockOutOption && (
