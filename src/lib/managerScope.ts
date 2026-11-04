@@ -2,7 +2,6 @@ import { supabase } from '../services/supabase'
 
 type ManagerCustomerScope = {
   managerIds?: string[]
-  managerNames?: string[]
   customerTokens: string[]
 }
 
@@ -81,14 +80,16 @@ const normalizeValue = (value?: string | null) => (value ? value.trim().toLowerC
 const uniqueTokens = (tokens: string[]) =>
   Array.from(new Set(tokens.map((token) => normalizeValue(token)).filter(Boolean)))
 
+/**
+ * Scope is resolved by login id only. Display names are user-editable, so they
+ * must never widen what a client login can see. The second parameter is kept
+ * so existing callers compile; it is ignored.
+ */
 export const resolveManagerCustomerScope = (
   managerId?: string | null,
-  managerName?: string | null,
+  _managerName?: string | null,
 ): string[] => {
   const id = normalizeValue(managerId ?? undefined)
-  const name = normalizeValue(managerName ?? undefined) || normalizeValue(
-    typeof window !== 'undefined' ? localStorage.getItem('userName') : undefined,
-  )
 
   const tokens: string[] = []
 
@@ -100,21 +101,8 @@ export const resolveManagerCustomerScope = (
     }
   }
 
-  const matchesScope = (scope: ManagerCustomerScope) => {
-    if (id && scope.managerIds?.some((candidate) => normalizeValue(candidate) === id)) {
-      return true
-    }
-    if (
-      name &&
-      scope.managerNames?.some((candidate) => {
-        const normalizedCandidate = normalizeValue(candidate)
-        return normalizedCandidate ? name.includes(normalizedCandidate) : false
-      })
-    ) {
-      return true
-    }
-    return false
-  }
+  const matchesScope = (scope: ManagerCustomerScope) =>
+    Boolean(id && scope.managerIds?.some((candidate) => normalizeValue(candidate) === id))
 
   for (const scope of MANAGER_CUSTOMER_SCOPES) {
     if (matchesScope(scope)) {
@@ -139,6 +127,52 @@ export const buildCustomerScopeMatcher = (scopeTokens: string[]) => {
       return normalizedTokens.some((token) => normalizedField.includes(token))
     })
   }
+}
+
+export type ManagerSiteLink = {
+  customerId: string | null
+  /** Lowercased customer label, as admin_list_manager_customer_scopes derives it. */
+  label: string
+  tokens: string[]
+}
+
+export type ManagerSiteLinks = {
+  links: ManagerSiteLink[]
+  /**
+   * False when the scope RPC gave no answer. Then an empty `links` means
+   * "unknown", not "nothing linked", and the caller must not say otherwise.
+   */
+  loaded: boolean
+}
+
+/**
+ * The customers linked to ONE manager id, for views that must fail closed.
+ *
+ * Unlike resolveManagerCustomerScope this matches by id only, never by display
+ * name (a manager called "James" at another client would otherwise inherit
+ * PSM), and returns an empty list, not a wildcard, when nothing is linked.
+ * A failed hydrate is retried once rather than trusted from the cache.
+ */
+export const resolveManagerSiteLinks = async (managerId?: string | null): Promise<ManagerSiteLinks> => {
+  const id = normalizeValue(managerId ?? undefined)
+  if (!id) return { links: [], loaded: true }
+
+  // hydrateManagerScopes never caches a failure, so a second call is a real retry.
+  const loaded = (await hydrateManagerScopes()) || (await hydrateManagerScopes())
+
+  const links: ManagerSiteLink[] = dbScopes
+    .filter((row) => row.manager_id.toLowerCase() === id)
+    .map((row) => ({ customerId: row.customer_id ?? null, label: row.customer_label, tokens: [row.customer_label] }))
+
+  const covered = new Set(links.map((link) => link.label))
+  MANAGER_CUSTOMER_SCOPES.forEach((scope) => {
+    if (!scope.managerIds?.some((candidate) => normalizeValue(candidate) === id)) return
+    const tokens = uniqueTokens(scope.customerTokens)
+    if (!tokens.length || tokens.some((token) => covered.has(token))) return
+    links.push({ customerId: null, label: tokens[0], tokens })
+  })
+
+  return { links, loaded }
 }
 
 export const resolveManagerIdsForCustomer = (customerLabel?: string | null): string[] => {

@@ -32,6 +32,7 @@ import UsersPage from "./pages/UsersPage";
 import DashboardAccessPage from "./pages/DashboardAccessPage";
 import AdminLiveDashboardPage from "./pages/AdminLiveDashboardPage";
 import CleanerSchedulePage from "./pages/CleanerSchedulePage";
+import SiteDashboardPage from "./pages/SiteDashboardPage";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +61,7 @@ const App = () => (
           <Route path="/manager-dashboard" element={<RequireAuth roles={["manager", "ops_manager", "admin"]}><ManagerDashboardPage /></RequireAuth>} />
           <Route path="/ops-dashboard" element={<RequireAuth roles={["ops_manager", "admin"]}><ManagerDashboardPage /></RequireAuth>} />
           <Route path="/ops-calendar" element={<RequireAuth roles={["ops_manager", "admin"]}><OpsCalendarPage /></RequireAuth>} />
+          <Route path="/site-dashboard" element={<RequireAuth roles={["manager", "ops_manager", "admin"]}><SiteDashboardPage /></RequireAuth>} />
           <Route path="/manager-activity" element={<RequireAuth roles={["manager", "ops_manager", "admin"]}><ManagerActivityPage /></RequireAuth>} />
           <Route path="/admin-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="/analytics" element={<RequireAuth roles={["manager", "ops_manager", "admin"]}><AnalyticsPage /></RequireAuth>} />
