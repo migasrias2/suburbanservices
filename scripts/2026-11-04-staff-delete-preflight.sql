@@ -3,6 +3,7 @@
 --   supabase/migrations/20261104120000_retire_manager_delete_cleaner.sql
 --   supabase/migrations/20261104120100_block_non_admin_staff_deletes.sql
 --   supabase/migrations/20261104120150_customer_scope_aliases.sql
+--   supabase/migrations/20261104120160_merge_psm_qr_labels.sql
 --   supabase/migrations/20261104120200_scope_client_manager_reads.sql
 --   supabase/migrations/20261104120300_scope_client_manager_cleaner_directory.sql
 --   supabase/migrations/20261104120400_close_open_delete_functions.sql
