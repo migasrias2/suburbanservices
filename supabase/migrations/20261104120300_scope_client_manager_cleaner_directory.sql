@@ -10,7 +10,7 @@
 --   * linked to it in manager_cleaners (the dashboard roster), or
 --   * linked to one of its clients in cleaner_customers, or
 --   * with a time_attendance row whose customer_name/site_name names one of its
---     clients, or
+--     clients (whole-word match, as in part 3), or
 --   * with a uk_cleaner_task_selections row on one of its clients' QR codes.
 -- Plus its own row, if it has one. Everyone else is unaffected: the policy is
 -- RESTRICTIVE and its first branch is a once-per-query constant for them.
