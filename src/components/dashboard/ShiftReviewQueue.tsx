@@ -13,10 +13,14 @@ function formatDateTime(iso: string | null) {
   return new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-/** Where the picker starts: two hours after the clock-in, never in the future. */
-function defaultFinish(clockIn: string | null): Date {
-  const start = clockIn ? new Date(clockIn).getTime() : Date.now()
-  return new Date(Math.min(start + 2 * 3600_000, Date.now()))
+/**
+ * Where the picker starts. A correction starts from the recorded finish. A
+ * missing clock-out starts empty: pre-filling a guess (it used to be clock-in
+ * + 2h) meant the guess got saved as real hours and paid.
+ */
+function initialFinish(shift: ReviewShift): Date | null {
+  if (shift.clockOutMissing || !shift.clockOut) return null
+  return new Date(shift.clockOut)
 }
 
 interface ShiftReviewQueueProps {
@@ -34,7 +38,7 @@ export function ShiftReviewQueue({ shifts, onChanged }: ShiftReviewQueueProps) {
 
   const startEditing = (shift: ReviewShift) => {
     setEditingId(shift.id)
-    setFinish(defaultFinish(shift.clockIn))
+    setFinish(initialFinish(shift))
   }
 
   const save = async (shift: ReviewShift) => {
@@ -95,9 +99,14 @@ export function ShiftReviewQueue({ shifts, onChanged }: ShiftReviewQueueProps) {
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="flex-1">
                   <DateTimeField id={`finish-${s.id}`} value={finish} onChange={setFinish} />
+                  {s.clockOutMissing && s.clockOut ? (
+                    <p className="mt-1 px-1 text-xs text-muted-foreground">
+                      Last recorded activity: {formatDateTime(s.clockOut)}. Check with the cleaner before saving.
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm" className="h-11 rounded-full sm:h-9" disabled={saving} onClick={() => save(s)}>
+                  <Button size="sm" className="h-11 rounded-full sm:h-9" disabled={saving || !finish} onClick={() => save(s)}>
                     {saving ? 'Saving…' : 'Save finish time'}
                   </Button>
                   <Button size="sm" variant="ghost" className="h-11 rounded-full sm:h-9" disabled={saving} onClick={() => setEditingId(null)}>
