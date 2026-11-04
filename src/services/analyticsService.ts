@@ -286,17 +286,15 @@ const buildCleanerScope = async (managerId: string | undefined | null, role: Ana
   if (isGlobalRole) {
     roster = await fetchAllCleaners()
   } else {
+    // A client login with no linked cleaners gets an empty roster that matches
+    // nothing -- never the whole company.
     scopedCleanerIds = await fetchManagerCleanerIds(managerId ?? '')
-    if (scopedCleanerIds.length) {
-      roster = await fetchCleanersByIds(scopedCleanerIds)
-    } else {
-      roster = await fetchAllCleaners()
-    }
+    roster = await fetchCleanersByIds(scopedCleanerIds)
   }
 
   roster = ensureUniqueCleanerSummaries(roster)
 
-  const restrictToManaged = !isGlobalRole && scopedCleanerIds.length > 0
+  const restrictToManaged = !isGlobalRole
   const cleanerIdSet = new Set(scopedCleanerIds.filter(Boolean))
   const numericCleanerIdSet = new Set(
     scopedCleanerIds
@@ -339,8 +337,35 @@ const buildCleanerScope = async (managerId: string | undefined | null, role: Ana
     roster,
     matchesCleanerScope,
     restrictToManaged,
+    hasNoCleaners: !isGlobalRole && scopedCleanerIds.length === 0,
   }
 }
+
+const emptySnapshot = (day: Date, isCurrentDay: boolean): DashboardSnapshot => ({
+  date: day.toISOString(),
+  isCurrentDay,
+  cleanersOnline: isCurrentDay ? 0 : null,
+  areasCleaned: 0,
+  photosTaken: 0,
+  hoursWorked: 0,
+  attendanceCount: 0,
+  hoursBreakdown: [],
+})
+
+const emptyAnalyticsSummary = (): AnalyticsSummary => ({
+  roster: [],
+  totals: {
+    complianceRate: null,
+    onTimeRate: null,
+    photoComplianceRate: null,
+    totalHoursWorked: 0,
+  },
+  trend: [],
+  onTimeByCleaner: [],
+  taskCompletionByArea: [],
+  photoComplianceBreakdown: { withPhoto: 0, withoutPhoto: 0 },
+  hoursByDate: [],
+})
 
 export async function fetchDashboardSnapshot({
   managerId,
@@ -355,6 +380,12 @@ export async function fetchDashboardSnapshot({
   const { start, end } = toDayBounds(dayIso)
 
   const scope = await buildCleanerScope(managerId ?? undefined, role)
+  // An empty customer scope means "every client" to the matcher, so a client
+  // login without one, or without cleaners, must stop here.
+  const isGlobalRole = role === 'admin' || role === 'ops_manager'
+  if (scope.hasNoCleaners || (!isGlobalRole && !customerScope.length)) {
+    return emptySnapshot(day, isCurrentDay)
+  }
   const matchesScope = buildCustomerScopeMatcher(customerScope)
 
   let allowedQrCodeIds: Set<string> | null = null
@@ -511,18 +542,17 @@ export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAna
     cleanerIds = roster.map((cleaner) => cleaner.id)
   } else {
     managerScopedCleanerIds = await fetchManagerCleanerIds(managerId ?? '')
-    if (managerScopedCleanerIds.length) {
-      roster = await fetchCleanersByIds(managerScopedCleanerIds)
-      cleanerIds = managerScopedCleanerIds
-    } else {
-      roster = await fetchAllCleaners()
-      cleanerIds = roster.map((cleaner) => cleaner.id)
+    // No linked cleaners means nothing to report, not the whole company.
+    if (!managerScopedCleanerIds.length) {
+      return emptyAnalyticsSummary()
     }
+    roster = await fetchCleanersByIds(managerScopedCleanerIds)
+    cleanerIds = managerScopedCleanerIds
   }
 
   roster = ensureUniqueCleanerSummaries(roster)
 
-  const restrictToManagedCleaners = !isGlobalRole && managerScopedCleanerIds.length > 0
+  const restrictToManagedCleaners = !isGlobalRole
   const filterCleanerIds = restrictToManagedCleaners ? managerScopedCleanerIds : []
   const cleanerIdSet = new Set(filterCleanerIds.filter(Boolean))
   const numericCleanerIds = filterCleanerIds

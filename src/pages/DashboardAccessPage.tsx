@@ -165,13 +165,13 @@ export default function DashboardAccessPage() {
           description="Choose a client, then decide which accounts can see its dashboard."
         />
         <div className="mb-6 sm:mb-8">
-          {/* Scope resolution fails open: buildCustomerScopeMatcher() matches
-              everything when an account has no assignments at all. Removing an
-              account's last assignment therefore widens its view rather than
-              narrowing it, which is the opposite of what "Remove" implies. */}
+          {/* Since FLAREN-109 (2026-11-04) client logins fail closed: with no
+              assignment, or no linked cleaners, ManagerAccessGate shows an
+              explanation instead of data. Ops managers and admins are global. */}
           <p className="rounded-2xl bg-warning/10 px-4 py-3 text-sm text-warning">
-            An account with no assignments at all currently sees every client. Removing
-            someone&rsquo;s last assignment widens their view instead of narrowing it.
+            A client login with no assignment sees nothing until it is assigned here. It also
+            needs at least one linked cleaner; cleaners are linked automatically the first time
+            they clock in at that client&rsquo;s site. Ops managers and admins see every client.
           </p>
         </div>
 

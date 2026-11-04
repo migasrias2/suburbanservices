@@ -3,6 +3,7 @@ import { createPortal } from "react-dom"
 import { useNavigate } from "react-router-dom"
 
 import { Sidebar07Layout } from "@/components/layout/Sidebar07Layout"
+import { ManagerAccessGate } from "@/components/dashboard/ManagerAccessGate"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
@@ -319,6 +320,8 @@ export default function ManagerActivityPage() {
 
   return (
     <Sidebar07Layout userType={role} userName={managerName}>
+      <ManagerAccessGate role={role} managerId={managerId} managerName={managerName}>
+        {() => (
       <div className="space-y-8">
         <div className="text-left">
           <h1 className="text-3xl font-semibold text-foreground">Recent Cleaner Activity</h1>
@@ -349,6 +352,8 @@ export default function ManagerActivityPage() {
           </CardContent>
         </Card>
       </div>
+        )}
+      </ManagerAccessGate>
       {photoPreviewOverlay}
     </Sidebar07Layout>
   )

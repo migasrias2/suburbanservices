@@ -27,16 +27,24 @@ type DbScopeRow = {
 }
 
 const dbScopes: DbScopeRow[] = []
-let hydratePromise: Promise<void> | null = null
+let hydratePromise: Promise<boolean> | null = null
 
-export const hydrateManagerScopes = async (): Promise<void> => {
+/**
+ * Loads the DB-backed client scopes. Resolves true once they are loaded and
+ * false when the lookup failed.
+ *
+ * A failure is not cached: the next caller tries again. Scopes are how a client
+ * login is fenced in, so "we never heard back" must stay distinguishable from
+ * "this login has no clients" -- callers fail closed on false.
+ */
+export const hydrateManagerScopes = async (): Promise<boolean> => {
   if (hydratePromise) return hydratePromise
-  hydratePromise = (async () => {
+  const attempt = (async (): Promise<boolean> => {
     try {
       const { data, error } = await supabase.rpc('admin_list_manager_customer_scopes')
       if (error) {
-        console.warn('hydrateManagerScopes: RPC failed, using hardcoded fallback only', error.message)
-        return
+        console.warn('hydrateManagerScopes: RPC failed', error.message)
+        return false
       }
       dbScopes.length = 0
       for (const row of (data ?? []) as DbScopeRow[]) {
@@ -48,11 +56,18 @@ export const hydrateManagerScopes = async (): Promise<void> => {
           })
         }
       }
+      return true
     } catch (err) {
       console.warn('hydrateManagerScopes: unexpected error', err)
+      return false
     }
   })()
-  return hydratePromise
+  hydratePromise = attempt
+  const loaded = await attempt
+  if (!loaded && hydratePromise === attempt) {
+    hydratePromise = null
+  }
+  return loaded
 }
 
 export const invalidateManagerScopes = () => {

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sidebar07Layout } from '@/components/layout/Sidebar07Layout'
 import { AnalyticsDashboard } from '@/components/analytics/AnalyticsDashboard'
+import { ManagerAccessGate } from '@/components/dashboard/ManagerAccessGate'
 import { getStoredCleanerName } from '@/lib/identity'
 
 const AnalyticsPage: React.FC = () => {
@@ -36,7 +37,9 @@ const AnalyticsPage: React.FC = () => {
 
   return (
     <Sidebar07Layout userType={role} userName={userName}>
-      <AnalyticsDashboard managerId={role === 'manager' ? userId : null} role={role} />
+      <ManagerAccessGate role={role} managerId={userId} managerName={userName}>
+        {() => <AnalyticsDashboard managerId={role === 'manager' ? userId : null} role={role} />}
+      </ManagerAccessGate>
     </Sidebar07Layout>
   )
 }
