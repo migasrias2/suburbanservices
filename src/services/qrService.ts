@@ -1510,6 +1510,8 @@ export class QRService {
         .insert({
           cleaner_id: cleanerId,
           site_id: siteId,
+          // Lets a client login's site-scoped read policy place the row.
+          customer_name: customerLabel,
           event_type: eventType,
           is_active: eventType === 'clock_in'
         })

@@ -32,19 +32,28 @@ const AnalyticsContent: React.FC<{ summary: AnalyticsSummary }> = ({ summary }) 
 export type AnalyticsDashboardProps = {
   managerId: string | null
   role: AnalyticsRole
+  /** Client tokens for a client login (from ManagerAccessGate). */
+  customerScope?: string[]
 }
 
-export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ managerId, role }) => {
+const NO_CUSTOMER_SCOPE: string[] = []
+
+export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
+  managerId,
+  role,
+  customerScope = NO_CUSTOMER_SCOPE,
+}) => {
   const [range, setRange] = useState<DateRange>(defaultAnalyticsRange())
   const isoRange = useMemo(() => toIsoRange(range), [range])
 
   const query = useQuery({
-    queryKey: ['analytics-summary', role, managerId, isoRange.start, isoRange.end],
+    queryKey: ['analytics-summary', role, managerId, customerScope.join('|'), isoRange.start, isoRange.end],
     queryFn: () =>
       fetchAnalyticsSummary({
         managerId,
         role,
         range: isoRange,
+        customerScope,
       }),
   })
 

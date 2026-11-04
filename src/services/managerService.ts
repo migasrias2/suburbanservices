@@ -1,6 +1,7 @@
 import { normalizeCleanerName, normalizeCleanerNumericId } from '../lib/identity'
 import {
   buildCustomerScopeMatcher,
+  hydrateManagerScopes,
   resolveManagerCustomerScope,
   resolveManagerIdsForCustomer,
 } from '../lib/managerScope'
@@ -36,26 +37,26 @@ export async function fetchManagerCleanerIds(managerId: string): Promise<string[
     return []
   }
 
-  try {
-    const { data, error } = await supabase
-      .from('manager_cleaners')
-      .select('cleaner_id')
-      .eq('manager_id', managerId)
+  const { data, error } = await supabase
+    .from('manager_cleaners')
+    .select('cleaner_id')
+    .eq('manager_id', managerId)
 
-    if (error) {
-      console.error('Failed to load manager_cleaners mapping', error)
-      throw error
-    }
+  // A failed lookup is not "no cleaners". It used to fall through to the
+  // hardcoded fallbacks and then, in every caller, to the full roster — so a
+  // flaky request showed a client login every cleaner in the company. Callers
+  // must treat the error as "show nothing".
+  if (error) {
+    console.error('Failed to load manager_cleaners mapping', error)
+    throw error
+  }
 
-    const ids = (data ?? [])
-      .map((row) => row.cleaner_id)
-      .filter((cleanerId): cleanerId is string => Boolean(cleanerId))
+  const ids = (data ?? [])
+    .map((row) => row.cleaner_id)
+    .filter((cleanerId): cleanerId is string => Boolean(cleanerId))
 
-    if (ids.length > 0) {
-      return ids
-    }
-  } catch (error) {
-    console.warn('Falling back to manual cleaner mapping', error)
+  if (ids.length > 0) {
+    return ids
   }
 
   // DEFERRED — decided 2026-08-26, not yet implemented.
@@ -104,71 +105,6 @@ export async function fetchAllCleaners(): Promise<CleanerSummary[]> {
   }
 
   return (data ?? []) as CleanerSummary[]
-}
-
-type DeleteCleanerOptions = {
-  cleanerId: string
-  cleanerName?: string | null
-}
-
-type DeleteCleanerSummary = Record<string, number>
-
-export async function deleteCleaner({ cleanerId, cleanerName }: DeleteCleanerOptions): Promise<{
-  summary: DeleteCleanerSummary
-}> {
-  const trimmedId = typeof cleanerId === 'string' ? cleanerId.trim() : ''
-
-  if (!trimmedId) {
-    throw new Error('Cleaner ID is required to delete a cleaner record')
-  }
-
-  const normalizedCleanerName = cleanerName ? normalizeCleanerName(cleanerName) : null
-
-  const { data, error } = await supabase.rpc('manager_delete_cleaner', {
-    p_cleaner_identifier: trimmedId,
-    p_cleaner_name: normalizedCleanerName ?? null,
-  })
-
-  if (error) {
-    console.error('manager_delete_cleaner RPC failed', error)
-    throw error
-  }
-
-  const summary: DeleteCleanerSummary = {}
-
-  if (data && typeof data === 'object' && !Array.isArray(data)) {
-    for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-      if (typeof value === 'number') {
-        summary[key] = value
-      } else if (typeof value === 'string') {
-        const parsed = Number(value)
-        if (!Number.isNaN(parsed)) {
-          summary[key] = parsed
-        }
-      }
-    }
-  }
-
-  return { summary }
-}
-
-export async function resolveManagerCleanerRoster(managerId?: string | null): Promise<CleanerSummary[]> {
-  const scopedManagerId = managerId ?? ''
-
-  if (!scopedManagerId) {
-    return fetchAllCleaners()
-  }
-
-  try {
-    const cleanerIds = await fetchManagerCleanerIds(scopedManagerId)
-    if (!cleanerIds.length) {
-      return fetchAllCleaners()
-    }
-    return fetchCleanersByIds(cleanerIds)
-  } catch (error) {
-    console.warn('Falling back to full cleaner roster', error)
-    return fetchAllCleaners()
-  }
 }
 
 export type ManagerActivityRow = {
@@ -304,16 +240,32 @@ export async function fetchManagerRecentActivity(
   const isGlobalRole = role === 'admin' || role === 'ops_manager'
   let scopedCleanerIds: string[] = []
 
+  // A client login ('manager') sees nothing without a client scope (DB rows or
+  // a legacy hardcoded entry). Every gap here used to widen the feed to the
+  // whole company instead. A failed DB lookup still leaves the hardcoded scopes.
+  if (!isGlobalRole && !managerId) return []
+  const scopesLoaded = isGlobalRole ? true : await hydrateManagerScopes()
+  const customerScope = resolveManagerCustomerScope(managerId ?? null, null)
+  if (!isGlobalRole && !customerScope.length) {
+    if (!scopesLoaded) {
+      throw new Error("We couldn't confirm which sites this login can see. Please try again.")
+    }
+    return []
+  }
+
   if (managerId) {
     try {
       scopedCleanerIds = await fetchManagerCleanerIds(managerId)
     } catch (error) {
-      console.warn('Falling back to global cleaner activity feed', error)
+      if (!isGlobalRole) throw error
+      console.warn('Could not load the cleaner links for this account', error)
       scopedCleanerIds = []
     }
   }
 
   const trimmedCleanerIds = scopedCleanerIds.filter((id) => typeof id === 'string' && id.trim().length > 0)
+  // Legacy clients (AvTrade, PSM) have no cleaner links and are scoped by
+  // client name alone; the customer filter at the end still applies.
   const restrictToManagedCleaners = !isGlobalRole && trimmedCleanerIds.length > 0
 
   type CleanerIdentifier = {
@@ -434,7 +386,7 @@ export async function fetchManagerRecentActivity(
 
   photosBuilder = photosBuilder.gte('photo_timestamp', windowStartIso)
 
-  if (restrictToManagedCleaners && trimmedCleanerIds.length) {
+  if (restrictToManagedCleaners) {
     // Scope at the query layer so managers don't lose results to global ordering limits.
     selectionsBuilder = selectionsBuilder.in('cleaner_id', trimmedCleanerIds)
     photosBuilder = photosBuilder.in('cleaner_id', trimmedCleanerIds)
@@ -678,7 +630,6 @@ export async function fetchManagerRecentActivity(
     })
   })
 
-  const customerScope = resolveManagerCustomerScope(managerId ?? null, null)
   const matchesCustomerScope = buildCustomerScopeMatcher(customerScope)
   const scopedEntries = customerScope.length
     ? entries.filter((entry) =>
@@ -740,17 +691,3 @@ export async function autoLinkCleanerToCustomer(
 
   return managerIds
 }
-
-export async function removeCleanerFromManager(managerId: string, cleanerId: string): Promise<void> {
-  if (!managerId || !cleanerId) return
-  const { error } = await supabase
-    .from('manager_cleaners')
-    .delete()
-    .eq('manager_id', managerId)
-    .eq('cleaner_id', cleanerId)
-  if (error) {
-    console.error('Failed to remove cleaner from manager', error)
-    throw error
-  }
-}
-

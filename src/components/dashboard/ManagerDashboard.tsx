@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { format } from 'date-fns'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Image as ImageIcon, ArrowRight, Clock, MapPin, Search, ChevronDown, ChevronLeft, ChevronRight, ThumbsUp, ThumbsDown, X, CalendarDays, Trash2, Loader2 } from 'lucide-react'
+import { Image as ImageIcon, ArrowRight, Clock, MapPin, Search, ChevronDown, ChevronLeft, ChevronRight, ThumbsUp, ThumbsDown, X, CalendarDays } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '../ui/hover-card'
@@ -13,8 +13,6 @@ import { signTaskPhotoPaths } from '@/services/photoStorageService'
 import {
   fetchAllCleaners,
   fetchCleanersByIds,
-  fetchManagerCleanerIds,
-  deleteCleaner,
   fetchManagerRecentActivity,
   type CleanerSummary,
   type ManagerActivityRow,
@@ -34,6 +32,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '.
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { toast } from '@/hooks/use-toast'
 import { AssistPhotoStrip } from './AssistPhotoStrip'
+import { ManagerAccessGate } from './ManagerAccessGate'
+import type { GrantedManagerAccess } from '../../services/managerAccessService'
 
 interface ManagerDashboardProps {
   managerId: string
@@ -364,7 +364,22 @@ const DETAIL_HISTORY_WINDOW_DAYS = 180
 const DETAIL_TASK_LIMIT = 400
 const DETAIL_PHOTO_LIMIT = 2000
 
-export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, managerName, role }) => {
+interface ManagerDashboardContentProps extends ManagerDashboardProps {
+  access: GrantedManagerAccess
+}
+
+/**
+ * Client logins ('manager') only reach the dashboard once they are linked to a
+ * client and at least one cleaner; otherwise the gate shows an explanation and
+ * none of the queries below run. Admin and ops_manager pass straight through.
+ */
+export const ManagerDashboard: React.FC<ManagerDashboardProps> = (props) => (
+  <ManagerAccessGate role={props.role} managerId={props.managerId} managerName={props.managerName}>
+    {(access) => <ManagerDashboardContent {...props} access={access} />}
+  </ManagerAccessGate>
+)
+
+const ManagerDashboardContent: React.FC<ManagerDashboardContentProps> = ({ managerId, managerName, role, access }) => {
   const navigate = useNavigate()
   const [isListLoading, setIsListLoading] = useState(true)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
@@ -395,14 +410,13 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const [isAutoDate, setIsAutoDate] = useState(true)
   const [now, setNow] = useState<Date>(() => new Date())
   const [todayRefreshKey, setTodayRefreshKey] = useState(0)
-  const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null)
   const isGlobalRole = role === 'admin' || role === 'ops_manager'
   const isOpsManager = role === 'ops_manager'
   const isAssistanceEnabled = isGlobalRole || !ASSISTANCE_HIDDEN_MANAGER_IDS.has(managerId)
-  const customerScope = useMemo(
-    () => (role === 'admin' ? [] : resolveManagerCustomerScope(managerId, managerName)),
-    [managerId, managerName, role],
-  )
+  const customerScope = useMemo(() => {
+    if (access.status === 'scoped') return access.customerTokens
+    return role === 'admin' ? [] : resolveManagerCustomerScope(managerId, managerName)
+  }, [access, managerId, managerName, role])
   const matchesCustomerScope = useMemo(() => buildCustomerScopeMatcher(customerScope), [customerScope])
   const scheduledCleanerNames = useMemo(() => getCleanerNamesForSiteTokens(customerScope), [customerScope])
   const scheduledCleanerSet = useMemo(() => {
@@ -434,7 +448,6 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const [globalActivity, setGlobalActivity] = useState<ManagerActivityRow[]>([])
   const [isGlobalActivityLoading, setIsGlobalActivityLoading] = useState(false)
   const [globalActivityError, setGlobalActivityError] = useState<string | null>(null)
-  const scopedManagerId = isGlobalRole ? undefined : managerId
   const analyticsManagerId = isGlobalRole ? null : managerId
 
   const isResolvedHiddenForManager = useCallback(
@@ -480,7 +493,11 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
       setIsListLoading(true)
 
       try {
-        const cleanerIds = scopedManagerId ? await fetchManagerCleanerIds(scopedManagerId) : []
+        // A client login is filtered by its linked cleaners. Legacy clients with
+        // no cleaner links (AvTrade, PSM) load unfiltered rows that are then cut
+        // down by client name below; customerScope is never empty for them.
+        const cleanerIds = access.status === 'scoped' ? access.cleanerIds : []
+        const isCustomerOnlyScope = access.status === 'scoped' && cleanerIds.length === 0
         const cleanerRoster = cleanerIds.length
           ? await fetchCleanersByIds(cleanerIds)
           : await fetchAllCleaners()
@@ -607,6 +624,12 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
             return
           }
 
+          // Without cleaner links or a schedule, the full roster is everyone in
+          // the company; only cleaners seen at this client's site are listed.
+          if (isCustomerOnlyScope && scheduledCleanerSet.size === 0) {
+            return
+          }
+
           if (!cleanerMap.has(row.id)) {
             cleanerMap.set(row.id, {
               id: row.id,
@@ -645,7 +668,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
 
     loadCleaners()
 
-  }, [managerId, customerScope, matchesCustomerScope, matchesScheduledCleaner, scheduledCleanerSet])
+  }, [access, customerScope, matchesCustomerScope, matchesScheduledCleaner, scheduledCleanerSet])
 
   const refreshAssistRequests = useCallback(async () => {
     if (!isAssistanceEnabled) {
@@ -1015,7 +1038,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
           .lt('clock_out', endIso)
           .order('clock_out', { ascending: false })
 
-        if (!isGlobalRole && managedCleanerIds.length) {
+        if (!isGlobalRole) {
           // Use cleaner_uuid for filtering as cleaner_id is integer and managedCleanerIds are UUIDs
           clockInQuery = clockInQuery.in('cleaner_uuid', managedCleanerIds)
           clockOutQuery = clockOutQuery.in('cleaner_uuid', managedCleanerIds)
@@ -1124,13 +1147,14 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
     }
 
     if (!managerId) return
-    if (!isGlobalRole && !managedCleanerIds.length && !managedCleanerNames.length && cleaners.length) {
-      setDailyAttendance([])
-      setIsDailyAttendanceLoading(false)
+    if (!isGlobalRole && isListLoading) {
       return
     }
 
-    if (!isGlobalRole && !cleaners.length && isListLoading) {
+    // Without managed cleaner ids the query below would be unfiltered.
+    if (!isGlobalRole && !managedCleanerIds.length) {
+      setDailyAttendance([])
+      setIsDailyAttendanceLoading(false)
       return
     }
 
@@ -1686,59 +1710,6 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
   const handleCleanerSelect = (cleaner: CleanerListItem) => {
     setSelectedCleaner(cleaner)
     setIsDetailModalOpen(true)
-  }
-
-  const handleCleanerDelete = async (
-    event: React.MouseEvent<HTMLButtonElement>,
-    cleaner: CleanerListItem,
-  ) => {
-    event.stopPropagation()
-    event.preventDefault()
-
-    if (!cleaner.cleaner_id) {
-      console.warn('Cannot delete cleaner without a cleaner_id', cleaner)
-      return
-    }
-
-    const confirmed = window.confirm(`Delete ${cleaner.cleaner_name}? This action cannot be undone.`)
-    if (!confirmed) {
-      return
-    }
-
-    const cleanerId = cleaner.cleaner_id
-    setDeleteLoadingId(cleanerId)
-
-    try {
-      const { summary } = await deleteCleaner({ cleanerId, cleanerName: cleaner.cleaner_name })
-      console.info('Cleaner deletion summary', summary)
-
-      const previouslySelectedId = selectedCleaner?.cleaner_id ?? null
-      let nextSelectedCleaner: CleanerListItem | null = null
-
-      setCleaners((prev) => {
-        const updated = prev.filter((item) => item.cleaner_id !== cleanerId)
-        if (previouslySelectedId === cleanerId) {
-          nextSelectedCleaner = updated[0] ?? null
-        }
-        return updated
-      })
-
-      setSelectedCleaner((prev) => {
-        if (prev?.cleaner_id === cleanerId) {
-          return nextSelectedCleaner
-        }
-        return prev
-      })
-
-      if (previouslySelectedId === cleanerId) {
-        setIsDetailModalOpen(false)
-      }
-    } catch (error) {
-      console.error('Failed to delete cleaner', error)
-      window.alert('Unable to delete cleaner right now. Please try again.')
-    } finally {
-      setDeleteLoadingId(null)
-    }
   }
 
   const metricCards = useMemo(() => {
@@ -2365,21 +2336,6 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ managerId, m
                         <span className="font-semibold text-primary">{cleaner.cleaner_name}</span>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/60">cleaner</span>
-                          {cleaner.cleaner_id && (
-                            <button
-                              type="button"
-                              onClick={(event) => handleCleanerDelete(event, cleaner)}
-                              className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card/80 text-primary transition hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-60"
-                              aria-label={`Delete ${cleaner.cleaner_name}`}
-                              disabled={deleteLoadingId === cleaner.cleaner_id}
-                            >
-                              {deleteLoadingId === cleaner.cleaner_id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-4 w-4" />
-                              )}
-                            </button>
-                          )}
                         </div>
                       </div>
                     )

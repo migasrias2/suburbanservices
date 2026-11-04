@@ -14,8 +14,9 @@ const MANAGER_CUSTOMER_SCOPES: ManagerCustomerScope[] = [
     customerTokens: ['avtrade'],
   },
   {
+    // Matched by id only. A name match ('james') used to grant PSM's scope to
+    // any login whose display name contained it -- and names are editable.
     managerIds: ['ce2c8d1a-6e0a-4d78-9746-2cd32983455f', 'bffb28ae-5ed3-46f2-8ec9-9864fab34301'],
-    managerNames: ['james'],
     customerTokens: ['psm marine', 'psm'],
   },
 ]
@@ -27,16 +28,24 @@ type DbScopeRow = {
 }
 
 const dbScopes: DbScopeRow[] = []
-let hydratePromise: Promise<void> | null = null
+let hydratePromise: Promise<boolean> | null = null
 
-export const hydrateManagerScopes = async (): Promise<void> => {
+/**
+ * Loads the DB-backed client scopes. Resolves true once they are loaded and
+ * false when the lookup failed.
+ *
+ * A failure is not cached: the next caller tries again. Scopes are how a client
+ * login is fenced in, so "we never heard back" must stay distinguishable from
+ * "this login has no clients" -- callers fail closed on false.
+ */
+export const hydrateManagerScopes = async (): Promise<boolean> => {
   if (hydratePromise) return hydratePromise
-  hydratePromise = (async () => {
+  const attempt = (async (): Promise<boolean> => {
     try {
       const { data, error } = await supabase.rpc('admin_list_manager_customer_scopes')
       if (error) {
-        console.warn('hydrateManagerScopes: RPC failed, using hardcoded fallback only', error.message)
-        return
+        console.warn('hydrateManagerScopes: RPC failed', error.message)
+        return false
       }
       dbScopes.length = 0
       for (const row of (data ?? []) as DbScopeRow[]) {
@@ -48,11 +57,18 @@ export const hydrateManagerScopes = async (): Promise<void> => {
           })
         }
       }
+      return true
     } catch (err) {
       console.warn('hydrateManagerScopes: unexpected error', err)
+      return false
     }
   })()
-  return hydratePromise
+  hydratePromise = attempt
+  const loaded = await attempt
+  if (!loaded && hydratePromise === attempt) {
+    hydratePromise = null
+  }
+  return loaded
 }
 
 export const invalidateManagerScopes = () => {
