@@ -3,6 +3,7 @@
 --   supabase/migrations/20261104120000_retire_manager_delete_cleaner.sql
 --   supabase/migrations/20261104120100_block_non_admin_staff_deletes.sql
 --   supabase/migrations/20261104120200_scope_client_manager_reads.sql
+--   supabase/migrations/20261104120300_scope_client_manager_cleaner_directory.sql
 --
 -- It lists the live state those migrations assume. The whole script runs in a
 -- READ ONLY transaction that is rolled back, so it cannot change anything.
@@ -33,6 +34,20 @@ select
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
 where p.proname = 'manager_delete_cleaner';
+
+-- 2b. Anything else that calls manager_delete_cleaner. Migration 1 drops the
+--     function; these would start failing at run time (plpgsql bodies are not
+--     tracked as dependencies). Expect no rows.
+select
+  p.oid::regprocedure          as signature,
+  pg_get_userbyid(p.proowner)  as owner,
+  p.prosecdef                  as security_definer,
+  has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated_can_execute
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where p.prosrc ilike '%manager_delete_cleaner%'
+  and p.proname <> 'manager_delete_cleaner'
+  and n.nspname not in ('pg_catalog', 'information_schema');
 
 -- 3. Role graph around anon / authenticated / admin_executor. If authenticated
 --    is a member of a role that holds DELETE on a staff table, migration 2's
@@ -97,8 +112,9 @@ order by tablename, cmd, policyname;
 
 -- 6. Every function whose body deletes from (or truncates) a staff table, or
 --    whose name sounds destructive. Look for:
---      * security_definer = false + a staff table: migration 2 keeps that
---        table's DELETE grant (WARNING) so the flow keeps working;
+--      * security_definer = false + a staff table: migration 2 ABORTS and names
+--        it. Decide per function: make it SECURITY DEFINER, or take the table
+--        out of migration 2's list;
 --      * authenticated_can_execute = true on anything that is not admin-gated:
 --        these are other ways a client/manager login could delete staff data.
 select
@@ -125,28 +141,28 @@ where n.nspname = 'public'
   )
 order by p.prosecdef, 1;
 
--- 7. Column types migration 3 compares against (cleaner columns and the scope
---    tables). Migration 3 casts as needed, but a non-uuid value in
---    manager_cleaners.cleaner_id would make client-login reads fail loudly.
+-- 7. Columns migrations 3 and 4 place rows at a site with. Missing ones are
+--    skipped (with a WARNING). device_info must be json/jsonb for cleaner_logs
+--    to be scoped by scanned QR; building_qr_codes.customer_id is used if present.
 select c.relname as table_name, a.attname as column_name, format_type(a.atttypid, a.atttypmod) as type
 from pg_attribute a
 join pg_class c on c.oid = a.attrelid
 where c.relnamespace = 'public'::regnamespace
   and not a.attisdropped
   and (c.relname, a.attname) in (
-    ('time_attendance', 'cleaner_uuid'), ('cleaner_logs', 'cleaner_id'),
-    ('uk_cleaner_task_selections', 'cleaner_id'), ('uk_cleaner_task_photos', 'cleaner_id'),
-    ('live_tracking', 'cleaner_id'), ('bathroom_assist_requests', 'customer_name'),
-    ('bathroom_assist_requests', 'location_label'), ('manager_cleaners', 'manager_id'),
-    ('manager_cleaners', 'cleaner_id'), ('manager_customers', 'manager_id'),
-    ('manager_customers', 'customer_id'), ('uk_customers', 'id'), ('uk_customers', 'name'),
-    ('uk_customers', 'display_name')
+    ('uk_cleaner_task_selections', 'qr_code_id'), ('uk_cleaner_task_selections', 'cleaner_id'),
+    ('uk_cleaner_task_photos', 'qr_code_id'), ('uk_cleaner_task_photos', 'storage_path'),
+    ('cleaner_logs', 'qr_code_id'), ('cleaner_logs', 'device_info'),
+    ('time_attendance', 'customer_name'), ('time_attendance', 'site_name'), ('time_attendance', 'cleaner_uuid'),
+    ('bathroom_assist_requests', 'customer_name'), ('bathroom_assist_requests', 'location_label'),
+    ('live_tracking', 'customer_name'), ('live_tracking', 'site_area'), ('live_tracking', 'site_id'),
+    ('building_qr_codes', 'qr_code_id'), ('building_qr_codes', 'customer_name'), ('building_qr_codes', 'customer_id'),
+    ('manager_customers', 'manager_id'), ('manager_customers', 'customer_id'),
+    ('cleaner_customers', 'cleaner_id'), ('cleaner_customers', 'customer_id'),
+    ('uk_customers', 'id'), ('uk_customers', 'name'), ('uk_customers', 'display_name'),
+    ('cleaners', 'id'), ('managers', 'username')
   )
 order by 1, 2;
-
-select count(*) as non_uuid_cleaner_links
-from public.manager_cleaners
-where cleaner_id::text !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
 
 -- 8. The role check every policy relies on, and the scope RPC the app now
 --    REQUIRES for client logins (if a client login cannot execute it, the app
@@ -174,13 +190,15 @@ where p.pronamespace = 'public'::regnamespace
   and 'p_admin_id' = any (coalesce(p.proargnames, '{}'))
 order by 1;
 
--- 10. Client logins after this change. would_see_nothing = true means the
---     dashboard shows "This login isn't linked to a site yet" (app change) and,
---     after migration 3, the database returns nothing either. The app also
---     honours two legacy hardcoded scopes (src/lib/managerScope.ts): AvTrade
---     manager df0bf2e7-..., PSM managers ce2c8d1a-... / bffb28ae-... and any
---     manager whose name contains "james". Those count as linked in the app but
---     NOT in migration 3 unless they have manager_customers rows here.
+-- 10. Client logins after this change. In the app a client login sees the
+--     "This login isn't linked to a site yet" screen only with no client scope
+--     at all: no manager_customers rows AND no legacy hardcoded entry
+--     (src/lib/managerScope.ts: AvTrade df0bf2e7-..., PSM ce2c8d1a-... /
+--     bffb28ae-..., or a name containing "james"). Migration 3 only knows
+--     manager_customers, so:
+--       * db_reads_nothing = true: after migration 3 the database returns no
+--         site data to this login;
+--       * migration 3 ABORTS if a legacy hardcoded login has customer_links = 0.
 select
   m.id,
   coalesce(nullif(btrim(concat_ws(' ', m.first_name, m.last_name)), ''), m.username) as name,
@@ -188,35 +206,92 @@ select
   m.is_active,
   (select count(*) from public.manager_customers mc where mc.manager_id::text = m.id::text) as customer_links,
   (select count(*) from public.manager_cleaners mcl where mcl.manager_id::text = m.id::text) as cleaner_links,
-  m.id::text in ('4d1381ae-332f-4ff4-8ae3-f062dd5b487f', '6d72f75b-9baa-4577-ba92-16c1a5474f44',
-                 'bcda2a69-79ee-45e5-8ee6-c2a132beb576') as has_hardcoded_cleaner_fallback,
   m.id::text in ('df0bf2e7-1a07-4876-949c-6cfe8fe0fac6', 'ce2c8d1a-6e0a-4d78-9746-2cd32983455f',
                  'bffb28ae-5ed3-46f2-8ec9-9864fab34301') as has_hardcoded_customer_scope,
-  (
-    (select count(*) from public.manager_customers mc where mc.manager_id::text = m.id::text) = 0
-    or (
-      (select count(*) from public.manager_cleaners mcl where mcl.manager_id::text = m.id::text) = 0
-      and m.id::text not in ('4d1381ae-332f-4ff4-8ae3-f062dd5b487f', '6d72f75b-9baa-4577-ba92-16c1a5474f44',
-                             'bcda2a69-79ee-45e5-8ee6-c2a132beb576')
-    )
-  ) as would_see_nothing_in_db
+  not exists (select 1 from public.manager_customers mc where mc.manager_id::text = m.id::text) as db_reads_nothing
 from public.managers m
 where coalesce(m.role, 'manager') = 'manager'
-order by would_see_nothing_in_db desc, name;
+order by db_reads_nothing desc, name;
 
--- 11. Attendance rows from the last 90 days with no cleaner_uuid. Migration 3
---     hides these from client logins (they cannot be tied to a linked cleaner).
-select count(*) as recent_attendance_rows_without_cleaner_uuid
+-- 10b. What each client login's names resolve to: its client labels and how
+--      many QR codes match them. qr_codes = 0 means its task rows, photos and
+--      scan logs disappear for it after migration 3.
+select
+  m.username,
+  array_agg(distinct lower(btrim(label.value))) as labels,
+  (select count(*) from public.building_qr_codes q
+   where exists (
+     select 1 from public.manager_customers mc2
+     join public.uk_customers c2 on c2.id::text = mc2.customer_id::text
+     cross join lateral unnest(array[c2.name::text, c2.display_name::text]) as l2(value)
+     where mc2.manager_id::text = m.id::text
+       and nullif(btrim(l2.value), '') is not null
+       and position(lower(btrim(l2.value)) in lower(coalesce(q.customer_name::text, ''))) > 0
+   )) as qr_codes
+from public.managers m
+join public.manager_customers mc on mc.manager_id::text = m.id::text
+join public.uk_customers c on c.id::text = mc.customer_id::text
+cross join lateral unnest(array[c.name::text, c.display_name::text]) as label(value)
+where coalesce(m.role, 'manager') = 'manager'
+  and nullif(btrim(label.value), '') is not null
+group by m.id, m.username
+order by qr_codes, m.username;
+
+-- 11. Rows that cannot be placed at any site, so become invisible to client
+--     logins after migration 3 (last 90 days). Big numbers here mean the
+--     site fields are not filled in the way migration 3 assumes.
+select 'building_qr_codes without customer_name' as what, count(*) as n
+from public.building_qr_codes where nullif(btrim(customer_name::text), '') is null
+union all
+select 'time_attendance (90d) without customer_name and site_name', count(*)
 from public.time_attendance
-where cleaner_uuid is null
-  and clock_in > now() - interval '90 days';
+where clock_in > now() - interval '90 days'
+  and nullif(btrim(customer_name::text), '') is null and nullif(btrim(site_name::text), '') is null
+union all
+select 'task selections (90d) without qr_code_id', count(*)
+from public.uk_cleaner_task_selections
+where "timestamp" > now() - interval '90 days' and qr_code_id is null;
 
--- 12. Names migration 1 and 3 would create; should be empty on a first run.
+-- 11b. cleaner_logs: migration 3 places a scan log by
+--      device_info->'qr_code_scanned'->>'id'. This shows how many recent logs
+--      carry such an id, and how many of those ids exist in building_qr_codes.
+--      (Errors if device_info is not json/jsonb; see section 7.)
+select
+  count(*) as logs_7d,
+  count(*) filter (where cl.device_info -> 'qr_code_scanned' ->> 'id' is not null) as with_scanned_id,
+  count(*) filter (where exists (
+    select 1 from public.building_qr_codes q
+    where q.qr_code_id::text = cl.device_info -> 'qr_code_scanned' ->> 'id'
+  )) as scanned_id_is_known_qr
+from public.cleaner_logs cl
+where cl."timestamp" > now() - interval '7 days';
+
+-- 12. Names migrations 1, 3 and 4 create; should be empty on a first run.
 select 'table' as kind, to_regclass('backup.dropped_routines_20261104')::text as existing
 union all
 select 'function', p.oid::regprocedure::text
 from pg_proc p
 where p.pronamespace = 'public'::regnamespace
-  and p.proname in ('is_client_manager', 'client_manager_cleaner_ids', 'client_manager_sees_customer');
+  and p.proname in ('is_client_manager', 'client_manager_customer_labels', 'client_manager_labels_match',
+                    'client_manager_qr_ids', 'client_manager_visible_cleaner_ids');
+
+-- 13. Indexes the new policies lean on. Want: an index on qr_code_id for
+--     uk_cleaner_task_photos (12 GB) and uk_cleaner_task_selections. Without
+--     one, a client login's unfiltered read of photos filters by QR after
+--     whatever scan its own WHERE clause allows -- same as today.
+select tablename, indexname, indexdef
+from pg_indexes
+where schemaname = 'public'
+  and tablename in ('uk_cleaner_task_photos', 'uk_cleaner_task_selections', 'cleaner_logs',
+                    'time_attendance', 'building_qr_codes', 'cleaners')
+order by tablename, indexname;
+
+-- 14. Task-photo bucket objects are NOT scoped by these migrations: paths are
+--     <cleaner_id>/<uuid>.jpg, with no site in them. Sample, to confirm.
+select name, created_at
+from storage.objects
+where bucket_id = 'task-photos'
+order by created_at desc
+limit 5;
 
 rollback;
