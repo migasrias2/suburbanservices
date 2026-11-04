@@ -23,13 +23,9 @@ export class SessionExpiredError extends Error {
  * user's id. Sourcing it from the session makes a stale value impossible
  * rather than merely unlikely. That, and only that, is what this closes.
  *
- * THIS IS NOT AN AUTHORISATION CONTROL. p_admin_id is an ARGUMENT to the
- * admin_* SECURITY DEFINER functions, and not one of them compares it to
- * auth.uid(); all are executable by `authenticated`, and at least one
- * (admin_rename_customer) is executable by anon. The server therefore accepts
- * whatever id the caller chooses to send, and sending a fresher one does not
- * change that. The real fix is server-side and is still outstanding -- never
- * read this function as evidence that a privileged RPC is guarded.
+ * The server is what authorises: since migration 20261104210000 every admin_*
+ * function also requires p_admin_id = auth.uid(), so sending another admin's
+ * id is refused. This function only makes sure the id we send is the live one.
  */
 export async function requireSessionUserId(): Promise<string> {
   const { data, error } = await supabase.auth.getSession()

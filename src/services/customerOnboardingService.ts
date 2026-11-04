@@ -86,11 +86,9 @@ export type QrPackItem = {
  * kept addressing those RPCs by the previous admin's id. This removes that
  * staleness and nothing else.
  *
- * It is NOT what makes those RPCs safe. p_admin_id is an argument the server
- * takes on trust: none of the admin_* SECURITY DEFINER functions compares it
- * to auth.uid(), and they are executable by `authenticated`. Anyone who can
- * sign in at all can call them with any id. Do not treat a call site that
- * sources p_admin_id from the session as an authorised one.
+ * The server enforces who may call: each admin_* function requires
+ * p_admin_id = auth.uid() (migration 20261104210000), so this must be the
+ * session's own id or the call is refused.
  */
 async function getAdminId(): Promise<string> {
   return requireSessionUserId()
