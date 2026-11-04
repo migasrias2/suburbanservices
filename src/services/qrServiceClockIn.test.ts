@@ -117,3 +117,13 @@ describe('an identity that is neither', () => {
     expect(attendanceRow()?.worker_role).toBe('cleaner')
   })
 })
+
+describe('the live_tracking row written on clock-in', () => {
+  it('carries the customer name, so a client login can see its own site (FLAREN-109)', async () => {
+    localStorage.setItem('userType', 'cleaner')
+    await clockIn()
+
+    const tracking = inserts.find((i) => i.table === 'live_tracking')?.payload
+    expect(tracking).toMatchObject({ customer_name: 'Avtrade', event_type: 'clock_in' })
+  })
+})

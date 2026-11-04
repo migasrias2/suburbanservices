@@ -14,8 +14,9 @@ const MANAGER_CUSTOMER_SCOPES: ManagerCustomerScope[] = [
     customerTokens: ['avtrade'],
   },
   {
+    // Matched by id only. A name match ('james') used to grant PSM's scope to
+    // any login whose display name contained it -- and names are editable.
     managerIds: ['ce2c8d1a-6e0a-4d78-9746-2cd32983455f', 'bffb28ae-5ed3-46f2-8ec9-9864fab34301'],
-    managerNames: ['james'],
     customerTokens: ['psm marine', 'psm'],
   },
 ]

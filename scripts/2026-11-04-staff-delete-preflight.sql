@@ -213,21 +213,39 @@ from public.managers m
 where coalesce(m.role, 'manager') = 'manager'
 order by db_reads_nothing desc, name;
 
--- 10b. What each client login's names resolve to: its client labels and how
---      many QR codes match them. qr_codes = 0 means its task rows, photos and
---      scan logs disappear for it after migration 3.
+-- 10b. What each client login matches after migration 3: its client labels,
+--      the QR codes it gets by customer_id (if that column exists) and by
+--      whole-word name, and how many recent attendance rows its names match.
+--      qr_by_name = 0 and qr_by_customer_id = 0 means its task rows, photos and
+--      QR-placed scan logs disappear for it.
 select
   m.username,
   array_agg(distinct lower(btrim(label.value))) as labels,
   (select count(*) from public.building_qr_codes q
-   where exists (
-     select 1 from public.manager_customers mc2
-     join public.uk_customers c2 on c2.id::text = mc2.customer_id::text
-     cross join lateral unnest(array[c2.name::text, c2.display_name::text]) as l2(value)
-     where mc2.manager_id::text = m.id::text
-       and nullif(btrim(l2.value), '') is not null
-       and position(lower(btrim(l2.value)) in lower(coalesce(q.customer_name::text, ''))) > 0
-   )) as qr_codes
+   where (to_jsonb(q) ->> 'customer_id') in (
+     select mc2.customer_id::text from public.manager_customers mc2 where mc2.manager_id::text = m.id::text
+   )) as qr_by_customer_id,
+  (select count(*) from public.building_qr_codes q
+   where (to_jsonb(q) ->> 'customer_id') is null
+     and exists (
+       select 1 from public.manager_customers mc2
+       join public.uk_customers c2 on c2.id::text = mc2.customer_id::text
+       cross join lateral unnest(array[c2.name::text, c2.display_name::text]) as l2(value)
+       where mc2.manager_id::text = m.id::text
+         and nullif(btrim(l2.value), '') is not null
+         and lower(coalesce(q.customer_name::text, '')) ~ ('(^|[^[:alnum:]])' || regexp_replace(lower(btrim(l2.value)), '([^[:alnum:][:space:]])', '\\\1', 'g') || '($|[^[:alnum:]])')
+     )) as qr_by_name,
+  (select count(*) from public.time_attendance ta
+   where ta.clock_in > now() - interval '90 days'
+     and exists (
+       select 1 from public.manager_customers mc2
+       join public.uk_customers c2 on c2.id::text = mc2.customer_id::text
+       cross join lateral unnest(array[c2.name::text, c2.display_name::text]) as l2(value)
+       where mc2.manager_id::text = m.id::text
+         and nullif(btrim(l2.value), '') is not null
+         and (lower(coalesce(ta.customer_name::text, '')) ~ ('(^|[^[:alnum:]])' || regexp_replace(lower(btrim(l2.value)), '([^[:alnum:][:space:]])', '\\\1', 'g') || '($|[^[:alnum:]])')
+              or lower(coalesce(ta.site_name::text, '')) ~ ('(^|[^[:alnum:]])' || regexp_replace(lower(btrim(l2.value)), '([^[:alnum:][:space:]])', '\\\1', 'g') || '($|[^[:alnum:]])'))
+     )) as attendance_90d
 from public.managers m
 join public.manager_customers mc on mc.manager_id::text = m.id::text
 join public.uk_customers c on c.id::text = mc.customer_id::text
@@ -235,7 +253,66 @@ cross join lateral unnest(array[c.name::text, c.display_name::text]) as label(va
 where coalesce(m.role, 'manager') = 'manager'
   and nullif(btrim(label.value), '') is not null
 group by m.id, m.username
-order by qr_codes, m.username;
+order by 3, 4, m.username;
+
+-- 10c. Name collisions. Migration 3 ABORTS and lists these (review
+--      2026-11-04); any row here must be fixed first by renaming a customer or
+--      giving it a more specific display name:
+--      (a) a client login's client name/display name matches, as a whole word,
+--          another customer's name/display name it is not linked to;
+--      (b) it matches the customer_name of a QR code whose customer_id is
+--          another customer the login is not linked to;
+--      (c) a client login's client name/display name is under 4 characters.
+with client_links as (
+  select distinct
+    m.id::text as manager_id,
+    coalesce(nullif(btrim(m.username::text), ''), m.id::text) as login,
+    mc.customer_id::text as customer_id
+  from public.managers m
+  join public.manager_customers mc on mc.manager_id::text = m.id::text
+  where coalesce(m.role, 'manager') = 'manager'
+    and coalesce(m.is_active, true)
+),
+customer_labels as (
+  select distinct c.id::text as customer_id, lower(btrim(l.value)) as label
+  from public.uk_customers c
+  cross join lateral unnest(array[c.name::text, c.display_name::text]) as l(value)
+  where nullif(btrim(l.value), '') is not null
+),
+login_labels as (
+  select cl.manager_id, cl.login, cl.customer_id, lab.label
+  from client_links cl
+  join customer_labels lab on lab.customer_id = cl.customer_id
+),
+not_linked as (
+  select ll.*, other.customer_id as other_customer_id, other.label as other_label
+  from login_labels ll
+  join customer_labels other on other.customer_id <> ll.customer_id
+  where not exists (
+    select 1 from client_links x
+    where x.manager_id = ll.manager_id and x.customer_id = other.customer_id
+  )
+)
+select format('(c) %s: client label "%s" is under 4 characters', login, label) as problem
+from login_labels
+where length(label) < 4
+union
+select format('(a) %s: "%s" also matches customer "%s"', login, label, other_label)
+from not_linked
+where lower(coalesce(other_label, '')) ~ ('(^|[^[:alnum:]])' || regexp_replace(label, '([^[:alnum:][:space:]])', '\\\1', 'g') || '($|[^[:alnum:]])')
+union
+select format('(b) %s: "%s" also matches QR %s (customer_name "%s") of another customer',
+              ll.login, ll.label, q.qr_code_id, q.customer_name)
+from login_labels ll
+join public.building_qr_codes q
+  on (to_jsonb(q) ->> 'customer_id') is not null
+ and (to_jsonb(q) ->> 'customer_id') <> ll.customer_id
+ and lower(coalesce(q.customer_name::text, '')) ~ ('(^|[^[:alnum:]])' || regexp_replace(ll.label, '([^[:alnum:][:space:]])', '\\\1', 'g') || '($|[^[:alnum:]])')
+where not exists (
+  select 1 from client_links x
+  where x.manager_id = ll.manager_id and x.customer_id = (to_jsonb(q) ->> 'customer_id')
+)
+order by 1;
 
 -- 11. Rows that cannot be placed at any site, so become invisible to client
 --     logins after migration 3 (last 90 days). Big numbers here mean the

@@ -136,6 +136,12 @@ describe('resolveManagerAccess', () => {
     })
   })
 
+  it('no longer grants PSM scope to any login whose name contains "james"', async () => {
+    await expect(
+      resolveManagerAccess({ role: 'manager', managerId: LINKED, managerName: 'James Somebody' }),
+    ).resolves.toEqual({ status: 'unlinked', reason: 'no_customers' })
+  })
+
   it('shows nothing when the cleaner links cannot be loaded', async () => {
     scopeRows = showgroundScope
     managerCleanerError = { message: 'network down' }
