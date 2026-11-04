@@ -4,6 +4,7 @@
 --   supabase/migrations/20261104120100_block_non_admin_staff_deletes.sql
 --   supabase/migrations/20261104120200_scope_client_manager_reads.sql
 --   supabase/migrations/20261104120300_scope_client_manager_cleaner_directory.sql
+--   supabase/migrations/20261104120400_close_open_delete_functions.sql
 --
 -- It lists the live state those migrations assume. The whole script runs in a
 -- READ ONLY transaction that is rolled back, so it cannot change anything.
