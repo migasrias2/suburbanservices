@@ -17,6 +17,7 @@ const TITLES: Record<string, string> = {
   '/area-tasks': 'Areas & Tasks',
   '/analytics': 'Analytics',
   '/manager-activity': 'Site Activity',
+  '/site-dashboard': 'Site Dashboard',
   '/ops-calendar': 'Calendar',
   '/profile': 'Profile',
   '/history': 'History',

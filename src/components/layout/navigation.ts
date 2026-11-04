@@ -10,6 +10,7 @@ import {
   Layers,
   LayoutDashboard,
   Library,
+  MapPin,
   QrCode,
   UserPlus,
   Users,
@@ -50,6 +51,14 @@ const CLEANER_ITEMS = {
   schedule: { icon: CalendarDays, label: 'My Schedule', shortLabel: 'Shifts', path: '/my-schedule' },
   assist: { icon: Camera, label: 'Assistance', shortLabel: 'Assist', path: ASSIST_PATH },
 } satisfies Record<string, NavItem>
+
+/** One client site, live. Shared by every role that can open it. */
+const SITE_DASHBOARD_ITEM = {
+  icon: MapPin,
+  label: 'Site Dashboard',
+  shortLabel: 'Site',
+  path: '/site-dashboard',
+} satisfies NavItem
 
 const MANAGER_ITEMS = {
   dashboard: { icon: BarChart3, label: 'Dashboard', path: '/manager-dashboard' },
@@ -98,16 +107,16 @@ const managerNavigation = (userName: string): Navigation => {
   )
   return {
     sections: [
-      { title: 'Overview', items: [MANAGER_ITEMS.dashboard] },
+      { title: 'Overview', items: [MANAGER_ITEMS.dashboard, SITE_DASHBOARD_ITEM] },
       { title: 'Performance', items: performance },
     ],
-    tabs: [MANAGER_ITEMS.dashboard, ...performance],
+    tabs: [MANAGER_ITEMS.dashboard, SITE_DASHBOARD_ITEM, ...performance],
   }
 }
 
 const opsNavigation = (): Navigation => ({
   sections: [
-    { title: 'Overview', items: [OPS_ITEMS.dashboard] },
+    { title: 'Overview', items: [OPS_ITEMS.dashboard, SITE_DASHBOARD_ITEM] },
     { title: 'Site Visits', items: [OPS_ITEMS.clockIn, OPS_ITEMS.calendar] },
     { title: 'Insights', items: [OPS_ITEMS.analytics] },
   ],
@@ -120,6 +129,7 @@ const adminNavigation = (): Navigation => ({
       title: 'Main',
       items: [
         ADMIN_ITEMS.dashboard,
+        SITE_DASHBOARD_ITEM,
         ADMIN_ITEMS.users,
         ADMIN_ITEMS.newCustomer,
         ADMIN_ITEMS.calendar,
