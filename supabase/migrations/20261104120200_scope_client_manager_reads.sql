@@ -24,7 +24,8 @@
 -- when the live table has no customer_id column).
 --
 -- "Names one of its clients" is a whole-word, case-insensitive match of the
--- client's name or display name: "SEAS" matches "SEAS Main Ring" but not
+-- client's name, display name or scope alias (uk_customers.scope_aliases,
+-- added by 20261104120150; hidden extra names such as PSM Marine's "PSM"): "SEAS" matches "SEAS Main Ring" but not
 -- "Overseas" or "Seasonal Kitchen". It is stricter than the app's substring
 -- matcher; preflight 10b shows what each client login still matches.
 -- Whole words still let "Adams" match "Adams Foods", so the migration ABORTS
@@ -34,6 +35,8 @@
 --   (b) it matches the customer_name of a QR code whose customer_id belongs to
 --       a customer the login is not linked to;
 --   (c) a client login's client name/display name is under 4 characters.
+--       Scope aliases are exempt from (c), set deliberately by an admin, but
+--       still go through (a) and (b).
 -- Fix by renaming or giving the customer a more specific display name.
 --
 -- How: one RESTRICTIVE select policy per table, ANDed with the existing
@@ -182,7 +185,7 @@ as $$
   );
 $$;
 
--- Lower-cased names and display names of the calling login's clients.
+-- Lower-cased names, display names and scope aliases of the calling login's clients.
 create or replace function public.client_manager_customer_labels()
 returns text[]
 language sql
@@ -193,7 +196,9 @@ as $$
   select coalesce(array_agg(distinct lower(btrim(label.value))), '{}'::text[])
   from public.manager_customers mc
   join public.uk_customers c on c.id::text = mc.customer_id::text
-  cross join lateral unnest(array[c.name::text, c.display_name::text]) as label(value)
+  cross join lateral unnest(
+    array[c.name::text, c.display_name::text] || coalesce(c.scope_aliases, '{}'::text[])
+  ) as label(value)
   where mc.manager_id::text = auth.uid()::text
     and nullif(btrim(label.value), '') is not null;
 $$;
@@ -262,13 +267,19 @@ begin
       and coalesce(m.is_active, true)
   ),
   customer_labels as (
-    select distinct c.id::text as customer_id, lower(btrim(l.value)) as label
+    -- alias_only: the label comes only from scope_aliases (exempt from rule c).
+    select c.id::text as customer_id, lower(btrim(l.value)) as label, bool_and(l.is_alias) as alias_only
     from public.uk_customers c
-    cross join lateral unnest(array[c.name::text, c.display_name::text]) as l(value)
+    cross join lateral (
+      select v, false from unnest(array[c.name::text, c.display_name::text]) as n(v)
+      union all
+      select v, true from unnest(coalesce(c.scope_aliases, '{}'::text[])) as a(v)
+    ) as l(value, is_alias)
     where nullif(btrim(l.value), '') is not null
+    group by 1, 2
   ),
   login_labels as (
-    select cl.manager_id, cl.login, cl.customer_id, lab.label
+    select cl.manager_id, cl.login, cl.customer_id, lab.label, lab.alias_only
     from client_links cl
     join customer_labels lab on lab.customer_id = cl.customer_id
   ),
@@ -286,6 +297,7 @@ begin
     select format('(c) %s: client label "%s" is under 4 characters', login, label) as problem
     from login_labels
     where length(label) < 4
+      and not alias_only
     union
     select format('(a) %s: "%s" also matches customer "%s"', login, label, other_label)
     from not_linked
