@@ -1,13 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { AlertCircle, CheckCircle2, Clock, QrCode, Camera, X } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Clock, QrCode, Camera, X, SwitchCamera } from 'lucide-react'
 import QrScanner from 'qr-scanner'
+import {
+  activeCameraId,
+  framesAreFlowing,
+  nextCameraId,
+  pickScanCamera,
+  readRememberedCamera,
+  releaseScanner,
+  rememberCamera,
+  REOPEN_GAP_MS,
+  sleep,
+  type CameraOption,
+} from '@/lib/cameraChoice'
 import { QRService, QRCodeData } from '../../services/qrService'
 import { clearDraft } from '../../lib/offlineStore'
-import { normalizeCleanerName } from '../../lib/identity'
 import { supabase } from '../../services/supabase'
 import { reportClockFailure } from '../../services/clockFailureService'
 import { Button } from '../ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import { Card, CardContent } from '../ui/card'
 import { Alert, AlertDescription } from '../ui/alert'
 import { Badge } from '../ui/badge'
 
@@ -37,9 +48,18 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
     qrData?: QRCodeData
   } | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [hasPermission, setHasPermission] = useState<boolean | null>(pendingQrData ? true : null)
+  const [cameras, setCameras] = useState<CameraOption[]>([])
+  const [cameraId, setCameraId] = useState<string | null>(null)
   // The scan callback is built once, so state read inside it is frozen; refs are not.
   const scannerRef = useRef<QrScanner | null>(null)
+  // A double tap lands before React re-renders; two scanners would fight over one video.
+  const startingRef = useRef(false)
+  // Bumped by Stop and by leaving the screen; a start that sees it change after
+  // an await was cancelled and must release what it opened.
+  const startGenRef = useRef(0)
+  // When the last scanner was released; see REOPEN_GAP_MS.
+  const lastReleaseAtRef = useRef(0)
+  const switchingRef = useRef(false)
   const submittingRef = useRef(false)
   // The camera callback fires several times a second; one record per reason is enough.
   const lastReportRef = useRef<{ reason: string; at: number } | null>(null)
@@ -60,37 +80,62 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
 
   useEffect(() => {
     return () => {
-      if (qrScanner) {
-        qrScanner.stop()
-        qrScanner.destroy()
-      }
+      if (qrScanner) void releaseScanner(qrScanner)
     }
   }, [qrScanner])
 
-  const requestCameraPermission = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true })
-      stream.getTracks().forEach(track => track.stop())
-      setHasPermission(true)
-      setError(null)
-    } catch (err) {
-      console.error('Camera permission denied:', err)
-      setHasPermission(false)
-      setError('Camera access is required to scan QR codes.')
-      reportFailure('Camera permission denied')
+  // Leaving the screen cancels a start that is still under way.
+  useEffect(() => {
+    const generation = startGenRef
+    return () => {
+      generation.current += 1
+    }
+  }, [])
+
+  // Released now, not on qr-scanner's 300 ms stop() timer, so the camera
+  // light goes off at once.
+  const releaseNow = (scanner: QrScanner) => {
+    lastReleaseAtRef.current = performance.now()
+    void releaseScanner(scanner)
+    if (scannerRef.current === scanner) {
+      scannerRef.current = null
+      setQrScanner(null)
     }
   }
 
+  // Same lens choice as the clock-in scanner. Plain 'environment' opens the
+  // ultra-wide on many Samsungs, which can't focus on a code at arm's length.
+  // There is no "Enable Camera" probe first: the browser asks when the camera
+  // opens, and each extra open/close is a chance for the camera to go black.
   const startScanning = async () => {
-    if (!videoRef.current) return
+    if (startingRef.current || scannerRef.current || !videoRef.current) return
+    startingRef.current = true
+    startGenRef.current += 1
+    const generation = startGenRef.current
+    const isCurrent = () => startGenRef.current === generation
+    let created: QrScanner | null = null
 
     try {
       setError(null)
       setValidationResult(null)
       setIsScanning(true)
+      // The switch button waits until this start has opened the camera.
+      setCameras([])
+
+      // Labels are only readable before start() if permission was granted earlier.
+      const chosenCamera = pickScanCamera(
+        await QrScanner.listCameras(false).catch(() => [] as CameraOption[]),
+        readRememberedCamera(),
+      )
+      // Wait out the last scanner's release timer before opening on this video.
+      const wait = lastReleaseAtRef.current + REOPEN_GAP_MS - performance.now()
+      if (wait > 0) await sleep(wait)
+      // Stopped, or the screen was left, while we waited.
+      const video = videoRef.current
+      if (!isCurrent() || !video) return
 
       const scanner = new QrScanner(
-        videoRef.current,
+        video,
         async (result) => {
           try {
             let qrData = QRService.parseQRCode(result.data)
@@ -169,28 +214,70 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
           returnDetailedScanResult: true,
           highlightScanRegion: true,
           highlightCodeOutline: true,
+          preferredCamera: chosenCamera ?? 'environment',
         }
       )
 
-      await scanner.start()
+      // Registered before start() so Stop and leaving the screen can always
+      // release the camera, even if start() stalls.
+      created = scanner
       scannerRef.current = scanner
       setQrScanner(scanner)
-      
+      await scanner.start()
+      if (!isCurrent()) {
+        releaseNow(scanner)
+        return
+      }
+
+      // The camera is open, so labels are readable now for the switch button.
+      const openCameras = await QrScanner.listCameras(false).catch(() => [] as CameraOption[])
+      if (!isCurrent()) return
+      setCameras(openCameras)
+      setCameraId(activeCameraId(videoRef.current) ?? chosenCamera)
     } catch (err) {
+      // Only the scanner this start created: once cancelled, scannerRef may
+      // already belong to a newer start.
+      if (created) releaseNow(created)
+      if (!isCurrent()) return
       console.error('Error starting QR scanner:', err)
       setError('Failed to start camera. Please check your camera permissions.')
       reportFailure(`Camera did not start: ${err instanceof Error ? err.message : String(err)}`)
       setIsScanning(false)
+    } finally {
+      if (isCurrent()) startingRef.current = false
+    }
+  }
+
+  // Way out when the chosen lens still can't read the code.
+  const switchCamera = async () => {
+    const scanner = scannerRef.current
+    const next = nextCameraId(cameras, cameraId)
+    // One switch at a time: a second setCamera mid-switch opens a second stream.
+    if (!scanner || !next || switchingRef.current) return
+    switchingRef.current = true
+    try {
+      await scanner.setCamera(next)
+      setCameraId(next)
+      if (await framesAreFlowing(videoRef.current)) {
+        rememberCamera(next)
+      } else if (scannerRef.current === scanner) {
+        setError('That camera is not showing a picture. Try the next one.')
+      }
+    } catch (err) {
+      console.error('Failed to switch camera:', err)
+      setError('Could not switch camera. Try stopping and starting the scan again.')
+    } finally {
+      switchingRef.current = false
     }
   }
 
   const stopScanning = () => {
+    startGenRef.current += 1
+    startingRef.current = false
     const scanner = scannerRef.current ?? qrScanner
-    if (scanner) {
-      scanner.stop()
-      scannerRef.current = null
-      setQrScanner(null)
-    }
+    if (scanner) releaseNow(scanner)
+    scannerRef.current = null
+    setQrScanner(null)
     setIsScanning(false)
   }
 
@@ -242,20 +329,10 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
         try { await clearDraft() } catch {}
         // Mark recent clock out to avoid immediate server reconciliation flipping us back
         try { localStorage.setItem('recentClockOutAt', String(Date.now())) } catch {}
-        // Force-close any lingering open attendance records and deactivate live tracking
+        // Deactivate live tracking. There is deliberately no "force-close every
+        // open shift with this name" any more: it closed other people's shifts
+        // and forgotten earlier ones at this moment's time, inflating hours.
         try {
-          const nowIso = new Date().toISOString()
-          const normalizedName = normalizeCleanerName(cleanerName)
-          await supabase
-            .from('time_attendance')
-            .update({ clock_out: nowIso })
-            .eq('cleaner_name', normalizedName)
-            .is('clock_out', null)
-          await supabase
-            .from('time_attendance')
-            .update({ clock_out: nowIso })
-            .eq('cleaner_name', normalizedName)
-            .eq('clock_out', '')
           await supabase
             .from('live_tracking')
             .update({ is_active: false, event_type: 'clock_out' })
@@ -289,65 +366,6 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
     // Run once for the code handed over on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  if (hasPermission === null) {
-    return (
-      <Card className="w-full max-w-md mx-auto rounded-3xl border-0 shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3 text-center justify-center">
-            <Clock className="h-6 w-6 text-destructive" />
-            Clock Out Validation
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-center space-y-4">
-          <p className="text-muted-foreground">Camera access is required to scan the clock out QR code</p>
-          <Button 
-            onClick={requestCameraPermission} 
-            className="w-full rounded-full bg-destructive hover:bg-destructive/90 text-destructive-foreground py-3"
-          >
-            <Camera className="h-4 w-4 mr-2" />
-            Enable Camera
-          </Button>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (hasPermission === false) {
-    return (
-      <Card className="w-full max-w-md mx-auto rounded-3xl border-0 shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3 text-center justify-center text-destructive">
-            <AlertCircle className="h-6 w-6" />
-            Camera Access Required
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Alert variant="destructive" className="rounded-2xl">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Camera access is required to scan the clock out QR code. Please enable camera permissions.
-            </AlertDescription>
-          </Alert>
-          <div className="flex gap-2">
-            <Button 
-              onClick={requestCameraPermission} 
-              className="flex-1 rounded-full bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-            >
-              Try Again
-            </Button>
-            <Button 
-              onClick={onCancel} 
-              variant="outline"
-              className="flex-1 rounded-full"
-            >
-              Cancel
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
 
   return (
     <div className="w-full max-w-md mx-auto space-y-6">
@@ -403,13 +421,25 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
               Start Scanning
             </Button>
           ) : isScanning ? (
-            <Button 
-              onClick={stopScanning} 
-              variant="outline" 
-              className="w-full rounded-full py-4 text-lg font-semibold border-destructive/30 text-destructive hover:bg-destructive/10"
-            >
-              Stop Scanning
-            </Button>
+            <>
+              {cameras.length > 1 && (
+                <Button
+                  variant="outline"
+                  onClick={switchCamera}
+                  className="w-full rounded-full py-4 font-semibold"
+                >
+                  <SwitchCamera className="h-5 w-5 mr-3" />
+                  Not scanning? Switch camera
+                </Button>
+              )}
+              <Button 
+                onClick={stopScanning} 
+                variant="outline" 
+                className="w-full rounded-full py-4 text-lg font-semibold border-destructive/30 text-destructive hover:bg-destructive/10"
+              >
+                Stop Scanning
+              </Button>
+            </>
           ) : null}
 
           {/* Validation Result */}

@@ -104,6 +104,50 @@ type TimeAttendanceRecord = {
   clock_in_qr?: string | null
 }
 
+// "error" means the server could not be asked (no signal, expired session),
+// which is not the same as "no open shift". Mixing the two told cleaners with
+// weak signal that they were not clocked in, and wiped their local clock-in.
+type OpenShiftLookup =
+  | { status: 'open'; record: TimeAttendanceRecord }
+  | { status: 'none' }
+  | { status: 'error' }
+
+type ShiftState = 'clocked_in' | 'not_clocked_in' | 'error'
+
+/**
+ * The outcome of a scan. `definitive` marks a clear answer from the rules
+ * ("already clocked in"): scanning the same poster again would get the same
+ * answer, so the scanner waits for the cleaner. Anything else (no signal, a
+ * save that didn't land) may be retried by pointing at the poster again.
+ */
+export interface ScanResult {
+  success: boolean
+  message?: string
+  definitive?: boolean
+}
+
+export const SHIFT_CHECK_FAILED_MESSAGE = "Couldn't check your shift. Check your signal and try again."
+export const CLOCK_OUT_NOT_SAVED_MESSAGE =
+  'Your clock-out was not saved. Please try again, or tell your manager if this keeps happening.'
+
+// A cleaner who keeps a poster in view can fail the same way several times a
+// minute. One failure row per code and reason per 30 s keeps the log readable.
+const CLOCK_FAILURE_REPORT_WINDOW_MS = 30_000
+const lastClockFailureReport = new Map<string, number>()
+
+const isFreshClockFailure = (key: string): boolean => {
+  const now = Date.now()
+  const last = lastClockFailureReport.get(key)
+  if (last !== undefined && now - last < CLOCK_FAILURE_REPORT_WINDOW_MS) return false
+  lastClockFailureReport.set(key, now)
+  return true
+}
+
+/** For tests: forget which failures were reported recently. */
+export const resetClockFailureThrottle = (): void => {
+  lastClockFailureReport.clear()
+}
+
 export const AREA_TASKS: Record<AreaType, TaskDefinition[]> = {
   BATHROOMS_ABLUTIONS: [
     { id: 'bath_clean_toilets', name: 'Clean toilets', category: 'BATHROOMS_ABLUTIONS' },
@@ -1168,13 +1212,18 @@ export class QRService {
     cleanerId: string,
     cleanerName: string,
     location?: { latitude: number; longitude: number }
-  ): Promise<{success: boolean, message?: string}> {
+  ): Promise<ScanResult> {
     const result = await this.runQRScan(qrData, cleanerId, cleanerName, location)
     const type = this.normalizeQrType(qrData.type)
-    if (!result.success && (type === 'CLOCK_IN' || type === 'CLOCK_OUT')) {
+    const reason = result.message || 'Clock scan failed with no message'
+    if (
+      !result.success &&
+      (type === 'CLOCK_IN' || type === 'CLOCK_OUT') &&
+      isFreshClockFailure(`${type}|${qrData.id}|${reason}`)
+    ) {
       void reportClockFailure({
         eventType: type === 'CLOCK_IN' ? 'clock_in' : 'clock_out',
-        reason: result.message || 'Clock scan failed with no message',
+        reason,
         cleanerName: getStoredCleanerName() || cleanerName,
         qrCodeId: qrData.id,
         customerName: qrData.customerName ?? null,
@@ -1189,7 +1238,7 @@ export class QRService {
     cleanerId: string,
     cleanerName: string,
     location?: { latitude: number; longitude: number }
-  ): Promise<{success: boolean, message?: string}> {
+  ): Promise<ScanResult> {
     try {
       let action = ''
       let siteArea = ''
@@ -1206,11 +1255,15 @@ export class QRService {
           siteArea = this.prettifySiteLabel(qrData.metadata?.areaName) || siteLabel
           
           // Check if already clocked in
-          const alreadyClockedIn = await this.isAlreadyClockedIn(cleanerId, { clockInQr: qrData.id })
-          if (alreadyClockedIn) {
+          const clockInState = await this.checkShiftState(cleanerId, { clockInQr: qrData.id })
+          if (clockInState === 'error') {
+            return { success: false, message: SHIFT_CHECK_FAILED_MESSAGE }
+          }
+          if (clockInState === 'clocked_in') {
             return { 
               success: false, 
-              message: 'You are already clocked in. Please clock out first or scan an area QR code to continue working.' 
+              message: 'You are already clocked in. Please clock out first or scan an area QR code to continue working.',
+              definitive: true,
             }
           }
           
@@ -1224,7 +1277,7 @@ export class QRService {
             location,
           )
           if (!clockInResult.success) {
-            return { success: false, message: clockInResult.message }
+            return { success: false, message: clockInResult.message, definitive: clockInResult.definitive }
           }
 
           await autoLinkCleanerToCustomer(customerLabel, cleanerId)
@@ -1236,17 +1289,18 @@ export class QRService {
           
           // Check if already clocked out
           const cleanerName = getStoredCleanerName()
-          console.log('Clock-out validation for:', cleanerName)
-          
-          const alreadyClockedOut = await this.isAlreadyClockedOut(cleanerId, {
+          const clockOutState = await this.checkShiftState(cleanerId, {
             clockInQr: clockInReference ?? null,
           })
-          console.log('Already clocked out?', alreadyClockedOut)
-          
-          if (alreadyClockedOut && !localClockedIn) {
+          if (clockOutState === 'error') {
+            return { success: false, message: SHIFT_CHECK_FAILED_MESSAGE }
+          }
+
+          if (clockOutState === 'not_clocked_in' && !localClockedIn) {
             return { 
               success: false, 
-              message: `You are already clocked out, ${cleanerName}. Please scan a Clock In QR code to start working.` 
+              message: `You are already clocked out, ${cleanerName}. Please scan a Clock In QR code to start working.`,
+              definitive: true,
             }
           }
           
@@ -1260,7 +1314,7 @@ export class QRService {
             location,
           )
           if (!clockOutResult.success) {
-            return { success: false, message: clockOutResult.message }
+            return { success: false, message: clockOutResult.message, definitive: clockOutResult.definitive }
           }
           break
           
@@ -1269,11 +1323,17 @@ export class QRService {
           siteArea = this.prettifySiteLabel(qrData.metadata?.areaName) || siteLabel
           
           // Check if clocked in before allowing area scan
-          const isClockedIn = await this.isAlreadyClockedIn(cleanerId)
-          if (!isClockedIn && !localClockedIn) {
+          // A phone that still holds this person's clock-in may carry on when
+          // the server can't be asked; otherwise say so, not "clock in first".
+          const areaState = await this.checkShiftState(cleanerId)
+          if (areaState === 'error' && !localClockedIn) {
+            return { success: false, message: SHIFT_CHECK_FAILED_MESSAGE }
+          }
+          if (areaState === 'not_clocked_in' && !localClockedIn) {
             return { 
               success: false, 
-              message: 'Please clock in first before scanning area QR codes.' 
+              message: 'Please clock in first before scanning area QR codes.',
+              definitive: true,
             }
           }
           break
@@ -1301,7 +1361,9 @@ export class QRService {
             customer_name: customerLabel,
             site_area: siteArea,
             comments: `${siteArea} - ${customerLabel}`.trim(),
-            device_info: { qr_code_scanned: qrData, device_ip: await this.getDeviceIP() },
+            // No outside IP lookup here: it had no timeout and held the success
+            // screen hostage on bad Wi-Fi, after the clock event was already saved.
+            device_info: { qr_code_scanned: qrData },
             timestamp: new Date().toISOString()
           })
 
@@ -1338,7 +1400,7 @@ export class QRService {
     // only presence evidence on the attendance row, so it has to be written here
     // and not just into cleaner_logs.
     location?: { latitude: number; longitude: number },
-  ): Promise<{success: boolean, message?: string}> {
+  ): Promise<ScanResult> {
     try {
       if (!this.isSupabaseConfigured()) {
         console.warn('Supabase not configured; skipping remote log for', eventType)
@@ -1384,14 +1446,18 @@ export class QRService {
         }
       } else {
         // For clock-out, update the most recent open time_attendance record
-        const openRecord = await this.findOpenAttendanceRecord(cleanerId, cleanerName, {
+        const lookup = await this.findOpenAttendanceRecord(cleanerId, cleanerName, {
           clockInQr: clockInReference || this.resolveClockInReference(qrData) || null,
         })
 
-        if (!openRecord) {
-          console.error('No active attendance record found for clock-out')
-          return { success: false, message: 'No active clock-in found. Please clock in first.' }
+        if (lookup.status === 'error') {
+          return { success: false, message: SHIFT_CHECK_FAILED_MESSAGE }
         }
+        if (lookup.status === 'none') {
+          console.error('No active attendance record found for clock-out')
+          return { success: false, message: 'No active clock-in found. Please clock in first.', definitive: true }
+        }
+        const openRecord = lookup.record
 
         const clockOutNote = location ? 'Clock-out via QR' : 'Clock-out via QR (no location)'
         const updatePayload: Record<string, any> = {
@@ -1411,14 +1477,22 @@ export class QRService {
           updatePayload.cleaner_id = numericCleanerId
         }
 
-        const { error: updateError } = await supabase
+        // Ask for the changed rows back. Without it, an UPDATE that RLS or a
+        // trigger filtered out changed nothing yet still read as success, and
+        // the shift stayed open until the 12-hour sweep closed it.
+        const { data: updatedRows, error: updateError } = await supabase
           .from('time_attendance')
           .update(updatePayload)
           .eq('id', openRecord.id)
+          .select('id')
 
         if (updateError) {
           console.error('Error logging clock-out to time_attendance:', updateError)
           return { success: false, message: 'Failed to log clock-out. Please try again.' }
+        }
+        if (!updatedRows || updatedRows.length === 0) {
+          console.error('Clock-out update changed no rows for attendance record', openRecord.id)
+          return { success: false, message: CLOCK_OUT_NOT_SAVED_MESSAGE }
         }
       }
 
@@ -1448,14 +1522,20 @@ export class QRService {
     cleanerId: string | null | undefined,
     cleanerName: string,
     options?: { clockInQr?: string | null; allowFuzzy?: boolean },
-  ): Promise<TimeAttendanceRecord | null> {
+  ): Promise<OpenShiftLookup> {
     try {
       if (!this.isSupabaseConfigured()) {
-        return null
+        return { status: 'none' }
       }
       if (!supabase || !import.meta.env.VITE_SUPABASE_URL) {
         console.error('Supabase not configured properly')
-        return null
+        return { status: 'none' }
+      }
+      // With no session supabase-js quietly sends the anon key, and RLS then
+      // answers "no rows" instead of an error. That is not "not clocked in".
+      const { data: sessionData } = await supabase.auth.getSession()
+      if (!sessionData?.session) {
+        return { status: 'error' }
       }
 
       const trimmedCleanerId = cleanerId ? cleanerId.toString().trim() : null
@@ -1601,124 +1681,69 @@ export class QRService {
         })
       }
 
+      let failedQueries = 0
       for (const buildQuery of queryFactories) {
         const { data, error } = await buildQuery()
         if (error) {
           console.error('Error finding open attendance record candidate:', error)
+          failedQueries += 1
           continue
         }
 
         const rows = (data ?? []).filter((row) => isOpenClockOutValue(row.clock_out))
         const match = rows.find((row) => matchesRecord(row))
         if (match) {
-          return match as TimeAttendanceRecord
+          return { status: 'open', record: match as TimeAttendanceRecord }
         }
       }
 
-      return null
+      // If any lookup failed, the one that would have matched may be among
+      // them. Refusing on flaky signal is safer for payroll than guessing "none".
+      if (failedQueries > 0) {
+        return { status: 'error' }
+      }
+      return { status: 'none' }
     } catch (error) {
       console.error('Error in findOpenAttendanceRecord:', error)
-      return null
+      return { status: 'error' }
     }
   }
 
   /**
-   * Check if cleaner is already clocked in
+   * Is this person on shift? "error" when the server could not be asked: the
+   * caller must say so, and local clock-in state is left alone, because the
+   * phone may well be right. Only a clean "no open shift" answer clears a
+   * stale local clock-in (one older than 5 minutes).
    */
-  private static async isAlreadyClockedIn(
+  private static async checkShiftState(
     cleanerId: string,
     options?: { clockInQr?: string | null },
-  ): Promise<boolean> {
+  ): Promise<ShiftState> {
     try {
       const localActive = this.hasLocalActiveClockIn(cleanerId)
-      if (!this.isSupabaseConfigured()) {
-        return localActive
-      }
-      // Check if Supabase is configured
-      if (!supabase || !import.meta.env.VITE_SUPABASE_URL) {
-        console.error('Supabase not configured properly')
-        return localActive
+      if (!this.isSupabaseConfigured() || !supabase || !import.meta.env.VITE_SUPABASE_URL) {
+        return localActive ? 'clocked_in' : 'not_clocked_in'
       }
 
-      const cleanerName = getStoredCleanerName()
-      console.log('Checking if clocked in for:', cleanerName)
-
-      const openRecord = await this.findOpenAttendanceRecord(cleanerId, cleanerName, {
+      const lookup = await this.findOpenAttendanceRecord(cleanerId, getStoredCleanerName(), {
         clockInQr: options?.clockInQr ?? null,
       })
+      if (lookup.status === 'error') return 'error'
+      if (lookup.status === 'open') return 'clocked_in'
 
-      const isOpen = Boolean(openRecord)
-      console.log('Has open clock-in sessions?', isOpen)
-      if (isOpen && openRecord) {
-        console.log('Latest open session:', openRecord)
-      }
-
-      if (!isOpen) {
-        if (localActive) {
-          const localAge = this.getLocalClockInAgeMs()
-          if (localAge !== null && localAge < 5 * 60 * 1000) {
-            console.warn('Supabase did not return an active clock-in, but recent local state indicates an active session. Trusting local state temporarily.')
-            return true
-          }
-          console.warn('Supabase did not return an active clock-in, and local state appears stale. Clearing local clock-in data.')
-          this.clearLocalClockInState()
+      if (localActive) {
+        const localAge = this.getLocalClockInAgeMs()
+        if (localAge !== null && localAge < 5 * 60 * 1000) {
+          console.warn('Supabase did not return an active clock-in, but recent local state indicates an active session. Trusting local state temporarily.')
+          return 'clocked_in'
         }
-        return false
+        console.warn('Supabase did not return an active clock-in, and local state appears stale. Clearing local clock-in data.')
+        this.clearLocalClockInState()
       }
-
-      return isOpen
+      return 'not_clocked_in'
     } catch (error) {
-      console.error('Error in isAlreadyClockedIn:', error)
-      // If any error, allow operation to continue
-      return this.hasLocalActiveClockIn(cleanerId)
-    }
-  }
-
-  /**
-   * Check if cleaner is already clocked out
-   */
-  private static async isAlreadyClockedOut(
-    cleanerId: string,
-    options?: { clockInQr?: string | null },
-  ): Promise<boolean> {
-    try {
-      const localActive = this.hasLocalActiveClockIn(cleanerId)
-      if (!this.isSupabaseConfigured()) {
-        return !localActive
-      }
-      // Check if Supabase is configured
-      if (!supabase || !import.meta.env.VITE_SUPABASE_URL) {
-        console.error('Supabase not configured properly')
-        return !localActive
-      }
-
-      const cleanerName = getStoredCleanerName()
-      console.log('Checking clock-out status for:', cleanerName)
-
-      // If there's no active clock-in, consider them clocked out
-      const isActive = await this.isAlreadyClockedIn(cleanerId, options)
-      console.log('Is currently clocked in?', isActive)
-      
-      const result = !isActive
-      if (result) {
-        const refreshedLocalState = this.hasLocalActiveClockIn(cleanerId)
-        if (refreshedLocalState) {
-          const localAge = this.getLocalClockInAgeMs()
-          if (localAge !== null && localAge < 5 * 60 * 1000) {
-            console.warn('Supabase indicated no active clock-in, but recent local state shows an active session. Treating as still clocked in.')
-            return false
-          }
-          console.warn('Supabase indicated no active clock-in, and local state appears stale. Clearing local clock-in data.')
-          this.clearLocalClockInState()
-        }
-      }
-      console.log('Should prevent clock-out?', result)
-      
-      return result
-    } catch (error) {
-      console.error('Error in isAlreadyClockedOut:', error)
-      // If any error, allow operation to continue
-      return false
+      console.error('Error in checkShiftState:', error)
+      return 'error'
     }
   }
 
@@ -1752,20 +1777,6 @@ export class QRService {
 
     if (error) {
       console.error('Error updating live tracking:', error)
-    }
-  }
-
-  /**
-   * Get device IP address
-   */
-  private static async getDeviceIP(): Promise<string> {
-    try {
-      const response = await fetch('https://api.ipify.org?format=json')
-      const data = await response.json()
-      return data.ip
-    } catch (error) {
-      console.error('Error getting IP:', error)
-      return 'unknown'
     }
   }
 
