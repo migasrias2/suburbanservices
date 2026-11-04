@@ -21,11 +21,18 @@ import { Button } from '../ui/button'
 import { Card, CardContent } from '../ui/card'
 import { Alert, AlertDescription } from '../ui/alert'
 import { Badge } from '../ui/badge'
+import { useClockSwitches } from '@/lib/clock/clockFlags'
+import type { SendOutcome } from '@/lib/clock/outbox'
+import { QrCamera } from '@/components/qr/scanner/QrCamera'
+import { ClockNoticePanel } from '../clock/ClockNoticePanel'
+import { useClockOutV2 } from '../clock/useClockOutV2'
 
 interface ClockOutValidatorProps {
   cleanerId: string
   cleanerName: string
-  onClockOutSuccess?: () => void
+  // New clock: called with the outcome once the attempt is over (saved, kept on
+  // the phone, or the shift was already closed). Old clock: called with nothing.
+  onClockOutSuccess?: (outcome?: SendOutcome) => void
   onCancel?: () => void
   // A Clock Out code already scanned on another screen: clock out with it straight away
   pendingQrData?: QRCodeData | null
@@ -38,6 +45,9 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
   onCancel,
   pendingQrData
 }) => {
+  // Remote kill switches: clock_v2 (server clock) and scanner_v2 (<QrCamera/>).
+  const { clockV2, scannerV2 } = useClockSwitches()
+  const v2 = useClockOutV2({ cleanerId, cleanerName, scannerV2, onFinished: (outcome) => onClockOutSuccess?.(outcome) })
   const videoRef = useRef<HTMLVideoElement>(null)
   const [qrScanner, setQrScanner] = useState<QrScanner | null>(null)
   const [isScanning, setIsScanning] = useState(false)
@@ -103,12 +113,102 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
     }
   }
 
+  // The old clock-out rules (clock_v2 off): kept as they were.
+  const handleScanTextV1 = async (text: string) => {
+      try {
+        let qrData = QRService.parseQRCode(text)
+        
+        if (!qrData) {
+          setValidationResult({
+            valid: false,
+            message: 'Invalid QR code format'
+          })
+          reportFailure('Scanned a code that is not a valid QR format')
+          return
+        }
+
+        const scannedType = QRService.normalizeQrType(qrData.type)
+
+        // Resolve canonical payload when possible, but keep scan type if DB metadata is stale.
+        try {
+          const { data: dbRow } = await supabase
+            .from('building_qr_codes')
+            .select('qr_code_url')
+            .eq('qr_code_id', qrData.id)
+            .eq('is_active', true)
+            .limit(1)
+            .maybeSingle()
+
+          if (dbRow?.qr_code_url) {
+            const resolved = QRService.parseQRCode(dbRow.qr_code_url)
+            if (resolved) {
+              const resolvedType = QRService.normalizeQrType(resolved.type)
+              if (scannedType && resolvedType && scannedType !== resolvedType) {
+                qrData = { ...resolved, type: scannedType }
+              } else {
+                qrData = resolved
+              }
+            }
+          }
+        } catch {
+          // Ignore metadata lookup errors and continue with scanned payload.
+        }
+
+        const normalizedType = QRService.normalizeQrType(qrData.type)
+        // Validate that this is a clock out QR code
+        if (normalizedType !== 'CLOCK_OUT') {
+          setValidationResult({
+            valid: false,
+            message: 'This is not a valid clock out QR code'
+          })
+          reportFailure(`Scanned a ${normalizedType ?? 'unknown'} code instead of a clock-out code`, qrData)
+          return
+        }
+
+        // Additional validation logic can be added here
+        // For example, checking if the location matches, time constraints, etc.
+        
+        const clockOutData = normalizedType ? { ...qrData, type: normalizedType } : qrData
+        setValidationResult({
+          valid: true,
+          message: 'Clock Out code found. Clocking you out…',
+          qrData: clockOutData
+        })
+        stopScanning()
+        // Clock out on the scan itself. It used to wait for a separate
+        // "Confirm Clock Out" tap; a cleaner who saw the green VALID badge
+        // and put the phone away was never clocked out, and nothing was logged.
+        void submitClockOut(clockOutData)
+
+      } catch (err) {
+        console.error('Error processing QR scan:', err)
+        setValidationResult({
+          valid: false,
+          message: 'Error processing QR code'
+        })
+      }
+    }
+
+  const handleScanText = (text: string) =>
+    clockV2 ? v2.handleText(text, stopScanning) : handleScanTextV1(text)
+
+  // New camera: <QrCamera/> owns the camera, so Start only turns it on.
+  const startScanningV2 = () => {
+    setError(null)
+    setValidationResult(null)
+    v2.setNotice(null)
+    if (clockV2) v2.startLocation()
+    setIsScanning(true)
+  }
+
   // Same lens choice as the clock-in scanner. Plain 'environment' opens the
   // ultra-wide on many Samsungs, which can't focus on a code at arm's length.
   // There is no "Enable Camera" probe first: the browser asks when the camera
   // opens, and each extra open/close is a chance for the camera to go black.
   const startScanning = async () => {
+    if (scannerV2) return startScanningV2()
     if (startingRef.current || scannerRef.current || !videoRef.current) return
+    if (clockV2) v2.startLocation()
     startingRef.current = true
     startGenRef.current += 1
     const generation = startGenRef.current
@@ -136,80 +236,7 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
 
       const scanner = new QrScanner(
         video,
-        async (result) => {
-          try {
-            let qrData = QRService.parseQRCode(result.data)
-            
-            if (!qrData) {
-              setValidationResult({
-                valid: false,
-                message: 'Invalid QR code format'
-              })
-              reportFailure('Scanned a code that is not a valid QR format')
-              return
-            }
-
-            const scannedType = QRService.normalizeQrType(qrData.type)
-
-            // Resolve canonical payload when possible, but keep scan type if DB metadata is stale.
-            try {
-              const { data: dbRow } = await supabase
-                .from('building_qr_codes')
-                .select('qr_code_url')
-                .eq('qr_code_id', qrData.id)
-                .eq('is_active', true)
-                .limit(1)
-                .maybeSingle()
-
-              if (dbRow?.qr_code_url) {
-                const resolved = QRService.parseQRCode(dbRow.qr_code_url)
-                if (resolved) {
-                  const resolvedType = QRService.normalizeQrType(resolved.type)
-                  if (scannedType && resolvedType && scannedType !== resolvedType) {
-                    qrData = { ...resolved, type: scannedType }
-                  } else {
-                    qrData = resolved
-                  }
-                }
-              }
-            } catch {
-              // Ignore metadata lookup errors and continue with scanned payload.
-            }
-
-            const normalizedType = QRService.normalizeQrType(qrData.type)
-            // Validate that this is a clock out QR code
-            if (normalizedType !== 'CLOCK_OUT') {
-              setValidationResult({
-                valid: false,
-                message: 'This is not a valid clock out QR code'
-              })
-              reportFailure(`Scanned a ${normalizedType ?? 'unknown'} code instead of a clock-out code`, qrData)
-              return
-            }
-
-            // Additional validation logic can be added here
-            // For example, checking if the location matches, time constraints, etc.
-            
-            const clockOutData = normalizedType ? { ...qrData, type: normalizedType } : qrData
-            setValidationResult({
-              valid: true,
-              message: 'Clock Out code found. Clocking you out…',
-              qrData: clockOutData
-            })
-            stopScanning()
-            // Clock out on the scan itself. It used to wait for a separate
-            // "Confirm Clock Out" tap; a cleaner who saw the green VALID badge
-            // and put the phone away was never clocked out, and nothing was logged.
-            void submitClockOut(clockOutData)
-
-          } catch (err) {
-            console.error('Error processing QR scan:', err)
-            setValidationResult({
-              valid: false,
-              message: 'Error processing QR code'
-            })
-          }
-        },
+        (result) => void handleScanText(result.data),
         {
           returnDetailedScanResult: true,
           highlightScanRegion: true,
@@ -357,6 +384,13 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
 
   useEffect(() => {
     if (!pendingQrData) return
+    if (clockV2) {
+      // The area scanner hands over the poster's own text; the server parses it.
+      // Keeps the time the code was read on the area screen, not the hand-over time.
+      const { rawPayload, scannedAtMs, ...parsed } = pendingQrData
+      void v2.submit(rawPayload ?? JSON.stringify(parsed), scannedAtMs ?? Date.now())
+      return
+    }
     setValidationResult({
       valid: true,
       message: 'Clock Out code found. Clocking you out…',
@@ -383,6 +417,17 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
       <Card className="rounded-3xl border-0 shadow-lg overflow-hidden">
         <CardContent className="p-6 space-y-4">
           {/* Camera View */}
+          {scannerV2 ? (
+            <QrCamera
+              active={isScanning}
+              paused={isProcessing || v2.saving}
+              onDecode={(text) => void handleScanText(text)}
+              onDiagnostics={(d) => {
+                v2.diagnosticsRef.current = d
+              }}
+              className="border-destructive/40"
+            />
+          ) : (
           <div className={`relative aspect-square rounded-3xl overflow-hidden border-2 ${
             isScanning 
               ? 'border-destructive/40 bg-black' 
@@ -410,9 +455,38 @@ export const ClockOutValidator: React.FC<ClockOutValidatorProps> = ({
               </div>
             )}
           </div>
+          )}
+
+          {v2.saving && (
+            <div role="status" className="flex items-center justify-center gap-2 rounded-2xl bg-muted p-4 font-semibold">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-border border-t-transparent" />
+              Clocking you out…
+            </div>
+          )}
+
+          {v2.notice && !v2.saving && (
+            <>
+              <ClockNoticePanel
+                notice={v2.notice}
+                secondary={{
+                  label: 'Scan again',
+                  onClick: () => {
+                    v2.setNotice(null)
+                    if (!isScanning) void startScanning()
+                  },
+                }}
+                onDismiss={() => v2.setNotice(null)}
+              />
+              {onCancel && !isScanning && (
+                <Button variant="outline" onClick={onCancel} className="w-full rounded-full">
+                  Cancel
+                </Button>
+              )}
+            </>
+          )}
 
           {/* Controls */}
-          {!isScanning && !validationResult ? (
+          {!isScanning && !validationResult && !v2.saving && !v2.notice ? (
             <Button 
               onClick={startScanning} 
               className="w-full rounded-full py-4 text-lg font-semibold bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-lg transition-all duration-200"

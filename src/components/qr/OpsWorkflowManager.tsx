@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ClockOutValidator } from './ClockOutValidator'
 import { QRService, type OpsInspectionPhoto } from '@/services/qrService'
+import type { SendOutcome } from '@/lib/clock/outbox'
 
 interface OpsWorkflowManagerProps {
   cleanerId: string
@@ -25,7 +26,11 @@ interface OpsWorkflowManagerProps {
   siteName?: string
   customerName?: string
   qrCodeId?: string
-  onClockOut?: () => void
+  // The new clock passes the clock-out outcome up; the old one passes nothing.
+  onClockOut?: (outcome?: SendOutcome) => void
+  // New clock: offer Clock Out on the welcome screen too, so an ops manager
+  // never needs to start an inspection just to finish a visit (L1).
+  showWelcomeClockOut?: boolean
 }
 
 type WorkflowStep = 'welcome' | 'photos' | 'next_action' | 'clock_out'
@@ -42,6 +47,7 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
   customerName,
   qrCodeId,
   onClockOut,
+  showWelcomeClockOut = false,
 }) => {
   const [currentStep, setCurrentStep] = useState<WorkflowStep>('welcome')
   const [photos, setPhotos] = useState<CapturedPhoto[]>([])
@@ -248,8 +254,8 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
     setError(null)
   }
 
-  const handleClockOutSuccess = () => {
-    onClockOut?.()
+  const handleClockOutSuccess = (outcome?: SendOutcome) => {
+    onClockOut?.(outcome)
   }
 
   const formattedClockIn = clockInTime
@@ -423,6 +429,19 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
             </p>
           </CardContent>
         </Card>
+
+        {showWelcomeClockOut && (
+          <div className="text-center">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentStep('clock_out')}
+              className="rounded-full px-8 py-3 text-destructive border-destructive/30 hover:bg-destructive/10"
+            >
+              <Clock className="w-4 h-4 mr-2" />
+              Clock Out
+            </Button>
+          </div>
+        )}
       </div>
     )
   }
@@ -566,7 +585,7 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
           cleanerId={cleanerId}
           cleanerName={cleanerName}
           onClockOutSuccess={handleClockOutSuccess}
-          onCancel={() => setCurrentStep(submittedAt ? 'next_action' : 'photos')}
+          onCancel={() => setCurrentStep(submittedAt ? 'next_action' : showWelcomeClockOut ? 'welcome' : 'photos')}
         />
       </div>
     )

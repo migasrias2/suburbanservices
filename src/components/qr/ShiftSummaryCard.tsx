@@ -14,6 +14,8 @@ interface ShiftSummaryCardProps {
   cleanerId: string
   cleanerName: string
   onDone: () => void
+  /** The shift the clock-out answer named (new clock). Without it, the latest closed shift is looked up. */
+  shiftId?: number | null
 }
 
 const formatWorked = (minutes: number): string => {
@@ -33,6 +35,7 @@ export const ShiftSummaryCard: React.FC<ShiftSummaryCardProps> = ({
   cleanerId,
   cleanerName,
   onDone,
+  shiftId,
 }) => {
   const [summary, setSummary] = useState<ShiftSummary | null>(null)
   const [attendanceId, setAttendanceId] = useState<number | null>(null)
@@ -45,7 +48,7 @@ export const ShiftSummaryCard: React.FC<ShiftSummaryCardProps> = ({
   useEffect(() => {
     let cancelled = false
     const load = async () => {
-      const id = await findLatestClosedShiftId(cleanerId)
+      const id = shiftId ?? (await findLatestClosedShiftId(cleanerId))
       if (cancelled) return
       setAttendanceId(id)
       if (id != null) {
@@ -58,7 +61,7 @@ export const ShiftSummaryCard: React.FC<ShiftSummaryCardProps> = ({
     return () => {
       cancelled = true
     }
-  }, [cleanerId])
+  }, [cleanerId, shiftId])
 
   const submitFlag = async () => {
     if (!attendanceId || !reason.trim()) return

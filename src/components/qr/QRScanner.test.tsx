@@ -76,6 +76,8 @@ vi.mock('../../services/clockFailureService', () => ({ reportClockFailure: async
 
 const { QRService, SHIFT_CHECK_FAILED_MESSAGE } = await import('@/services/qrService')
 const { QRScanner } = await import('./QRScanner')
+// These tests cover the old path: both kill switches off (P3 keeps it intact behind them).
+const { setClockSwitchesForTests } = await import('@/lib/clock/clockFlags')
 
 const CLOCK_IN = JSON.stringify({ id: 'qr-in-1', type: 'CLOCK_IN', customerName: 'Avtrade' })
 const OTHER_CLOCK_IN = JSON.stringify({ id: 'qr-in-2', type: 'CLOCK_IN', customerName: 'Metalex' })
@@ -129,6 +131,7 @@ beforeEach(() => {
   vi.spyOn(Date, 'now').mockImplementation(() => clock)
   processQRScan.mockReset()
   installTestLocalStorage()
+  setClockSwitchesForTests({ clockV2: false, scannerV2: false })
 })
 
 afterEach(() => {

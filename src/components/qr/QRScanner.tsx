@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Camera, QrCode, AlertCircle, CheckCircle2, Clock, SwitchCamera, Loader2, X } from 'lucide-react'
+import { Camera, QrCode, CheckCircle2, SwitchCamera, X } from 'lucide-react'
 import QrScanner from 'qr-scanner'
 import {
   activeCameraId,
@@ -19,10 +19,20 @@ import { ClockOutValidator } from './ClockOutValidator'
 import { hasOpenClockInToday } from '../../services/attendanceService'
 import { reportClockFailure } from '../../services/clockFailureService'
 import { describeWrongQrType, isClockCode } from '../../lib/wrongQrType'
+import { useClockSwitches } from '@/lib/clock/clockFlags'
+import { isOnShiftForAreaScan, queueClockFailureReport } from '@/lib/clock/clockRuntime'
+import type { ScanDiagnostics } from '@/lib/scanner/scanDiagnostics'
+import { QrCamera } from '@/components/qr/scanner/QrCamera'
 import { Button } from '../ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Alert, AlertDescription } from '../ui/alert'
-import { Badge } from '../ui/badge'
+import { CameraDeniedCard, ClockInRequiredCard, SavingOverlay } from './QRScannerParts'
+
+/**
+ * What a parent that handles the scanned text itself (onDecodeText) reports
+ * back: 'done' stops the camera; 'failed' shows the message, and a definitive
+ * one blocks that code until ✕, exactly like the scanner's own failures.
+ */
+export type DecodeTextOutcome = { status: 'done' } | { status: 'failed'; message: string; definitive: boolean }
 
 interface QRScannerProps {
   cleanerId: string
@@ -38,6 +48,11 @@ interface QRScannerProps {
   previewMode?: boolean
   // Offer a real code of a disallowed type to the parent; return true if it took it
   onWrongType?: (data: QRCodeData) => boolean
+  // New clock path: the parent takes the raw text after the scanner's own
+  // guards (dedupe, one at a time, Saving…), instead of processQRScan.
+  onDecodeText?: (text: string) => Promise<DecodeTextOutcome>
+  // Facts about the camera session (new camera only), for the clock event's device field.
+  onDiagnostics?: (diagnostics: ScanDiagnostics) => void
 }
 
 // The same code is ignored for this long after a read, so one poster held in
@@ -58,8 +73,12 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   showClockOutOption,
   onClockOutSuccess,
   previewMode = false,
-  onWrongType
+  onWrongType,
+  onDecodeText,
+  onDiagnostics,
 }) => {
+  // Remote kill switches: clock_v2 (server clock) and scanner_v2 (<QrCamera/>).
+  const { clockV2, scannerV2 } = useClockSwitches()
   const videoRef = useRef<HTMLVideoElement>(null)
   const [qrScanner, setQrScanner] = useState<QrScanner | null>(null)
   const [isScanning, setIsScanning] = useState(false)
@@ -186,7 +205,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     lastScanCodeRef.current = null
   }
 
-  const handleDecode = async (result: QrScanner.ScanResult) => {
+  const handleDecode = async (result: { data: string }) => {
     // These checks sit outside the try below on purpose: qr-scanner calls this
     // for every decoded frame without waiting, and only the call that takes
     // the processing guard may release it in `finally`.
@@ -217,8 +236,26 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     setError(null)
 
     try {
+      if (onDecodeText) {
+        const outcome = await onDecodeText(result.data)
+        if (outcome.status === 'done') finalizeSuccess(qrData)
+        else showScanFailure(result.data, { success: false, message: outcome.message, definitive: outcome.definitive })
+        return
+      }
+
       const scannedType = QRService.normalizeQrType(qrData.type)
       const rawPayload = result.data?.trim() || ''
+
+      // New clock: a clock code for another screen goes to the parent straight
+      // away, with its raw text and decode time, before any lookup. The server
+      // parses the text itself; waiting on lookups on weak signal left the
+      // clock-out in nobody's outbox (review M5).
+      const handOver =
+        clockV2 && onWrongType && allowedTypes && isClockCode(scannedType) && !allowedTypes.includes(scannedType as QRCodeData['type'])
+      if (handOver && onWrongType({ ...qrData, type: scannedType as QRCodeData['type'], rawPayload: result.data, scannedAtMs: now })) {
+        stopScanning()
+        return
+      }
 
       // Resolve canonical data from database before type-gating.
       // Some legacy QR payloads are stale/mis-typed while DB metadata is correct.
@@ -276,7 +313,8 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         lastScanCodeRef.current = { code: result.data, time: now - SCAN_DEDUPE_MS + 1500 }
         processingRef.current = false
         setIsProcessing(false)
-        if (onWrongType?.(qrData)) {
+        // The new clock sends the poster's own text to the server, so hand it over.
+        if (onWrongType?.(clockV2 ? { ...qrData, rawPayload: result.data, scannedAtMs: now } : qrData)) {
           stopScanning()
           return
         }
@@ -288,7 +326,9 @@ export const QRScanner: React.FC<QRScannerProps> = ({
           lastReport && lastReport.key === reportKey && now - lastReport.at < 30_000
         if (!previewMode && isClockCode(qrData.type) && !recentlyReported) {
           wrongTypeReportRef.current = { key: reportKey, at: now }
-          void reportClockFailure({
+          // New clock: kept on the phone while signed out, sent after sign-in (D7c).
+          const report = clockV2 ? queueClockFailureReport : reportClockFailure
+          void report({
             eventType: qrData.type === 'CLOCK_IN' ? 'clock_in' : 'clock_out',
             reason: `Scanned on the wrong screen: ${describeWrongQrType(qrData.type, allowedTypes)}`,
             cleanerName,
@@ -319,16 +359,18 @@ export const QRScanner: React.FC<QRScannerProps> = ({
         }
       }
 
-      // Cleaners must have an open clock-in for today before scanning area/task QRs.
+      // Cleaners must have an open clock-in before scanning area/task QRs.
       // Why: prevents on-site work being invisible to the live dashboard (real incident, May 2026).
       // How to apply: skip for managers/admin and for non-area scans; check fails open on network errors.
+      // The new clock asks the server for the open shift (any day, so a night
+      // shift still counts after midnight); the old one uses today's calendar day.
       const userType = typeof window !== 'undefined' ? localStorage.getItem('userType') : null
       const requiresClockIn =
         !previewMode &&
         userType === 'cleaner' &&
         (qrData.type === 'AREA' || qrData.type === 'TASK')
       if (requiresClockIn) {
-        const hasOpen = await hasOpenClockInToday(cleanerId)
+        const hasOpen = clockV2 ? await isOnShiftForAreaScan(cleanerId) : await hasOpenClockInToday(cleanerId)
         if (!hasOpen) {
           setClockInRequired(true)
           processingRef.current = false
@@ -344,7 +386,11 @@ export const QRScanner: React.FC<QRScannerProps> = ({
 
       if (shouldGoToTasks) {
         if (!previewMode) {
-          const outcome = await QRService.processQRScan(qrData, cleanerId, cleanerName, location)
+          // Already checked against the server's open shift: don't look it up again by name.
+          const outcome =
+            clockV2 && requiresClockIn
+              ? await QRService.processQRScan(qrData, cleanerId, cleanerName, location, { shiftChecked: true })
+              : await QRService.processQRScan(qrData, cleanerId, cleanerName, location)
           if (!outcome.success) {
             // Stays on screen until dismissed or replaced by the next attempt.
             showScanFailure(result.data, outcome)
@@ -516,6 +562,18 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     }
   }
 
+  // New camera: <QrCamera/> owns the camera, so Start only turns it on. Same
+  // reset as the old Start: a new Start is an explicit retry.
+  const startScanningV2 = () => {
+    setError(null)
+    failedCodeRef.current = null
+    lastScanCodeRef.current = null
+    setLastScan(null)
+    handledSuccessRef.current = false
+    setHasHandledSuccess(false)
+    setIsScanning(true)
+  }
+
   // Way out for any phone whose first-choice lens still can't read the code:
   // cycle through the cameras, and remember the one picked if it shows a picture.
   const switchCamera = async () => {
@@ -565,66 +623,15 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   // No separate "Enable Camera" step: the browser asks for permission when
   // Start opens the camera. The extra probe stream it used to open was one of
   // several quick open/close cycles that leave some Android cameras black.
-  if (permissionState === 'denied') {
-    return (
-      <Card className="w-full max-w-md mx-auto rounded-2xl border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-destructive">
-            <AlertCircle className="h-5 w-5" />
-            Camera Access Denied
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Camera access is required to scan QR codes. Please enable camera permissions in your browser settings.
-            </AlertDescription>
-          </Alert>
-          <Button onClick={() => setPermissionState('unknown')} className="w-full rounded-full text-primary-foreground bg-primary">
-            Try Again
-          </Button>
-        </CardContent>
-      </Card>
-    )
+  // The new camera has its own denied panel, with steps per phone.
+  if (!scannerV2 && permissionState === 'denied') {
+    return <CameraDeniedCard onRetry={() => setPermissionState('unknown')} />
   }
 
   // Task UI is handled by parent; this component just scans
 
   if (clockInRequired) {
-    return (
-      <Card className="w-full max-w-md mx-auto rounded-3xl border-0 bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04),0_20px_50px_-20px_rgba(0,0,0,0.15)]">
-        <CardContent className="space-y-5 p-7 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-warning/10 text-warning">
-            <Clock className="h-6 w-6" />
-          </div>
-          <div className="space-y-1.5">
-            <h2 className="text-title3 font-semibold tracking-tight text-foreground">
-              Clock in first
-            </h2>
-            <p className="text-footnote leading-snug text-muted-foreground">
-              You need to clock in before scanning area or task QR codes. Tap the button
-              below to clock in, then come back to scan.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Button
-              onClick={() => navigate('/clock-in')}
-              className="h-11 w-full rounded-full bg-primary text-subheadline font-semibold text-primary-foreground shadow-none hover:bg-primary/90"
-            >
-              Go to Clock In
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => setClockInRequired(false)}
-              className="h-10 w-full rounded-full text-footnote font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              Cancel
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    )
+    return <ClockInRequiredCard onGoToClockIn={() => navigate('/clock-in')} onCancel={() => setClockInRequired(false)} />
   }
 
   // Show clock-out validator if requested
@@ -642,10 +649,32 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     )
   }
 
+  const wrongTypeBadge = wrongType ? (
+    <div className="absolute top-3 left-1/2 -translate-x-1/2">
+      <div className="px-3 py-1 rounded-full bg-warning/10 text-warning text-xs font-medium border border-warning/30 shadow-sm">
+        {describeWrongQrType(wrongType, allowedTypes ?? [])}
+      </div>
+    </div>
+  ) : null
+
   return (
     <div className="w-full space-y-4">
       <div className="space-y-4">
         {/* Camera View */}
+        {scannerV2 ? (
+          <QrCamera
+            active={isScanning}
+            paused={isProcessing}
+            onDecode={(text) => void handleDecode({ data: text })}
+            onDiagnostics={onDiagnostics}
+            overlay={
+              <>
+                {wrongTypeBadge}
+                {isProcessing && <SavingOverlay />}
+              </>
+            }
+          />
+        ) : (
         <div className={`relative aspect-square rounded-3xl overflow-hidden border-2 ${isScanning ? 'border-primary/40 bg-foreground' : 'border-border bg-muted'} transition-all duration-200`}>
           <video
             ref={videoRef}
@@ -658,13 +687,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
                 <div className="w-56 h-56 rounded-2xl border-2 border-border/60 shadow-[0_0_0_6000px_rgba(17,24,39,0.6)]" />
               </div>
             )}
-          {wrongType && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2">
-              <div className="px-3 py-1 rounded-full bg-warning/10 text-warning text-xs font-medium border border-warning/30 shadow-sm">
-                {describeWrongQrType(wrongType, allowedTypes ?? [])}
-              </div>
-            </div>
-          )}
+          {wrongTypeBadge}
           {!isScanning && !lastScan?.success && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center space-y-3">
@@ -675,18 +698,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
               </div>
             </div>
           )}
-          {isProcessing && isScanning && (
-            <div
-              role="status"
-              aria-live="polite"
-              className="absolute inset-0 flex items-center justify-center bg-foreground/60"
-            >
-              <div className="flex items-center gap-2 rounded-full bg-background px-5 py-3 text-base font-semibold text-foreground shadow-lg">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Saving…
-              </div>
-            </div>
-          )}
+          {isProcessing && isScanning && <SavingOverlay />}
           {lastScan?.success && (
             <div className="absolute inset-0 flex items-center justify-center bg-success/10">
               <div className="flex items-center justify-center h-24 w-24 rounded-full bg-success/10 text-success">
@@ -695,11 +707,12 @@ export const QRScanner: React.FC<QRScannerProps> = ({
             </div>
           )}
         </div>
+        )}
 
         {/* Controls */}
         {!isScanning ? (
           <Button 
-            onClick={startScanning} 
+            onClick={scannerV2 ? startScanningV2 : startScanning} 
             className="w-full rounded-full py-6 text-lg font-semibold text-primary-foreground shadow-lg transition-all duration-200 bg-primary"
           >
             <Camera className="h-5 w-5 mr-3" />

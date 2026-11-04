@@ -33,6 +33,10 @@ export interface QRCodeData {
   customerName?: string
   areaType?: AreaType
   metadata?: Record<string, any>
+  /** The text the camera read, when a screen hands a code on (new clock path: the server parses it). */
+  rawPayload?: string
+  /** Date.now() when the code was read, when a screen hands a code on (new clock path). */
+  scannedAtMs?: number
 }
 
 export interface TaskSelection {
@@ -1211,9 +1215,12 @@ export class QRService {
     qrData: QRCodeData,
     cleanerId: string,
     cleanerName: string,
-    location?: { latitude: number; longitude: number }
+    location?: { latitude: number; longitude: number },
+    // shiftChecked: the caller already asked the server for the open shift
+    // (new clock path), so the area scan skips the old by-name shift lookups.
+    options?: { shiftChecked?: boolean },
   ): Promise<ScanResult> {
-    const result = await this.runQRScan(qrData, cleanerId, cleanerName, location)
+    const result = await this.runQRScan(qrData, cleanerId, cleanerName, location, options)
     const type = this.normalizeQrType(qrData.type)
     const reason = result.message || 'Clock scan failed with no message'
     if (
@@ -1237,7 +1244,8 @@ export class QRService {
     qrData: QRCodeData,
     cleanerId: string,
     cleanerName: string,
-    location?: { latitude: number; longitude: number }
+    location?: { latitude: number; longitude: number },
+    options?: { shiftChecked?: boolean },
   ): Promise<ScanResult> {
     try {
       let action = ''
@@ -1325,7 +1333,7 @@ export class QRService {
           // Check if clocked in before allowing area scan
           // A phone that still holds this person's clock-in may carry on when
           // the server can't be asked; otherwise say so, not "clock in first".
-          const areaState = await this.checkShiftState(cleanerId)
+          const areaState = options?.shiftChecked ? 'clocked_in' : await this.checkShiftState(cleanerId)
           if (areaState === 'error' && !localClockedIn) {
             return { success: false, message: SHIFT_CHECK_FAILED_MESSAGE }
           }

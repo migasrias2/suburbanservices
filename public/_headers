@@ -1,0 +1,7 @@
+# Netlify response headers.
+# Everything Vite writes to /assets/ has a content hash in its file name (JS, CSS,
+# the decoder worker and the ~950 KB zxing .wasm), so a new build always gets a
+# new URL and these can be cached for a year. Nothing in public/ lives under
+# /assets/, and index.html is not covered, so a deploy is still picked up at once.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

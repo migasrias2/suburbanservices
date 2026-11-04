@@ -9,6 +9,7 @@ import { Badge } from '../ui/badge'
 import { QRCodeData } from '../../services/qrService'
 import { QRService } from '../../services/qrService'
 import { getDraft as getLocalDraft } from '../../lib/offlineStore'
+import type { SendOutcome } from '../../lib/clock/outbox'
 
 type WorkflowStep = 
   | 'welcome' 
@@ -22,7 +23,8 @@ interface WorkflowManagerProps {
   cleanerName: string
   clockInTime?: string
   siteName?: string
-  onClockOut?: () => void
+  // The new clock passes the clock-out outcome up; the old one passes nothing.
+  onClockOut?: (outcome?: SendOutcome) => void
 }
 
 interface CompletedArea {
@@ -186,8 +188,8 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
     return true
   }
 
-  const handleClockOutSuccess = () => {
-    onClockOut?.()
+  const handleClockOutSuccess = (outcome?: SendOutcome) => {
+    onClockOut?.(outcome)
   }
 
   const handleScanAnotherArea = () => {

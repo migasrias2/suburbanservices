@@ -1,2 +1,6 @@
+# A missing build file (an old tab asking for last deploy's hashed JS, worker
+# or wasm) must be a real 404, not index.html with a 200: that HTML would be
+# cached as the asset and break scanning until a reload. Non-forced, so files
+# that exist are served as normal. Must come before the SPA fallback.
+/assets/*  /404.html  404
 /* /index.html 200
-

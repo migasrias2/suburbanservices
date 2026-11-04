@@ -47,6 +47,7 @@
     "@supabase/gotrue-js": "^2.75.1",
     "@supabase/supabase-js": "^2.57.4",
     "@tanstack/react-query": "^5.56.2",
+    "barcode-detector": "3.2.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",

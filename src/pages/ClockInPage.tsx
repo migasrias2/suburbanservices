@@ -9,10 +9,21 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/services/supabase'
 import { getStoredCleanerName } from '@/lib/identity'
 import { ShiftSummaryCard } from '@/components/qr/ShiftSummaryCard'
+import ClockInPageV2 from '@/components/clock/ClockInPageV2'
+import { useClockSwitches } from '@/lib/clock/clockFlags'
 
 type Phase = 'clock_in' | 'workflow' | 'completed'
 
+/**
+ * The clock-in page. clock_v2 on: the server clock (ClockInPageV2). Off: the
+ * old page below, unchanged (P6 deletes it once the switch has stayed on).
+ */
 export default function ClockInPage() {
+  const { clockV2 } = useClockSwitches()
+  return clockV2 ? <ClockInPageV2 /> : <LegacyClockInPage />
+}
+
+function LegacyClockInPage() {
   const userName = getStoredCleanerName() || 'Cleaner'
   const userType = (localStorage.getItem('userType') as 'cleaner' | 'manager' | 'ops_manager' | 'admin') || 'cleaner'
   const cleanerId = localStorage.getItem('userId') || ''

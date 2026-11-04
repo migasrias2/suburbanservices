@@ -53,6 +53,8 @@ vi.mock('../../services/clockFailureService', () => ({
 }))
 
 const { ClockOutValidator } = await import('./ClockOutValidator')
+// These tests cover the old path: both kill switches off (P3 keeps it intact behind them).
+const { setClockSwitchesForTests } = await import('@/lib/clock/clockFlags')
 
 const deferred = <T,>() => {
   let resolve!: (value: T) => void
@@ -71,6 +73,7 @@ beforeEach(() => {
   fake.startGate = () => Promise.resolve()
   fake.reportClockFailure.mockClear()
   installTestLocalStorage()
+  setClockSwitchesForTests({ clockV2: false, scannerV2: false })
 })
 
 afterEach(() => cleanup())
