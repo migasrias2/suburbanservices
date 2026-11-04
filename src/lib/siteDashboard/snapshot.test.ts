@@ -112,3 +112,35 @@ describe('buildSiteSnapshot', () => {
     })
   })
 })
+
+describe('buildSiteSnapshot across midnight', () => {
+  // 00:30 on 2 Nov. The shift started at 22:00 on 1 Nov; at 23:50 the cleaner
+  // scanned Eco Block Men's and at 23:58 submitted it.
+  const justAfterMidnight = new Date(Date.UTC(2026, 10, 2, 0, 30))
+  const snapshot = buildSiteSnapshot(
+    SEAS,
+    {
+      qrRows: SEAS_QR_ROWS,
+      areaTaskRows: [],
+      attendance: [attendanceRow({ clock_in: at(22, 0) })],
+      selections: [selectionRow({ qr_code_id: QR_ECO_MENS, timestamp: at(23, 58) })],
+      photoRows: [photoRow({ qr_code_id: QR_ECO_MENS, photo_timestamp: at(23, 56) })],
+      scans: [{ cleaner_id: CLEANER_ID, timestamp: at(23, 50), scanned_qr_id: QR_ECO_MENS }],
+      assists: [],
+    },
+    justAfterMidnight,
+  )
+
+  it("does not claim yesterday's finished area is still being cleaned", () => {
+    expect(snapshot.onSite[0].activity).toMatchObject({ kind: 'last_cleaned', areaName: "Eco Block Men's", at: at(23, 58) })
+    expect(snapshot.kpis.inProgress).toBe(0)
+  })
+
+  it("counts yesterday's clean and photo in none of today's numbers", () => {
+    expect(snapshot.kpis.cleansCompleted).toBe(0)
+    expect(snapshot.kpis.photos).toBe(0)
+    expect(snapshot.coverage.done).toBe(0)
+    expect(snapshot.timeline.some((item) => item.kind === 'clean')).toBe(false)
+    expect(snapshot.dayStart).toBe(new Date(Date.UTC(2026, 10, 2)).toISOString())
+  })
+})

@@ -190,6 +190,8 @@ export type SiteKpis = {
 export type SiteSnapshot = {
   site: SiteRef
   generatedAt: string
+  /** London midnight that "today" is counted from. */
+  dayStart: string
   kpis: SiteKpis
   onSite: OnSiteCleaner[]
   timeline: TimelineItem[]

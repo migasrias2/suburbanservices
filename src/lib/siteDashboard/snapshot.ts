@@ -2,6 +2,7 @@ import { buildAreaCatalog } from './areaCatalog'
 import { averageResponseMinutes, buildCalls } from './callACleaner'
 import { buildCleans } from './cleans'
 import { buildCoverage } from './coverage'
+import { startOfSiteDay } from './format'
 import { buildOnSite } from './presence'
 import { buildSiteMatcher } from './siteScope'
 import { buildTimeline, timelineAreaOptions } from './timeline'
@@ -28,12 +29,6 @@ export type SiteRawData = {
   photoRows: PhotoMetaRow[]
   scans: AreaScanRow[]
   assists: AssistRow[]
-}
-
-export const startOfLocalDay = (now: Date): Date => {
-  const start = new Date(now)
-  start.setHours(0, 0, 0, 0)
-  return start
 }
 
 export const buildKpis = (input: {
@@ -88,15 +83,22 @@ export const buildSiteSnapshot = (
   defaultTaskNames: Record<string, string> = {},
 ): SiteSnapshot => {
   const scoped = scopeRawData(site, raw)
-  const dayStart = startOfLocalDay(now)
+  const dayStart = startOfSiteDay(now)
+  const dayStartMs = dayStart.getTime()
   const catalog = buildAreaCatalog({
     qrRows: scoped.qrRows,
     areaTaskRows: scoped.areaTaskRows,
     siteNames: site.matchNames,
     defaultTaskNames,
   })
-  const { cleans, photos } = buildCleans(scoped.selections, scoped.photoRows, catalog)
-  const onSite = buildOnSite(scoped.attendance, scoped.scans, cleans, catalog, now)
+  // Rows arrive over the whole on-shift window, which can reach back past
+  // midnight. Presence needs all of them (a 23:58 submit closes a 23:50 scan);
+  // everything a client counts as "today" starts at London midnight.
+  const shiftWindow = buildCleans(scoped.selections, scoped.photoRows, catalog)
+  const isToday = (iso: string) => new Date(iso).getTime() >= dayStartMs
+  const cleans = shiftWindow.cleans.filter((clean) => isToday(clean.at))
+  const photos = shiftWindow.photos.filter((photo) => isToday(photo.at))
+  const onSite = buildOnSite(scoped.attendance, scoped.scans, shiftWindow.cleans, catalog, now)
   const calls = buildCalls(scoped.assists, catalog, now, dayStart)
   const inProgressKeys = onSite.flatMap((person) =>
     person.activity?.kind === 'cleaning' ? [person.activity.areaKey] : [],
@@ -107,6 +109,7 @@ export const buildSiteSnapshot = (
   return {
     site,
     generatedAt: now.toISOString(),
+    dayStart: dayStart.toISOString(),
     kpis: buildKpis({ onSite, cleans, photoCount: photos.length, calls }),
     onSite,
     timeline,

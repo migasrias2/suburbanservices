@@ -2,7 +2,7 @@ import React from 'react'
 import { AlertCircle, Check, LogIn, LogOut, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { describeOpenCall, describeResolvedCall } from '@/lib/siteDashboard/callACleaner'
-import { formatClock, pluralize } from '@/lib/siteDashboard/format'
+import { formatClockWithDay, pluralize } from '@/lib/siteDashboard/format'
 import type { SitePhoto, TimelineItem } from '@/lib/siteDashboard/types'
 import { LazyPhotoGroup, type OpenPhotoHandler } from './LazyPhotoGroup'
 import { StatusPill } from './parts'
@@ -32,15 +32,21 @@ const MarkerIcon: React.FC<{ kind: TimelineItem['kind'] }> = ({ kind }) => {
   }
 }
 
-const Heading: React.FC<{ at: string; title: string; pill?: React.ReactNode }> = ({ at, title, pill }) => (
-  <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-    <time className="min-w-[2.75rem] text-sm font-semibold text-primary" dateTime={at}>
-      {formatClock(at)}
-    </time>
-    <span className="text-sm font-semibold text-foreground">{title}</span>
-    {pill}
-  </div>
-)
+/** Start of the site's day, so anything older (an open request from last night) shows its date too. */
+const DayStartContext = React.createContext<Date>(new Date(0))
+
+const Heading: React.FC<{ at: string; title: string; pill?: React.ReactNode }> = ({ at, title, pill }) => {
+  const dayStart = React.useContext(DayStartContext)
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+      <time className="min-w-[2.75rem] text-sm font-semibold text-primary" dateTime={at}>
+        {formatClockWithDay(at, dayStart)}
+      </time>
+      <span className="text-sm font-semibold text-foreground">{title}</span>
+      {pill}
+    </div>
+  )
+}
 
 const Body: React.FC<{ item: TimelineItem; photosById: Map<number, SitePhoto>; onOpenPhoto: OpenPhotoHandler }> = ({
   item,
@@ -124,7 +130,9 @@ export const TimelineEntry: React.FC<{
   item: TimelineItem
   photosById: Map<number, SitePhoto>
   onOpenPhoto: OpenPhotoHandler
-}> = ({ item, photosById, onOpenPhoto }) => (
+  dayStart: Date
+}> = ({ item, photosById, onOpenPhoto, dayStart }) => (
+  <DayStartContext.Provider value={dayStart}>
   <li className="relative pb-5 pl-7 last:pb-0">
     <span
       className={cn(
@@ -137,4 +145,5 @@ export const TimelineEntry: React.FC<{
     </span>
     <Body item={item} photosById={photosById} onOpenPhoto={onOpenPhoto} />
   </li>
+  </DayStartContext.Provider>
 )

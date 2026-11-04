@@ -9,6 +9,13 @@ import type { AreaCatalog, AreaScanRow, AttendanceRow, Clean, CurrentActivity, O
  */
 export const ON_SITE_MAX_HOURS = 12
 
+/**
+ * An area scan with no submit after this long is no longer "being cleaned"
+ * right now: the cleaner abandoned it, or the submit never reached us. The
+ * longest real area cleans run well under an hour.
+ */
+export const IN_PROGRESS_MAX_MINUTES = 60
+
 const toMs = (iso: string | null | undefined): number => (iso ? new Date(iso).getTime() : Number.NaN)
 
 const minutesBetween = (fromMs: number, toMsValue: number) => Math.max(0, Math.floor((toMsValue - fromMs) / 60000))
@@ -22,6 +29,7 @@ const resolveActivity = (
   scans: AreaScanRow[],
   cleans: Clean[],
   catalog: AreaCatalog,
+  nowMs: number,
 ): CurrentActivity | null => {
   const ownCleans = cleans
     .filter((clean) => cleanerId && clean.cleanerId === cleanerId && toMs(clean.at) >= clockInMs)
@@ -39,7 +47,8 @@ const resolveActivity = (
     // Any clean submitted after the scan means that scan's work is finished.
     const scanMs = toMs(latestScan.scan.timestamp)
     const submittedSinceScan = ownCleans.some((clean) => toMs(clean.at) >= scanMs)
-    if (!submittedSinceScan) {
+    const stale = nowMs - scanMs > IN_PROGRESS_MAX_MINUTES * 60000
+    if (!submittedSinceScan && !stale) {
       return {
         kind: 'cleaning',
         areaKey: latestScan.area.key as string,
@@ -92,7 +101,7 @@ export const buildOnSite = (
         name: displayCleanerName(row.cleaner_name),
         clockIn: row.clock_in as string,
         minutesOnSite: minutesBetween(clockInMs, nowMs),
-        activity: resolveActivity(cleanerId, clockInMs, scans, cleans, catalog),
+        activity: resolveActivity(cleanerId, clockInMs, scans, cleans, catalog, nowMs),
       }
     })
     .sort((a, b) => toMs(a.clockIn) - toMs(b.clockIn))

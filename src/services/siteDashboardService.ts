@@ -5,7 +5,8 @@ import { signTaskPhotoPaths } from './photoStorageService'
 import { AREA_TASKS } from './qrService'
 import { resolveManagerSiteLinks } from '../lib/managerScope'
 import { buildNameFilter, collectMatchNames, titleCaseLabel } from '../lib/siteDashboard/siteScope'
-import { buildSiteSnapshot, startOfLocalDay, type SiteRawData } from '../lib/siteDashboard/snapshot'
+import { buildSiteSnapshot, type SiteRawData } from '../lib/siteDashboard/snapshot'
+import { startOfSiteDay } from '../lib/siteDashboard/format'
 import { ON_SITE_MAX_HOURS } from '../lib/siteDashboard/presence'
 import type {
   AreaScanRow,
@@ -22,8 +23,13 @@ import type { AppRole } from '../contexts/AuthContext'
 
 /** PostgREST puts .in() lists in the URL; keep each request comfortably short. */
 const IN_LIST_CHUNK = 80
-/** A busy site day is a few hundred photos; this is a ceiling, not an expectation. */
-const PHOTO_META_LIMIT = 1000
+/** PostgREST's default max-rows; a request never returns more than this, so bigger days are paged. */
+export const PAGE_SIZE = 1000
+/**
+ * A busy SEAS day is ~2,300 photos. Twenty pages is ~9x that; past it the
+ * oldest rows are dropped (pages run newest first) rather than looping forever.
+ */
+const MAX_PAGES = 20
 const OPEN_CALL_LIMIT = 50
 const RESOLVED_CALL_LIMIT = 100
 
@@ -37,6 +43,7 @@ const DEFAULT_TASK_NAMES: Record<string, string> = Object.fromEntries(
 )
 
 type CustomerDetailRow = { id: string; name: string | null; display_name: string | null; address: string | null }
+type QueryResult = { data: unknown; error: { message?: string } | null }
 
 const chunk = <T,>(items: T[], size: number): T[][] =>
   Array.from({ length: Math.ceil(items.length / size) }, (_, index) => items.slice(index * size, (index + 1) * size))
@@ -51,41 +58,58 @@ const fail = (what: string, error: { message?: string } | null): never => {
 // ---------------------------------------------------------------------------
 
 /** manager_customers rows for this manager, read directly the way OpsCalendarPage does. */
-async function fetchLinkedCustomerIds(managerId: string): Promise<string[]> {
+async function fetchLinkedCustomerIds(managerId: string): Promise<{ ids: string[]; loaded: boolean }> {
   const { data, error } = await supabase.from('manager_customers').select('customer_id').eq('manager_id', managerId)
   if (error) {
-    console.warn('Site dashboard: manager_customers not readable, using scope RPC only', error)
-    return []
+    console.warn('Site dashboard: manager_customers not readable', error)
+    return { ids: [], loaded: false }
   }
-  return (data ?? []).map((row: { customer_id: string | null }) => row.customer_id).filter((id): id is string => Boolean(id))
+  const ids = (data ?? [])
+    .map((row: { customer_id: string | null }) => row.customer_id)
+    .filter((id): id is string => Boolean(id))
+  return { ids, loaded: true }
 }
 
-async function fetchCustomerDetails(ids: string[]): Promise<Map<string, CustomerDetailRow>> {
-  if (!ids.length) return new Map()
+async function fetchCustomerDetails(ids: string[]): Promise<{ rows: Map<string, CustomerDetailRow>; loaded: boolean }> {
+  if (!ids.length) return { rows: new Map(), loaded: true }
   const { data, error } = await supabase.from('uk_customers').select('id, name, display_name, address').in('id', ids)
   if (error) {
     console.warn('Site dashboard: customer details not readable', error)
-    return new Map()
+    return { rows: new Map(), loaded: false }
   }
-  return new Map(((data ?? []) as CustomerDetailRow[]).map((row) => [row.id, row]))
+  return { rows: new Map(((data ?? []) as CustomerDetailRow[]).map((row) => [row.id, row])), loaded: true }
 }
 
 /**
  * A client login's sites: the customers linked to THIS manager id, from the
- * scope RPC and manager_customers. Nothing linked means an empty list, and an
- * empty list means the page shows no data at all.
+ * scope RPC and manager_customers.
+ *
+ * "Nothing linked" (an empty list, so the page shows no data) is only ever
+ * said when a lookup actually answered. If neither lookup answered, or a
+ * linked customer cannot be named, this throws so the page offers a retry
+ * instead of telling a client on weak wifi that they have no site.
  */
 async function loadManagerSites(managerId: string): Promise<SiteRef[]> {
-  const [links, directIds] = await Promise.all([resolveManagerSiteLinks(managerId), fetchLinkedCustomerIds(managerId)])
+  const [scope, direct] = await Promise.all([resolveManagerSiteLinks(managerId), fetchLinkedCustomerIds(managerId)])
+  if (!scope.loaded && !direct.loaded) {
+    throw new Error('Could not load your sites. Please try again.')
+  }
+
+  const { links } = scope
   const customerIds = Array.from(
-    new Set([...links.flatMap((link) => (link.customerId ? [link.customerId] : [])), ...directIds]),
+    new Set([...links.flatMap((link) => (link.customerId ? [link.customerId] : [])), ...direct.ids]),
   )
   const details = await fetchCustomerDetails(customerIds)
+  const labelledIds = new Set(links.flatMap((link) => (link.customerId ? [link.customerId] : [])))
+  if (!details.loaded && customerIds.some((id) => !labelledIds.has(id))) {
+    throw new Error('Could not load your sites. Please try again.')
+  }
 
   const fromIds: SiteRef[] = customerIds.flatMap((customerId) => {
-    const detail = details.get(customerId)
+    const detail = details.rows.get(customerId)
     const tokens = links.filter((link) => link.customerId === customerId).flatMap((link) => link.tokens)
     const matchNames = collectMatchNames([detail?.display_name, detail?.name, ...tokens])
+    // A customer row that genuinely has no name cannot be scoped, so it is not shown.
     if (!matchNames.length) return []
     const name = detail?.display_name?.trim() || detail?.name?.trim() || titleCaseLabel(matchNames[0])
     return [{ key: customerId, customerId, name, matchNames, address: detail?.address?.trim() || null }]
@@ -145,6 +169,32 @@ export async function loadSitesForUser(role: AppRole | null, userId: string | nu
 // One site's day
 // ---------------------------------------------------------------------------
 
+/**
+ * Every row of a query, PAGE_SIZE at a time. Callers order newest first with
+ * an id tiebreak; a row inserted mid-read only pushes others down a page, so
+ * duplicates are possible (dropped here by id) but misses are not.
+ */
+async function fetchAllPages<T extends { id: number | string }>(
+  page: (from: number, to: number) => PromiseLike<QueryResult>,
+  what: string,
+): Promise<T[]> {
+  const loadFrom = async (pageIndex: number, collected: T[]): Promise<T[]> => {
+    const from = pageIndex * PAGE_SIZE
+    const result = await page(from, from + PAGE_SIZE - 1)
+    if (result.error) fail(what, result.error)
+    const batch = (result.data ?? []) as T[]
+    const rows = [...collected, ...batch]
+    if (batch.length < PAGE_SIZE) return rows
+    if (pageIndex + 1 >= MAX_PAGES) {
+      console.warn(`Site dashboard: ${what} truncated at ${rows.length} rows`)
+      return rows
+    }
+    return loadFrom(pageIndex + 1, rows)
+  }
+  const rows = await loadFrom(0, [])
+  return Array.from(new Map(rows.map((row) => [String(row.id), row])).values())
+}
+
 async function fetchQrRows(nameFilter: string): Promise<QrCodeRow[]> {
   const { data, error } = await supabase
     .from('building_qr_codes')
@@ -184,7 +234,8 @@ async function fetchAssists(nameFilter: string, dayStartIso: string): Promise<As
       .select(ASSIST_COLUMNS)
       .in('status', ['pending', 'accepted', 'escalated'])
       .or(nameFilter)
-      .order('reported_at', { ascending: true })
+      // Newest first so the cap keeps current requests; long-forgotten ones fall off the end.
+      .order('reported_at', { ascending: false })
       .limit(OPEN_CALL_LIMIT),
     supabase
       .from('bathroom_assist_requests')
@@ -200,40 +251,46 @@ async function fetchAssists(nameFilter: string, dayStartIso: string): Promise<As
   return [...(openRes.data ?? []), ...(resolvedRes.data ?? [])] as AssistRow[]
 }
 
-async function fetchByQrIds<T>(qrIds: string[], run: (ids: string[]) => PromiseLike<{ data: unknown; error: { message?: string } | null }>, what: string): Promise<T[]> {
+async function fetchByQrIds<T extends { id: number | string }>(
+  qrIds: string[],
+  page: (ids: string[], from: number, to: number) => PromiseLike<QueryResult>,
+  what: string,
+): Promise<T[]> {
   if (!qrIds.length) return []
-  const results = await Promise.all(chunk(qrIds, IN_LIST_CHUNK).map((ids) => run(ids)))
-  return results.flatMap((result) => {
-    if (result.error) fail(what, result.error)
-    return (result.data ?? []) as T[]
-  })
+  const groups = await Promise.all(
+    chunk(qrIds, IN_LIST_CHUNK).map((ids) => fetchAllPages<T>((from, to) => page(ids, from, to), what)),
+  )
+  return groups.flat()
 }
 
 /** Metadata only. photo_data is a ~174 KB base64 blob per row; loading a day of it times the query out. */
-const fetchPhotoMeta = (qrIds: string[], dayStartIso: string) =>
+const fetchPhotoMeta = (qrIds: string[], sinceIso: string) =>
   fetchByQrIds<PhotoMetaRow>(
     qrIds,
-    (ids) =>
+    (ids, from, to) =>
       supabase
         .from('uk_cleaner_task_photos')
         .select('id, cleaner_id, cleaner_name, qr_code_id, task_id, photo_timestamp')
         .in('qr_code_id', ids)
-        .gte('photo_timestamp', dayStartIso)
-        .order('photo_timestamp', { ascending: true })
-        .limit(PHOTO_META_LIMIT),
+        .gte('photo_timestamp', sinceIso)
+        .order('photo_timestamp', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to),
     'photos',
   )
 
-const fetchSelections = (qrIds: string[], dayStartIso: string) =>
+const fetchSelections = (qrIds: string[], sinceIso: string) =>
   fetchByQrIds<SelectionRow>(
     qrIds,
-    (ids) =>
+    (ids, from, to) =>
       supabase
         .from('uk_cleaner_task_selections')
         .select('id, cleaner_id, cleaner_name, qr_code_id, area_type, selected_tasks, completed_tasks, timestamp')
         .in('qr_code_id', ids)
-        .gte('timestamp', dayStartIso)
-        .order('timestamp', { ascending: true }),
+        .gte('timestamp', sinceIso)
+        .order('timestamp', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to),
     'cleans',
   )
 
@@ -266,14 +323,16 @@ export async function loadSiteSnapshot(site: SiteRef, now: Date = new Date()): P
   const empty: SiteRawData = { qrRows: [], areaTaskRows: [], attendance: [], selections: [], photoRows: [], scans: [], assists: [] }
   if (!nameFilter || !attendanceFilter) return buildSiteSnapshot(site, empty, now, DEFAULT_TASK_NAMES)
 
-  const dayStartIso = startOfLocalDay(now).toISOString()
+  const dayStartIso = startOfSiteDay(now).toISOString()
   const onSiteWindowIso = new Date(now.getTime() - ON_SITE_MAX_HOURS * 3600 * 1000).toISOString()
-  const attendanceSinceIso = dayStartIso < onSiteWindowIso ? dayStartIso : onSiteWindowIso
+  // Everything that decides presence is read over the same window as the shifts,
+  // which can start before midnight. The snapshot counts only from midnight.
+  const windowStartIso = dayStartIso < onSiteWindowIso ? dayStartIso : onSiteWindowIso
 
   const [qrRows, areaTaskRows, attendance, assists] = await Promise.all([
     fetchQrRows(nameFilter),
     fetchAreaTaskRows(nameFilter),
-    fetchAttendance(attendanceFilter, attendanceSinceIso),
+    fetchAttendance(attendanceFilter, windowStartIso),
     fetchAssists(nameFilter, dayStartIso),
   ])
 
@@ -288,9 +347,9 @@ export async function loadSiteSnapshot(site: SiteRef, now: Date = new Date()): P
   )
 
   const [selections, photoRows, scans] = await Promise.all([
-    fetchSelections(qrIds, dayStartIso),
-    fetchPhotoMeta(qrIds, dayStartIso),
-    fetchAreaScans(openCleanerIds, attendanceSinceIso),
+    fetchSelections(qrIds, windowStartIso),
+    fetchPhotoMeta(qrIds, windowStartIso),
+    fetchAreaScans(openCleanerIds, windowStartIso),
   ])
 
   return buildSiteSnapshot(site, { qrRows, areaTaskRows, attendance, selections, photoRows, scans, assists }, now, DEFAULT_TASK_NAMES)

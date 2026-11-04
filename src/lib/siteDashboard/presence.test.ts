@@ -50,6 +50,14 @@ describe('buildOnSite', () => {
     expect(onSite[0].clockIn).toBe(at(9, 40))
   })
 
+  it('stops calling a scan "in progress" after an hour with no submit', () => {
+    const { cleans } = buildCleans([selectionRow({ qr_code_id: QR_PAVILION_LADIES, timestamp: at(13, 0) })], [], catalog)
+    const at59 = buildOnSite([attendanceRow({})], [scan(QR_ECO_MENS, at(13, 53))], cleans, catalog, NOW)
+    const at61 = buildOnSite([attendanceRow({})], [scan(QR_ECO_MENS, at(13, 51))], cleans, catalog, NOW)
+    expect(at59[0].activity?.kind).toBe('cleaning')
+    expect(at61[0].activity).toEqual({ kind: 'last_cleaned', areaKey: "pavilion ladies'", areaName: "Pavilion Ladies'", at: at(13, 0) })
+  })
+
   it('says what they are cleaning from their latest area scan', () => {
     const [person] = buildOnSite(
       [attendanceRow({})],

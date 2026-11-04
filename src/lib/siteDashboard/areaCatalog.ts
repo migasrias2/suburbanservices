@@ -42,39 +42,79 @@ const NON_AREA_TASK_TYPES = new Set(['CLOCK_IN', 'CLOCK_OUT', 'FEEDBACK'])
 /** area_tasks rows of this type are the area placeholder itself, not a checklist item. */
 const PLACEHOLDER_TASK_TYPES = new Set(['AREA', 'TASK', ...NON_AREA_TASK_TYPES])
 
+type LabelContext = { qrCodeIds?: Iterable<string>; siteNames?: Iterable<string> }
+
+const SLUG_SEPARATOR = /[-_]+/
+const SLUG_WORD = /^[a-z]+(?:['’][a-z]+)?$/i
+
+const collapse = (value: string | null | undefined): string =>
+  typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : ''
+
 /**
- * Is this something a client would recognise as a place?
- *
- * Rejects anything that looks like a code: UUIDs, QR ids, snake_case or
- * SHOUTY-KEBAB identifiers, "QR" labels, area-type names, clock posters and
- * the site's own name. A label that fails here is never shown — the dashboard
- * says "Area not recorded" instead of leaking a code name.
+ * "pavilion-ladies" / "PAVILION_LADIES" -> "Pavilion Ladies". Only for slugs
+ * made of real words (two or more, each three letters or longer):
+ * QRUploadManager names areas after upload folders this way. Anything shorter
+ * or with digits ("pav-l-01") is a code and gets no name.
  */
-export const isHumanAreaLabel = (
-  value: string | null | undefined,
-  context: { qrCodeIds?: Iterable<string>; siteNames?: Iterable<string> } = {},
-): boolean => {
-  const trimmed = typeof value === 'string' ? value.trim() : ''
-  if (!trimmed) return false
-  if (UUID_PATTERN.test(trimmed)) return false
-  if (/\bqr\b/i.test(trimmed) || /^ops[_-]?inspection/i.test(trimmed)) return false
-  if (!/[a-z]/i.test(trimmed)) return false
+const humaniseSlug = (token: string): string | null => {
+  const words = token.split(SLUG_SEPARATOR).filter(Boolean)
+  if (words.length < 2 || !words.every((word) => word.length >= 3 && SLUG_WORD.test(word))) return null
+  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ')
+}
 
-  const hasWhitespace = /\s/.test(trimmed)
-  if (!hasWhitespace && trimmed.includes('_')) return false
-  if (!hasWhitespace && trimmed.includes('-') && trimmed === trimmed.toUpperCase()) return false
+/**
+ * The name a client would recognise for a place, or null.
+ *
+ * Rejects anything that looks like a code: UUIDs, QR ids, anything mentioning
+ * QR ("QR1", "QRCode Pavilion"), single tokens with digits ("T04", "7f3a9c",
+ * "pav-l-01"), short all-caps tokens, area-type names, clock posters and the
+ * site's own name. Word slugs are humanised rather than dropped. A label that
+ * fails here is never shown; the dashboard says "Area not recorded" instead.
+ */
+export const toAreaLabel = (value: string | null | undefined, context: LabelContext = {}): string | null => {
+  const trimmed = collapse(value)
+  if (!trimmed) return null
+  if (UUID_PATTERN.test(trimmed)) return null
+  if (/\bqr/i.test(trimmed) || /^ops[_-]?inspection/i.test(trimmed)) return null
+  if (!/[a-z]/i.test(trimmed)) return null
 
-  const normalized = normalizeName(trimmed)
-  if (RESERVED_LABELS.has(normalized)) return false
-  if (isClockAreaName(trimmed)) return false
+  let label = trimmed
+  if (!/\s/.test(trimmed)) {
+    if (/\d/.test(trimmed)) return null
+    if (SLUG_SEPARATOR.test(trimmed)) {
+      const humanised = humaniseSlug(trimmed)
+      if (!humanised) return null
+      label = humanised
+    } else if (trimmed.length <= 4 && trimmed === trimmed.toUpperCase()) {
+      return null
+    }
+  }
 
+  const normalized = normalizeName(label)
+  if (RESERVED_LABELS.has(normalized)) return null
+  if (isClockAreaName(label)) return null
   for (const qrId of context.qrCodeIds ?? []) {
-    if (normalizeName(qrId) === normalized) return false
+    const id = normalizeName(qrId)
+    if (id === normalized || id === normalizeName(trimmed)) return null
   }
   for (const siteName of context.siteNames ?? []) {
-    if (normalizeName(siteName) === normalized) return false
+    if (normalizeName(siteName) === normalized) return null
   }
-  return true
+  return label
+}
+
+export const isHumanAreaLabel = (value: string | null | undefined, context: LabelContext = {}): boolean =>
+  toAreaLabel(value, context) !== null
+
+/**
+ * The best name among several candidates. One already written as a place name
+ * wins over one that had to be humanised from a slug, so a QR payload's
+ * "Pavilion Ladies'" beats building_area "PAVILION_LADIES".
+ */
+export const pickAreaLabel = (candidates: Array<string | null | undefined>, context: LabelContext = {}): string | null => {
+  const labels = candidates.map((candidate) => ({ raw: collapse(candidate), label: toAreaLabel(candidate, context) }))
+  const verbatim = labels.find((entry) => entry.label !== null && entry.label === entry.raw)
+  return verbatim?.label ?? labels.find((entry) => entry.label !== null)?.label ?? null
 }
 
 type ParsedQrPayload = { type: string | null; areaName: string | null }
@@ -156,9 +196,7 @@ export const buildAreaCatalog = ({ qrRows, areaTaskRows, siteNames, defaultTaskN
     const kind = qrKindOf(row, payload)
     if (kind !== 'AREA' && kind !== 'TASK') return
     const description = DEFAULT_DESCRIPTION_KIND[normalizeName(row.area_description)] ? null : row.area_description
-    const name = [row.building_area, payload.areaName, description].find((candidate) =>
-      isHumanAreaLabel(candidate, context),
-    )
+    const name = pickAreaLabel([row.building_area, payload.areaName, description], context)
     if (name) upsertEntry(name, qrId, row.is_active !== false)
   })
 
@@ -168,7 +206,7 @@ export const buildAreaCatalog = ({ qrRows, areaTaskRows, siteNames, defaultTaskN
     const taskType = (row.task_type ?? '').trim().toUpperCase()
     if (NON_AREA_TASK_TYPES.has(taskType)) return
     const qrId = row.qr_code?.trim() || null
-    const areaName = isHumanAreaLabel(row.area, context) ? (row.area as string) : null
+    const areaName = toAreaLabel(row.area, context)
     if (areaName && !(qrId && byQrId.has(qrId))) {
       upsertEntry(areaName, qrId, row.active !== false)
     }
@@ -200,9 +238,9 @@ export const resolveArea = (
   const entry = qrCodeId ? catalog.byQrId.get(qrCodeId.trim()) : undefined
   if (entry) return { key: entry.key, name: entry.name }
   const context = { qrCodeIds: catalog.qrCodeIds, siteNames: catalog.siteNames }
-  const label = fallbacks.find((candidate) => isHumanAreaLabel(candidate, context))
+  const label = pickAreaLabel(fallbacks, context)
   if (!label) return { key: null, name: null }
   const key = normalizeName(label)
   const known = catalog.areas.find((area) => area.key === key)
-  return { key, name: known?.name ?? label.trim().replace(/\s+/g, ' ') }
+  return { key, name: known?.name ?? label }
 }

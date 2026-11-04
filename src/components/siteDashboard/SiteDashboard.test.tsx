@@ -35,8 +35,14 @@ const snapshot = buildSiteSnapshot(
 
 const loadSiteSnapshot = vi.fn(async () => snapshot)
 
+let sitesError: Error | null = null
+const loadSitesForUser = vi.fn(async () => {
+  if (sitesError) throw sitesError
+  return sites
+})
+
 vi.mock('@/services/siteDashboardService', () => ({
-  loadSitesForUser: vi.fn(async () => sites),
+  loadSitesForUser: (...args: unknown[]) => loadSitesForUser(...(args as [])),
   loadSiteSnapshot: (...args: unknown[]) => loadSiteSnapshot(...(args as [])),
   loadPhotoSources: vi.fn(async () => ({})),
 }))
@@ -54,7 +60,24 @@ const renderDashboard = (role: 'manager' | 'admin', path = '/site-dashboard') =>
 
 beforeEach(() => {
   sites = []
+  sitesError = null
   loadSiteSnapshot.mockClear()
+  loadSitesForUser.mockClear()
+})
+
+describe('SiteDashboard when the site lookup fails', () => {
+  it('says it could not load the sites, not that none are linked, and recovers on Try again', async () => {
+    sitesError = new Error('Could not load your sites. Please try again.')
+    renderDashboard('manager')
+    expect(await screen.findByText(/We couldn't load your sites/, {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(screen.queryByText(/No site is linked/)).toBeNull()
+    expect(loadSiteSnapshot).not.toHaveBeenCalled()
+
+    sitesError = null
+    sites = [SEAS]
+    screen.getByRole('button', { name: 'Try again' }).click()
+    expect(await screen.findByText('Cleans completed')).toBeInTheDocument()
+  })
 })
 
 describe('SiteDashboard', () => {
@@ -87,5 +110,14 @@ describe('SiteDashboard', () => {
     expect(screen.getByText('Currently cleaning')).toBeInTheDocument()
     expect(screen.queryByText(QR_PAVILION_LADIES)).toBeNull()
     expect(screen.queryByRole('button', { name: /delete|remove|clear/i })).toBeNull()
+  })
+
+  it('opens the timeline newest first', async () => {
+    sites = [SEAS]
+    renderDashboard('manager')
+    expect(await screen.findByRole('button', { name: /Newest first/ })).toBeInTheDocument()
+    const times = Array.from(document.querySelectorAll('ol time')).map((node) => node.textContent)
+    expect(times[0]).toBe('14:41')
+    expect(times[times.length - 1]).toBe('09:40')
   })
 })

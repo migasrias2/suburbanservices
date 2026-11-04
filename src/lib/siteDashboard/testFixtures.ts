@@ -1,11 +1,15 @@
 import type { AreaTaskRow, AssistRow, AttendanceRow, PhotoMetaRow, QrCodeRow, SelectionRow, SiteRef } from './types'
 
-/** Local wall-clock time on 1 Nov 2026, the day of the client's prototype. */
+/**
+ * London wall-clock time on 1 Nov 2026, the day of the client's prototype.
+ * British Summer Time ended on 25 Oct, so London is on UTC that day and these
+ * hold whatever time zone the test machine is in.
+ */
 export const at = (hours: number, minutes = 0, dayOffset = 0): string =>
-  new Date(2026, 10, 1 + dayOffset, hours, minutes, 0, 0).toISOString()
+  new Date(Date.UTC(2026, 10, 1 + dayOffset, hours, minutes, 0, 0)).toISOString()
 
-export const NOW = new Date(2026, 10, 1, 14, 52, 0, 0)
-export const DAY_START = new Date(2026, 10, 1, 0, 0, 0, 0)
+export const NOW = new Date(Date.UTC(2026, 10, 1, 14, 52, 0, 0))
+export const DAY_START = new Date(Date.UTC(2026, 10, 1, 0, 0, 0, 0))
 
 export const SEAS: SiteRef = {
   key: 'cust-seas',

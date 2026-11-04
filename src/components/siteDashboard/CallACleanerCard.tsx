@@ -1,12 +1,12 @@
 import React from 'react'
 import { AlertCircle, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatClock } from '@/lib/siteDashboard/format'
+import { formatClockWithDay } from '@/lib/siteDashboard/format'
 import { describeOpenCall, describeResolvedCall } from '@/lib/siteDashboard/callACleaner'
 import type { CallItem } from '@/lib/siteDashboard/types'
 import { EmptyState, SectionHeading, StatusPill } from './parts'
 
-const CallRow: React.FC<{ call: CallItem; open: boolean }> = ({ call, open }) => (
+const CallRow: React.FC<{ call: CallItem; open: boolean; dayStart: Date }> = ({ call, open, dayStart }) => (
   <div
     className={cn(
       'flex items-start gap-3 rounded-2xl border p-3.5',
@@ -29,12 +29,12 @@ const CallRow: React.FC<{ call: CallItem; open: boolean }> = ({ call, open }) =>
       </StatusPill>
     </div>
     <time className="shrink-0 text-xs text-muted-foreground" dateTime={call.reportedAt}>
-      {formatClock(call.reportedAt)}
+      {formatClockWithDay(call.reportedAt, dayStart)}
     </time>
   </div>
 )
 
-export const CallACleanerCard: React.FC<{ calls: { open: CallItem[]; resolved: CallItem[] } }> = ({ calls }) => (
+export const CallACleanerCard: React.FC<{ calls: { open: CallItem[]; resolved: CallItem[] }; dayStart: Date }> = ({ calls, dayStart }) => (
   <section>
     <SectionHeading
       title="Call a Cleaner"
@@ -46,10 +46,10 @@ export const CallACleanerCard: React.FC<{ calls: { open: CallItem[]; resolved: C
     ) : (
       <div className="space-y-2.5">
         {calls.open.map((call) => (
-          <CallRow key={call.id} call={call} open />
+          <CallRow key={call.id} call={call} open dayStart={dayStart} />
         ))}
         {calls.resolved.map((call) => (
-          <CallRow key={call.id} call={call} open={false} />
+          <CallRow key={call.id} call={call} open={false} dayStart={dayStart} />
         ))}
       </div>
     )}

@@ -28,6 +28,8 @@ type DbScopeRow = {
 
 const dbScopes: DbScopeRow[] = []
 let hydratePromise: Promise<void> | null = null
+/** Whether the last hydrate actually got an answer; an empty dbScopes alone cannot tell "none" from "failed". */
+let scopesLoaded = false
 
 export const hydrateManagerScopes = async (): Promise<void> => {
   if (hydratePromise) return hydratePromise
@@ -48,6 +50,7 @@ export const hydrateManagerScopes = async (): Promise<void> => {
           })
         }
       }
+      scopesLoaded = true
     } catch (err) {
       console.warn('hydrateManagerScopes: unexpected error', err)
     }
@@ -58,6 +61,7 @@ export const hydrateManagerScopes = async (): Promise<void> => {
 export const invalidateManagerScopes = () => {
   hydratePromise = null
   dbScopes.length = 0
+  scopesLoaded = false
 }
 
 const normalizeValue = (value?: string | null) => (value ? value.trim().toLowerCase() : '')
@@ -132,18 +136,32 @@ export type ManagerSiteLink = {
   tokens: string[]
 }
 
+export type ManagerSiteLinks = {
+  links: ManagerSiteLink[]
+  /**
+   * False when the scope RPC gave no answer. Then an empty `links` means
+   * "unknown", not "nothing linked", and the caller must not say otherwise.
+   */
+  loaded: boolean
+}
+
 /**
  * The customers linked to ONE manager id, for views that must fail closed.
  *
- * Unlike resolveManagerCustomerScope this never matches on display name (a
- * manager called "James" at another client would otherwise inherit PSM) and
- * returns an empty list, not a wildcard, when nothing is linked.
+ * Unlike resolveManagerCustomerScope this matches by id only, never by display
+ * name (a manager called "James" at another client would otherwise inherit
+ * PSM), and returns an empty list, not a wildcard, when nothing is linked.
+ * A failed hydrate is retried once rather than trusted from the cache.
  */
-export const resolveManagerSiteLinks = async (managerId?: string | null): Promise<ManagerSiteLink[]> => {
+export const resolveManagerSiteLinks = async (managerId?: string | null): Promise<ManagerSiteLinks> => {
   const id = normalizeValue(managerId ?? undefined)
-  if (!id) return []
+  if (!id) return { links: [], loaded: true }
 
   await hydrateManagerScopes()
+  if (!scopesLoaded) {
+    invalidateManagerScopes()
+    await hydrateManagerScopes()
+  }
 
   const links: ManagerSiteLink[] = dbScopes
     .filter((row) => row.manager_id.toLowerCase() === id)
@@ -157,7 +175,7 @@ export const resolveManagerSiteLinks = async (managerId?: string | null): Promis
     links.push({ customerId: null, label: tokens[0], tokens })
   })
 
-  return links
+  return { links, loaded: scopesLoaded }
 }
 
 export const resolveManagerIdsForCustomer = (customerLabel?: string | null): string[] => {

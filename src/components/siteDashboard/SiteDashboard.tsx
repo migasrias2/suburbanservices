@@ -38,23 +38,41 @@ const SiteBody: React.FC<{ snapshot: SiteSnapshot }> = ({ snapshot }) => {
   const openPhoto = (photos: PhotoViewerState['photos'], index: number, sources: Record<number, string>) =>
     setViewer({ photos, index, sources })
 
+  const dayStart = new Date(snapshot.dayStart)
+
+  // Two layouts from one tree. Below lg the column wrappers are `display:
+  // contents`, so every section is a direct flex child placed by `order`:
+  // Call a Cleaner, who is on site, timeline, coverage, photos — what a
+  // client on a phone needs first. From lg the wrappers become the two
+  // columns and DOM order applies.
   return (
     <div className="space-y-6 sm:space-y-8">
       <SiteKpiRow kpis={snapshot.kpis} onSite={snapshot.onSite} />
-      <div className="grid gap-6 sm:gap-8 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
-        <div className="min-w-0 space-y-6 sm:space-y-8">
-          <ActivityTimeline
-            items={snapshot.timeline}
-            areaOptions={snapshot.areaOptions}
-            photos={snapshot.photos}
-            onOpenPhoto={openPhoto}
-          />
-          <PhotoEvidence photos={snapshot.photos} onOpenPhoto={openPhoto} />
+      <div className="flex flex-col gap-6 sm:gap-8 lg:grid lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+        <div className="contents lg:block lg:min-w-0 lg:space-y-8">
+          <div className="order-3 min-w-0">
+            <ActivityTimeline
+              items={snapshot.timeline}
+              areaOptions={snapshot.areaOptions}
+              photos={snapshot.photos}
+              onOpenPhoto={openPhoto}
+              dayStart={dayStart}
+            />
+          </div>
+          <div className="order-5 min-w-0">
+            <PhotoEvidence photos={snapshot.photos} onOpenPhoto={openPhoto} />
+          </div>
         </div>
-        <div className="min-w-0 space-y-6 sm:space-y-8">
-          <OnSiteCard onSite={snapshot.onSite} />
-          <CallACleanerCard calls={snapshot.calls} />
-          <CoverageCard coverage={snapshot.coverage} />
+        <div className="contents lg:block lg:min-w-0 lg:space-y-8">
+          <div className="order-2 min-w-0">
+            <OnSiteCard onSite={snapshot.onSite} />
+          </div>
+          <div className="order-1 min-w-0">
+            <CallACleanerCard calls={snapshot.calls} dayStart={dayStart} />
+          </div>
+          <div className="order-4 min-w-0">
+            <CoverageCard coverage={snapshot.coverage} />
+          </div>
         </div>
       </div>
       <PhotoViewer state={viewer} onChange={setViewer} />
@@ -79,7 +97,11 @@ export const SiteDashboard: React.FC<SiteDashboardProps> = ({ role, userId }) =>
   const sitesQuery = useQuery({
     queryKey: ['site-dashboard-sites', role, userId],
     queryFn: () => loadSitesForUser(role, userId),
+    // Only a successful answer is kept for 5 minutes. A failed lookup throws
+    // (it is never cached as "no sites") and the page offers Try again.
     staleTime: 5 * 60 * 1000,
+    retry: 1,
+    retryDelay: 500,
   })
   const sites: SiteRef[] = sitesQuery.data ?? []
   const site = pickSelectedSite(sites, searchParams.get('site'), isClient)

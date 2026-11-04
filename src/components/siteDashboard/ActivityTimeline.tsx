@@ -24,12 +24,14 @@ interface ActivityTimelineProps {
   areaOptions: Array<{ key: string; name: string }>
   photos: SitePhoto[]
   onOpenPhoto: OpenPhotoHandler
+  dayStart: Date
 }
 
-export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ items, areaOptions, photos, onOpenPhoto }) => {
+export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ items, areaOptions, photos, onOpenPhoto, dayStart }) => {
   const [filter, setFilter] = useState<TimelineFilter>('all')
   const [areaKey, setAreaKey] = useState<string | null>(null)
-  const [order, setOrder] = useState<TimelineOrder>('oldest')
+  // Newest first: on a live view the first page should be what just happened.
+  const [order, setOrder] = useState<TimelineOrder>('newest')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   // An area that drops out of today's list (e.g. the site changed) must not leave a filter nobody can see.
@@ -98,7 +100,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ items, areaO
         <div className="rounded-3xl border border-border bg-card px-4 py-5 sm:px-6">
           <ol className="ml-2.5 border-l-2 border-border">
             {shown.map((item) => (
-              <TimelineEntry key={item.id} item={item} photosById={photosById} onOpenPhoto={onOpenPhoto} />
+              <TimelineEntry key={item.id} item={item} photosById={photosById} onOpenPhoto={onOpenPhoto} dayStart={dayStart} />
             ))}
           </ol>
           {visible.length > shown.length ? (
