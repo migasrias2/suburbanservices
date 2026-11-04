@@ -55,6 +55,9 @@ const { resolveManagerAccess } = await import('./managerAccessService')
 const { invalidateManagerScopes } = await import('../lib/managerScope')
 
 const LINKED = '11111111-1111-4111-8111-111111111111'
+// Legacy hardcoded scopes in src/lib/managerScope.ts.
+const AVTRADE = 'df0bf2e7-1a07-4876-949c-6cfe8fe0fac6'
+const PSM = 'ce2c8d1a-6e0a-4d78-9746-2cd32983455f'
 
 const showgroundScope = [
   { manager_id: LINKED, customer_id: 'cust-1', customer_label: 'South of England Showground' },
@@ -104,13 +107,32 @@ describe('resolveManagerAccess', () => {
     })
   })
 
-  it('shows nothing to a client login with no cleaners linked', async () => {
+  it('scopes a client with a site but no cleaner links by client name alone', async () => {
     scopeRows = showgroundScope
     managerCleanerRows = []
 
     await expect(resolveManagerAccess({ role: 'manager', managerId: LINKED })).resolves.toEqual({
-      status: 'unlinked',
-      reason: 'no_cleaners',
+      status: 'scoped',
+      cleanerIds: [],
+      customerTokens: ['south of england showground'],
+    })
+  })
+
+  it('keeps a legacy hardcoded client (AvTrade) with no DB rows working', async () => {
+    await expect(resolveManagerAccess({ role: 'manager', managerId: AVTRADE })).resolves.toEqual({
+      status: 'scoped',
+      cleanerIds: [],
+      customerTokens: ['avtrade'],
+    })
+  })
+
+  it('scopes a legacy hardcoded client (PSM) by its hardcoded clients when the scope lookup fails', async () => {
+    scopeError = { message: 'timeout' }
+
+    await expect(resolveManagerAccess({ role: 'manager', managerId: PSM })).resolves.toEqual({
+      status: 'scoped',
+      cleanerIds: [],
+      customerTokens: ['psm marine', 'psm'],
     })
   })
 
@@ -124,7 +146,7 @@ describe('resolveManagerAccess', () => {
     })
   })
 
-  it('shows nothing when the client scopes cannot be loaded, and retries next time', async () => {
+  it('shows nothing to a non-legacy client when the client scopes cannot be loaded, and retries next time', async () => {
     scopeError = { message: 'timeout' }
     managerCleanerRows = [{ cleaner_id: 'c1' }]
 

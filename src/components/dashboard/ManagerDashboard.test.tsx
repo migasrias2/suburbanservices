@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { installTestLocalStorage } from '@/test/localStorage'
 
@@ -19,6 +19,8 @@ const calls: Call[] = []
 let scopeRows: unknown[] = []
 let managerCleanerRows: Record<string, unknown[]> = {}
 let managerCleanerError: { message: string } | null = null
+let scopeError: { message: string } | null = null
+let trackingRows: Array<Record<string, unknown>> = []
 
 const CLEANERS = [
   { id: 'c-linked', first_name: 'Alice', last_name: 'Linked', created_at: '2026-01-01T00:00:00Z', email: null, mobile_number: null, is_active: true },
@@ -28,6 +30,8 @@ const CLEANERS = [
 const LINKED = '11111111-1111-4111-8111-111111111111'
 const UNLINKED = '22222222-2222-4222-8222-222222222222'
 const ADMIN = '33333333-3333-4333-8333-333333333333'
+// Legacy hardcoded AvTrade client in src/lib/managerScope.ts: no DB rows at all.
+const AVTRADE = 'df0bf2e7-1a07-4876-949c-6cfe8fe0fac6'
 
 const makeQuery = (table: string) => {
   const filters: Array<{ method: string; args: unknown[] }> = []
@@ -50,6 +54,11 @@ const makeQuery = (table: string) => {
       const ids = inFilter ? (inFilter.args[1] as string[]) : null
       return { data: ids ? CLEANERS.filter((c) => ids.includes(c.id)) : CLEANERS, error: null }
     }
+    if (table === 'live_tracking') {
+      const inFilter = filters.find((f) => f.method === 'in')
+      const ids = inFilter ? (inFilter.args[1] as string[]) : null
+      return { data: ids ? trackingRows.filter((r) => ids.includes(r.cleaner_id as string)) : trackingRows, error: null }
+    }
     return { data: [], error: null }
   }
   ;(q as { then: unknown }).then = (resolve: (v: unknown) => unknown) => resolve(resolveRows())
@@ -64,7 +73,7 @@ vi.mock('../../services/supabase', () => ({
     },
     rpc: async (name: string) =>
       name === 'admin_list_manager_customer_scopes'
-        ? { data: scopeRows, error: null }
+        ? { data: scopeError ? null : scopeRows, error: scopeError }
         : { data: null, error: null },
   },
 }))
@@ -108,6 +117,11 @@ describe('ManagerDashboard roster', () => {
     scopeRows = [{ manager_id: LINKED, customer_id: 'cust-1', customer_label: 'South of England Showground' }]
     managerCleanerRows = { [LINKED]: [{ cleaner_id: 'c-linked' }] }
     managerCleanerError = null
+    scopeError = null
+    trackingRows = [
+      { id: 1, cleaner_id: 'c-linked', cleaner_name: 'Alice Linked', customer_name: 'AvTrade', site_area: 'Reception', timestamp: '2026-11-04T08:00:00Z', is_active: true },
+      { id: 2, cleaner_id: 'c-other', cleaner_name: 'Bob Otherclient', customer_name: 'OtherCo', site_area: 'Reception', timestamp: '2026-11-04T08:00:00Z', is_active: true },
+    ]
   })
 
   it('admin sees every cleaner and no Delete button', async () => {
@@ -144,15 +158,47 @@ describe('ManagerDashboard roster', () => {
     expect(tablesQueried()).not.toContain('time_attendance')
   })
 
-  it('a client login with a site but no cleaners linked sees the empty state', async () => {
-    scopeRows = [{ manager_id: UNLINKED, customer_id: 'cust-2', customer_label: 'Another Client' }]
+  it('a linked client login only loads attendance for its own cleaners', async () => {
+    renderDashboard('manager', LINKED)
+    await screen.findByText('Alice Linked')
+
+    await waitFor(() => {
+      const attendanceFilters = calls.filter((c) => c.table === 'time_attendance' && c.method === 'in')
+      expect(attendanceFilters.length).toBeGreaterThan(0)
+      for (const filter of attendanceFilters) {
+        expect(filter.args).toEqual(['cleaner_uuid', ['c-linked']])
+      }
+    })
+  })
+
+  it('a legacy hardcoded client with no DB rows sees its own site, not other clients', async () => {
+    scopeRows = []
     managerCleanerRows = {}
 
-    renderDashboard('manager', UNLINKED)
+    renderDashboard('manager', AVTRADE)
 
-    expect(await screen.findByText(UNLINKED_TITLE)).toBeInTheDocument()
+    expect(await screen.findByText('Alice Linked')).toBeInTheDocument()
+    expect(screen.queryByText('Bob Otherclient')).not.toBeInTheDocument()
+    expect(screen.queryByText(UNLINKED_TITLE)).not.toBeInTheDocument()
+  })
+
+  it('a legacy hardcoded client still sees its own site when the scope lookup fails', async () => {
+    scopeError = { message: 'timeout' }
+    managerCleanerRows = {}
+
+    renderDashboard('manager', AVTRADE)
+
+    expect(await screen.findByText('Alice Linked')).toBeInTheDocument()
+    expect(screen.queryByText('Bob Otherclient')).not.toBeInTheDocument()
+  })
+
+  it('a non-legacy client login sees the lookup error when the scope lookup fails', async () => {
+    scopeError = { message: 'timeout' }
+
+    renderDashboard('manager', LINKED)
+
+    expect(await screen.findByText(LOOKUP_FAILED_TITLE)).toBeInTheDocument()
     expect(tablesQueried()).not.toContain('cleaners')
-    expect(tablesQueried()).not.toContain('live_tracking')
   })
 
   it('a client login whose links fail to load sees nothing and can retry', async () => {

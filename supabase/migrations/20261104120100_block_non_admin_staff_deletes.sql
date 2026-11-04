@@ -23,11 +23,18 @@
 --   * missing tables and views are skipped with a NOTICE;
 --   * RLS is never switched on here (that could lock out every read). A table
 --     without RLS gets the REVOKE only;
---   * a SECURITY INVOKER function that deletes from a table keeps that table's
---     grant, so the admin flow behind it keeps working, and a WARNING names it.
---     The restrictive policy still stops non-admins;
+--   * if any SECURITY INVOKER function or trigger function deletes from (or
+--     truncates) one of these tables, the migration ABORTS before changing
+--     anything and names it. Such a function runs with the caller's rights, so
+--     after this migration its delete would fail or, worse, silently remove 0
+--     rows (e.g. a clock-out trigger clearing live_tracking). A human decides:
+--     make it SECURITY DEFINER, or drop the table from this list. Preflight
+--     section 6 lists the candidates;
 --   * the final check aborts the whole migration if an app login could still
---     DELETE from a table that has no RLS to stop it.
+--     DELETE from a table and nothing stops it: RLS is off, or anon /
+--     authenticated has the privileges of the table's owner (e.g. through
+--     admin_executor) and the table is not FORCE ROW LEVEL SECURITY, so the
+--     owner's RLS bypass applies to them.
 --
 -- Run scripts/2026-11-04-staff-delete-preflight.sql first (sections 3-6).
 
@@ -35,6 +42,48 @@ do $$
 begin
   if to_regprocedure('public.has_app_role(text[])') is null then
     raise exception 'public.has_app_role(text[]) is missing; this migration relies on it';
+  end if;
+end
+$$;
+
+-- Abort before changing anything if a caller-rights function deletes from one
+-- of the tables (B1, review 2026-11-04).
+do $$
+declare
+  v_tables text[] := array[
+    'cleaners', 'managers', 'admins',
+    'time_attendance', 'cleaner_logs',
+    'uk_cleaner_task_selections', 'uk_cleaner_task_photos',
+    'manager_cleaners', 'manager_customers', 'cleaner_customers',
+    'live_tracking', 'work_drafts', 'user_passwords',
+    'cleaner_shift_changes', 'clock_event_failures', 'cleaner_shifts'
+  ];
+  v_table    text;
+  v_found    text;
+  v_offences text[] := '{}';
+begin
+  foreach v_table in array v_tables loop
+    select string_agg(p.oid::regprocedure::text, ', ' order by p.oid::regprocedure::text)
+      into v_found
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname not in ('pg_catalog', 'information_schema')
+      and n.nspname not like 'pg\_%'
+      and not p.prosecdef
+      and p.prosrc ~* format(
+        '(delete\s+from|truncate(\s+table)?)\s+(only\s+)?("?public"?\s*\.\s*)?"?%s"?([^a-z0-9_]|$)',
+        v_table
+      );
+
+    if v_found is not null then
+      v_offences := v_offences || format('%s <- %s', v_table, v_found);
+    end if;
+  end loop;
+
+  if cardinality(v_offences) > 0 then
+    raise exception
+      'SECURITY INVOKER function(s) delete from staff tables: %. After this migration those deletes would fail or remove 0 rows. Make them SECURITY DEFINER or exclude the table, then re-run. Nothing was changed.',
+      array_to_string(v_offences, '; ');
   end if;
 end
 $$;
@@ -57,7 +106,6 @@ declare
   v_rel       regclass;
   v_relkind   "char";
   v_rls       boolean;
-  v_invokers  text;
 begin
   foreach v_table in array v_revoke_tables || v_admin_delete_tables loop
     v_rel := to_regclass(format('public.%I', v_table));
@@ -78,21 +126,7 @@ begin
     execute format('revoke truncate on table %s from public, anon, authenticated', v_rel);
 
     if v_table = any (v_revoke_tables) then
-      select string_agg(p.oid::regprocedure::text, ', ')
-        into v_invokers
-      from pg_proc p
-      join pg_namespace n on n.oid = p.pronamespace
-      where n.nspname = 'public'
-        and not p.prosecdef
-        and p.prosrc ~* format('delete\s+from\s+(only\s+)?("?public"?\s*\.\s*)?"?%s"?([^a-z0-9_]|$)', v_table);
-
-      if v_invokers is null then
-        execute format('revoke delete on table %s from public, anon, authenticated', v_rel);
-      else
-        raise warning
-          'Kept DELETE on % for authenticated: SECURITY INVOKER function(s) delete from it: %. Only the admin-only policy guards it.',
-          v_rel, v_invokers;
-      end if;
+      execute format('revoke delete on table %s from public, anon, authenticated', v_rel);
     end if;
 
     if v_rls then
@@ -115,8 +149,10 @@ end
 $$;
 
 -- Abort unless every table on the list is safe: either no app login can DELETE
--- (grants, including ones inherited through admin_executor) or RLS is on, so the
--- admin-only policy applies.
+-- (grants, including ones inherited through admin_executor), or RLS applies to
+-- them so the admin-only policy does. RLS does not apply when it is off, or
+-- when the login has the privileges of the table owner and RLS is not forced
+-- (owners bypass it) -- B2, review 2026-11-04.
 do $$
 declare
   v_tables text[] := array[
@@ -132,7 +168,11 @@ declare
   r record;
 begin
   for r in
-    select c.oid::regclass as rel, c.relrowsecurity
+    select
+      c.oid::regclass as rel,
+      c.relrowsecurity,
+      c.relforcerowsecurity,
+      pg_has_role('authenticated', c.relowner, 'USAGE') or pg_has_role('anon', c.relowner, 'USAGE') as login_is_owner
     from pg_class c
     join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public'
@@ -140,7 +180,7 @@ begin
       and c.relname = any (v_tables)
   loop
     if (has_table_privilege('authenticated', r.rel, 'DELETE') or has_table_privilege('anon', r.rel, 'DELETE'))
-       and not r.relrowsecurity then
+       and (not r.relrowsecurity or (r.login_is_owner and not r.relforcerowsecurity)) then
       v_unsafe := v_unsafe || r.rel::text;
     end if;
     if has_table_privilege('authenticated', r.rel, 'TRUNCATE') or has_table_privilege('anon', r.rel, 'TRUNCATE') then
@@ -157,7 +197,7 @@ begin
 
   if cardinality(v_unsafe) > 0 then
     raise exception
-      'App logins can still DELETE from % and RLS is off there, so nothing stops them. The grant is inherited (see preflight section 3). Nothing was changed.',
+      'App logins can still DELETE from % and RLS does not apply to them there (RLS off, or they inherit the table owner and RLS is not forced). See preflight sections 3-4. Nothing was changed.',
       v_unsafe;
   end if;
 end

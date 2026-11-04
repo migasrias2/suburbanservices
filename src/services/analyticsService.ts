@@ -121,6 +121,8 @@ export type FetchAnalyticsParams = {
   managerId?: string | null
   role: AnalyticsRole
   range: AnalyticsRange
+  /** Client tokens for a client login; required for one with no cleaner links. */
+  customerScope?: string[]
 }
 
 const toDateKey = (iso?: string | null) => {
@@ -286,15 +288,15 @@ const buildCleanerScope = async (managerId: string | undefined | null, role: Ana
   if (isGlobalRole) {
     roster = await fetchAllCleaners()
   } else {
-    // A client login with no linked cleaners gets an empty roster that matches
-    // nothing -- never the whole company.
+    // Never the whole company's roster for a client login. Legacy clients with
+    // no cleaner links are scoped by client name by the caller instead.
     scopedCleanerIds = await fetchManagerCleanerIds(managerId ?? '')
     roster = await fetchCleanersByIds(scopedCleanerIds)
   }
 
   roster = ensureUniqueCleanerSummaries(roster)
 
-  const restrictToManaged = !isGlobalRole
+  const restrictToManaged = !isGlobalRole && scopedCleanerIds.length > 0
   const cleanerIdSet = new Set(scopedCleanerIds.filter(Boolean))
   const numericCleanerIdSet = new Set(
     scopedCleanerIds
@@ -337,8 +339,28 @@ const buildCleanerScope = async (managerId: string | undefined | null, role: Ana
     roster,
     matchesCleanerScope,
     restrictToManaged,
-    hasNoCleaners: !isGlobalRole && scopedCleanerIds.length === 0,
   }
+}
+
+/**
+ * QR codes belonging to the scoped clients. Task selections and photos carry a
+ * QR id rather than a client name, so this is how they are scoped by client. A
+ * failed lookup yields an empty set: nothing matches rather than everything.
+ */
+const fetchAllowedQrCodeIds = async (
+  matchesScope: (...fields: Array<string | null | undefined>) => boolean,
+): Promise<Set<string>> => {
+  const { data, error } = await supabase.from('building_qr_codes').select('qr_code_id, customer_name')
+  if (error) {
+    console.warn('Could not load QR codes for client scoping', error)
+    return new Set()
+  }
+  return new Set(
+    (data ?? [])
+      .filter((q) => matchesScope(q.customer_name))
+      .map((q) => q.qr_code_id)
+      .filter(Boolean) as string[],
+  )
 }
 
 const emptySnapshot = (day: Date, isCurrentDay: boolean): DashboardSnapshot => ({
@@ -379,30 +401,18 @@ export async function fetchDashboardSnapshot({
   const isCurrentDay = isSameCalendarDay(day, today)
   const { start, end } = toDayBounds(dayIso)
 
-  const scope = await buildCleanerScope(managerId ?? undefined, role)
   // An empty customer scope means "every client" to the matcher, so a client
-  // login without one, or without cleaners, must stop here.
+  // login without one must stop here.
   const isGlobalRole = role === 'admin' || role === 'ops_manager'
-  if (scope.hasNoCleaners || (!isGlobalRole && !customerScope.length)) {
+  if (!isGlobalRole && !customerScope.length) {
     return emptySnapshot(day, isCurrentDay)
   }
+  const scope = await buildCleanerScope(managerId ?? undefined, role)
   const matchesScope = buildCustomerScopeMatcher(customerScope)
 
-  let allowedQrCodeIds: Set<string> | null = null
-  if (customerScope.length > 0) {
-    const { data: qrData } = await supabase
-      .from('building_qr_codes')
-      .select('qr_code_id, customer_name')
-    
-    if (qrData) {
-      allowedQrCodeIds = new Set(
-        qrData
-          .filter((q) => matchesScope(q.customer_name))
-          .map((q) => q.qr_code_id)
-          .filter(Boolean) as string[]
-      )
-    }
-  }
+  const allowedQrCodeIds: Set<string> | null = customerScope.length > 0
+    ? await fetchAllowedQrCodeIds(matchesScope)
+    : null
 
   const attendanceQuery = supabase
     .from('time_attendance')
@@ -530,7 +540,12 @@ export async function fetchDashboardSnapshot({
   }
 }
 
-export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAnalyticsParams): Promise<AnalyticsSummary> {
+export async function fetchAnalyticsSummary({
+  managerId,
+  role,
+  range,
+  customerScope = [],
+}: FetchAnalyticsParams): Promise<AnalyticsSummary> {
   const isGlobalRole = role === 'admin' || role === 'ops_manager'
 
   let roster: CleanerSummary[]
@@ -542,8 +557,10 @@ export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAna
     cleanerIds = roster.map((cleaner) => cleaner.id)
   } else {
     managerScopedCleanerIds = await fetchManagerCleanerIds(managerId ?? '')
-    // No linked cleaners means nothing to report, not the whole company.
-    if (!managerScopedCleanerIds.length) {
+    // No linked cleaners and no client scope means nothing to report, never
+    // the whole company. Legacy clients (no cleaner links) are scoped by
+    // client name below instead.
+    if (!managerScopedCleanerIds.length && !customerScope.length) {
       return emptyAnalyticsSummary()
     }
     roster = await fetchCleanersByIds(managerScopedCleanerIds)
@@ -552,7 +569,10 @@ export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAna
 
   roster = ensureUniqueCleanerSummaries(roster)
 
-  const restrictToManagedCleaners = !isGlobalRole
+  const restrictToManagedCleaners = !isGlobalRole && managerScopedCleanerIds.length > 0
+  const restrictToCustomers = !isGlobalRole && !restrictToManagedCleaners
+  const matchesCustomerScope = buildCustomerScopeMatcher(customerScope)
+  const allowedQrCodeIds = restrictToCustomers ? await fetchAllowedQrCodeIds(matchesCustomerScope) : null
   const filterCleanerIds = restrictToManagedCleaners ? managerScopedCleanerIds : []
   const cleanerIdSet = new Set(filterCleanerIds.filter(Boolean))
   const numericCleanerIds = filterCleanerIds
@@ -662,15 +682,26 @@ export async function fetchAnalyticsSummary({ managerId, role, range }: FetchAna
     return false
   }
 
-  const attendance = restrictToManagedCleaners ? rawAttendance.filter((row) => matchesCleanerScope(row)) : rawAttendance
+  const matchesQrScope = (qrCodeId: string | null) =>
+    Boolean(qrCodeId && allowedQrCodeIds?.has(qrCodeId))
+
+  const attendance = restrictToManagedCleaners
+    ? rawAttendance.filter((row) => matchesCleanerScope(row))
+    : restrictToCustomers
+      ? rawAttendance.filter((row) => matchesCustomerScope(row.customer_name, row.site_name))
+      : rawAttendance
   const selections = restrictToManagedCleaners
     ? rawSelections.filter((row) =>
         matchesCleanerScope({ cleaner_id: row.cleaner_id, cleaner_name: row.cleaner_name ?? null })
       )
-    : rawSelections
+    : restrictToCustomers
+      ? rawSelections.filter((row) => matchesQrScope(row.qr_code_id))
+      : rawSelections
   const photos = restrictToManagedCleaners
     ? rawPhotos.filter((row) => matchesCleanerScope({ cleaner_id: row.cleaner_id, cleaner_name: row.cleaner_name ?? null }))
-    : rawPhotos
+    : restrictToCustomers
+      ? rawPhotos.filter((row) => matchesQrScope(row.qr_code_id))
+      : rawPhotos
 
   const complianceByDate = new Map<string, { total: number; completed: number }>()
   let totalAttendance = 0

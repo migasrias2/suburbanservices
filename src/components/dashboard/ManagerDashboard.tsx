@@ -493,17 +493,19 @@ const ManagerDashboardContent: React.FC<ManagerDashboardContentProps> = ({ manag
       setIsListLoading(true)
 
       try {
-        // Scoped access always carries at least one cleaner; only admin and
-        // ops_manager ever reach the unfiltered branches.
+        // A client login is filtered by its linked cleaners. Legacy clients with
+        // no cleaner links (AvTrade, PSM) load unfiltered rows that are then cut
+        // down by client name below; customerScope is never empty for them.
         const cleanerIds = access.status === 'scoped' ? access.cleanerIds : []
-        const cleanerRoster = access.status === 'scoped'
+        const isCustomerOnlyScope = access.status === 'scoped' && cleanerIds.length === 0
+        const cleanerRoster = cleanerIds.length
           ? await fetchCleanersByIds(cleanerIds)
           : await fetchAllCleaners()
 
         let trackingRows: any[] | null = []
         let trackingError: any = null
 
-        if (access.status === 'scoped') {
+        if (cleanerIds.length) {
           const trackingResponse = await supabase
             .from('live_tracking')
             .select('id, cleaner_id, cleaner_name, site_area, site_id, customer_name, event_type, timestamp, updated_at, created_at, is_active')
@@ -619,6 +621,12 @@ const ManagerDashboardContent: React.FC<ManagerDashboardContentProps> = ({ manag
           const normalizedKey = normalizedName.toLowerCase()
 
           if (customerScope.length && scheduledCleanerSet.size > 0 && !matchesScheduledCleaner(normalizedKey)) {
+            return
+          }
+
+          // Without cleaner links or a schedule, the full roster is everyone in
+          // the company; only cleaners seen at this client's site are listed.
+          if (isCustomerOnlyScope && scheduledCleanerSet.size === 0) {
             return
           }
 

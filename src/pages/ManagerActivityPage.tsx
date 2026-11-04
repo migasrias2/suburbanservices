@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom"
 
 import { Sidebar07Layout } from "@/components/layout/Sidebar07Layout"
 import { ManagerAccessGate } from "@/components/dashboard/ManagerAccessGate"
+import { useVerifiedManagerIdentity } from "@/hooks/useVerifiedManagerIdentity"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
@@ -29,15 +30,14 @@ const formatDateTime = (iso?: string | null) =>
       })
     : "—"
 
-const INITIAL_STATE = {
-  managerId: "",
-  managerName: "",
-}
-
 export default function ManagerActivityPage() {
   const navigate = useNavigate()
-  const [{ managerId, managerName }, setIdentity] = useState(INITIAL_STATE)
-  const [role, setRole] = useState<"manager" | "ops_manager">("manager")
+  // Verified session role and id, never localStorage (see useVerifiedManagerIdentity).
+  const identity = useVerifiedManagerIdentity()
+  const isAllowedRole = identity?.role === "manager" || identity?.role === "ops_manager"
+  const managerId = isAllowedRole ? identity.managerId : ""
+  const managerName = isAllowedRole ? identity.managerName : ""
+  const role: "manager" | "ops_manager" = identity?.role === "ops_manager" ? "ops_manager" : "manager"
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [activity, setActivity] = useState<ActivityRow[]>([])
@@ -80,22 +80,11 @@ export default function ManagerActivityPage() {
   }, [isPreviewVisible, previewPhotoUrl])
 
   useEffect(() => {
-    const storedUserType = localStorage.getItem("userType")
-    const storedManagerId = localStorage.getItem("userId")
-    const storedManagerName = localStorage.getItem("userName")
-
-    if ((storedUserType !== "manager" && storedUserType !== "ops_manager") || !storedManagerId || !storedManagerName) {
+    // Admins were always sent away from this page; keep that.
+    if (identity && !isAllowedRole) {
       navigate("/login")
-      return
     }
-
-    if (storedUserType === "ops_manager") {
-      setRole("ops_manager")
-    } else {
-      setRole("manager")
-    }
-    setIdentity({ managerId: storedManagerId, managerName: storedManagerName })
-  }, [navigate])
+  }, [identity, isAllowedRole, navigate])
 
   useEffect(() => {
     if (!managerId) return

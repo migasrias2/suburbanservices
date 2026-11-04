@@ -240,19 +240,18 @@ export async function fetchManagerRecentActivity(
   const isGlobalRole = role === 'admin' || role === 'ops_manager'
   let scopedCleanerIds: string[] = []
 
-  // A client login ('manager') sees nothing unless it is linked to both a
-  // client and at least one cleaner. Every gap here used to widen the feed to
-  // the whole company instead.
-  if (!isGlobalRole) {
-    if (!managerId) return []
-    const scopesLoaded = await hydrateManagerScopes()
+  // A client login ('manager') sees nothing without a client scope (DB rows or
+  // a legacy hardcoded entry). Every gap here used to widen the feed to the
+  // whole company instead. A failed DB lookup still leaves the hardcoded scopes.
+  if (!isGlobalRole && !managerId) return []
+  const scopesLoaded = isGlobalRole ? true : await hydrateManagerScopes()
+  const customerScope = resolveManagerCustomerScope(managerId ?? null, null)
+  if (!isGlobalRole && !customerScope.length) {
     if (!scopesLoaded) {
       throw new Error("We couldn't confirm which sites this login can see. Please try again.")
     }
+    return []
   }
-
-  const customerScope = resolveManagerCustomerScope(managerId ?? null, null)
-  if (!isGlobalRole && !customerScope.length) return []
 
   if (managerId) {
     try {
@@ -265,8 +264,9 @@ export async function fetchManagerRecentActivity(
   }
 
   const trimmedCleanerIds = scopedCleanerIds.filter((id) => typeof id === 'string' && id.trim().length > 0)
-  if (!isGlobalRole && !trimmedCleanerIds.length) return []
-  const restrictToManagedCleaners = !isGlobalRole
+  // Legacy clients (AvTrade, PSM) have no cleaner links and are scoped by
+  // client name alone; the customer filter at the end still applies.
+  const restrictToManagedCleaners = !isGlobalRole && trimmedCleanerIds.length > 0
 
   type CleanerIdentifier = {
     raw: string

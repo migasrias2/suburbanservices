@@ -1,33 +1,14 @@
-import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React from 'react'
 import { Sidebar07Layout } from '@/components/layout/Sidebar07Layout'
 import { AnalyticsDashboard } from '@/components/analytics/AnalyticsDashboard'
 import { ManagerAccessGate } from '@/components/dashboard/ManagerAccessGate'
-import { getStoredCleanerName } from '@/lib/identity'
+import { useVerifiedManagerIdentity } from '@/hooks/useVerifiedManagerIdentity'
 
 const AnalyticsPage: React.FC = () => {
-  const navigate = useNavigate()
-  const [userId, setUserId] = useState<string>('')
-  const [userName, setUserName] = useState<string>('')
-  const [role, setRole] = useState<'manager' | 'ops_manager' | 'admin'>('manager')
+  // Verified session role and id, never localStorage (see useVerifiedManagerIdentity).
+  const identity = useVerifiedManagerIdentity()
 
-  useEffect(() => {
-    const storedRole = localStorage.getItem('userType')
-    const storedId = localStorage.getItem('userId')
-    const storedName = getStoredCleanerName()
-
-    const allowedRoles: Array<'manager' | 'ops_manager' | 'admin'> = ['manager', 'ops_manager', 'admin']
-    if (!storedRole || !allowedRoles.includes(storedRole as typeof allowedRoles[number]) || !storedId || !storedName) {
-      navigate('/login')
-      return
-    }
-
-    setRole(storedRole as 'manager' | 'ops_manager' | 'admin')
-    setUserId(storedId)
-    setUserName(storedName)
-  }, [navigate])
-
-  if (!userId || !userName) {
+  if (!identity) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/40 border-t-transparent" />
@@ -35,21 +16,21 @@ const AnalyticsPage: React.FC = () => {
     )
   }
 
+  const { managerId, managerName, role } = identity
+
   return (
-    <Sidebar07Layout userType={role} userName={userName}>
-      <ManagerAccessGate role={role} managerId={userId} managerName={userName}>
-        {() => <AnalyticsDashboard managerId={role === 'manager' ? userId : null} role={role} />}
+    <Sidebar07Layout userType={role} userName={managerName}>
+      <ManagerAccessGate role={role} managerId={managerId} managerName={managerName}>
+        {(access) => (
+          <AnalyticsDashboard
+            managerId={role === 'manager' ? managerId : null}
+            role={role}
+            customerScope={access.status === 'scoped' ? access.customerTokens : undefined}
+          />
+        )}
       </ManagerAccessGate>
     </Sidebar07Layout>
   )
 }
 
 export default AnalyticsPage
-
-
-
-
-
-
-
-

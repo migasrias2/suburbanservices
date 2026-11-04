@@ -14,6 +14,7 @@ const calls: Call[] = []
 let scopeRows: unknown[] = []
 let managerCleanerRows: unknown[] = []
 let managerCleanerError: { message: string } | null = null
+let tableRows: Record<string, unknown[]> = {}
 
 const makeQuery = (table: string) => {
   const q: Record<string, unknown> = {}
@@ -27,7 +28,7 @@ const makeQuery = (table: string) => {
     resolve(
       table === 'manager_cleaners'
         ? { data: managerCleanerRows, error: managerCleanerError }
-        : { data: [], error: null },
+        : { data: tableRows[table] ?? [], error: null },
     )
   return q
 }
@@ -54,6 +55,7 @@ const { invalidateManagerScopes } = await import('../lib/managerScope')
 const { fetchManagerCleanerIds, fetchManagerRecentActivity } = managerService
 
 const LINKED = '11111111-1111-4111-8111-111111111111'
+const AVTRADE = 'df0bf2e7-1a07-4876-949c-6cfe8fe0fac6'
 const tablesQueried = () => calls.filter((c) => c.method === 'from').map((c) => c.table)
 
 describe('managerService fail-closed lookups', () => {
@@ -62,6 +64,7 @@ describe('managerService fail-closed lookups', () => {
     scopeRows = []
     managerCleanerRows = []
     managerCleanerError = null
+    tableRows = {}
     installTestLocalStorage()
     invalidateManagerScopes()
   })
@@ -85,12 +88,22 @@ describe('managerService fail-closed lookups', () => {
     expect(tablesQueried()).not.toContain('uk_cleaner_task_photos')
   })
 
-  it('recent activity is empty for a client login with no cleaners linked', async () => {
-    scopeRows = [{ manager_id: LINKED, customer_id: 'cust-1', customer_label: 'Showground' }]
+  it('recent activity for a legacy client with no cleaner links is filtered by client name', async () => {
+    tableRows = {
+      uk_cleaner_task_selections: [
+        { id: 1, cleaner_id: 'c1', cleaner_name: 'Mosleen', qr_code_id: 'q-av', area_type: 'office', selected_tasks: '[]', completed_tasks: '[]', timestamp: '2026-11-03T09:00:00Z' },
+        { id: 2, cleaner_id: 'c2', cleaner_name: 'Bob', qr_code_id: 'q-other', area_type: 'office', selected_tasks: '[]', completed_tasks: '[]', timestamp: '2026-11-03T10:00:00Z' },
+      ],
+      building_qr_codes: [
+        { qr_code_id: 'q-av', customer_name: 'AvTrade', building_area: 'Reception' },
+        { qr_code_id: 'q-other', customer_name: 'OtherCo', building_area: 'Reception' },
+      ],
+    }
 
-    await expect(fetchManagerRecentActivity(LINKED, 40, 'manager')).resolves.toEqual([])
-    expect(tablesQueried()).not.toContain('uk_cleaner_task_selections')
-    expect(tablesQueried()).not.toContain('uk_cleaner_task_photos')
+    const rows = await fetchManagerRecentActivity(AVTRADE, 40, 'manager')
+
+    expect(rows.map((row) => row.site)).toEqual(['AvTrade'])
+    expect(calls.some((c) => c.table === 'uk_cleaner_task_selections' && c.method === 'in')).toBe(false)
   })
 
   it('recent activity errors for a client login whose cleaner links fail to load', async () => {

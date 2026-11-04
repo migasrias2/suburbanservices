@@ -3,14 +3,19 @@ import { fetchManagerCleanerIds } from './managerService'
 
 export type ManagerAccessRole = 'manager' | 'ops_manager' | 'admin'
 
-export type UnlinkedReason = 'no_customers' | 'no_cleaners' | 'lookup_failed'
+export type UnlinkedReason = 'no_customers' | 'lookup_failed'
 
 /**
  * What a manager-facing screen may show.
  *
  *   global   -- admin and ops_manager: every client, as before.
- *   scoped   -- a client login linked to at least one client and one cleaner.
- *   unlinked -- a client login we cannot fence in. Show nothing.
+ *   scoped   -- a client login with a client scope (DB manager_customers rows
+ *               or a legacy hardcoded entry in managerScope.ts). customerTokens
+ *               is never empty. cleanerIds may be empty: legacy clients such as
+ *               AvTrade and PSM have no manager_cleaners rows and are filtered
+ *               by client name alone, as they always were.
+ *   unlinked -- a client login with no client scope at all, or whose links
+ *               could not be loaded. Show nothing.
  *
  * THIS IS A UX BOUNDARY, NOT A SECURITY BOUNDARY. It stops the app from
  * fetching and rendering other clients' data, but the browser can still query
@@ -52,14 +57,12 @@ export async function resolveManagerAccess({
     return unlinked('lookup_failed')
   }
 
+  // A failed DB lookup still leaves the legacy hardcoded scopes, which can only
+  // narrow the view. Fail closed only when there is no scope at all.
   const scopesLoaded = await hydrateManagerScopes()
-  if (!scopesLoaded) {
-    return unlinked('lookup_failed')
-  }
-
   const customerTokens = resolveManagerCustomerScope(id, managerName ?? null)
   if (!customerTokens.length) {
-    return unlinked('no_customers')
+    return unlinked(scopesLoaded ? 'no_customers' : 'lookup_failed')
   }
 
   let cleanerIds: string[]
@@ -68,10 +71,6 @@ export async function resolveManagerAccess({
   } catch (error) {
     console.error('Could not load the cleaners linked to this login', error)
     return unlinked('lookup_failed')
-  }
-
-  if (!cleanerIds.length) {
-    return unlinked('no_cleaners')
   }
 
   return { status: 'scoped', cleanerIds, customerTokens }
