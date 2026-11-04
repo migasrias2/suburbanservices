@@ -2,7 +2,6 @@ import { supabase } from '../services/supabase'
 
 type ManagerCustomerScope = {
   managerIds?: string[]
-  managerNames?: string[]
   customerTokens: string[]
 }
 
@@ -29,8 +28,6 @@ type DbScopeRow = {
 
 const dbScopes: DbScopeRow[] = []
 let hydratePromise: Promise<boolean> | null = null
-/** Whether the last hydrate actually got an answer; an empty dbScopes alone cannot tell "none" from "failed". */
-let scopesLoaded = false
 
 /**
  * Loads the DB-backed client scopes. Resolves true once they are loaded and
@@ -59,7 +56,6 @@ export const hydrateManagerScopes = async (): Promise<boolean> => {
           })
         }
       }
-      scopesLoaded = true
       return true
     } catch (err) {
       console.warn('hydrateManagerScopes: unexpected error', err)
@@ -77,7 +73,6 @@ export const hydrateManagerScopes = async (): Promise<boolean> => {
 export const invalidateManagerScopes = () => {
   hydratePromise = null
   dbScopes.length = 0
-  scopesLoaded = false
 }
 
 const normalizeValue = (value?: string | null) => (value ? value.trim().toLowerCase() : '')
@@ -85,14 +80,16 @@ const normalizeValue = (value?: string | null) => (value ? value.trim().toLowerC
 const uniqueTokens = (tokens: string[]) =>
   Array.from(new Set(tokens.map((token) => normalizeValue(token)).filter(Boolean)))
 
+/**
+ * Scope is resolved by login id only. Display names are user-editable, so they
+ * must never widen what a client login can see. The second parameter is kept
+ * so existing callers compile; it is ignored.
+ */
 export const resolveManagerCustomerScope = (
   managerId?: string | null,
-  managerName?: string | null,
+  _managerName?: string | null,
 ): string[] => {
   const id = normalizeValue(managerId ?? undefined)
-  const name = normalizeValue(managerName ?? undefined) || normalizeValue(
-    typeof window !== 'undefined' ? localStorage.getItem('userName') : undefined,
-  )
 
   const tokens: string[] = []
 
@@ -104,21 +101,8 @@ export const resolveManagerCustomerScope = (
     }
   }
 
-  const matchesScope = (scope: ManagerCustomerScope) => {
-    if (id && scope.managerIds?.some((candidate) => normalizeValue(candidate) === id)) {
-      return true
-    }
-    if (
-      name &&
-      scope.managerNames?.some((candidate) => {
-        const normalizedCandidate = normalizeValue(candidate)
-        return normalizedCandidate ? name.includes(normalizedCandidate) : false
-      })
-    ) {
-      return true
-    }
-    return false
-  }
+  const matchesScope = (scope: ManagerCustomerScope) =>
+    Boolean(id && scope.managerIds?.some((candidate) => normalizeValue(candidate) === id))
 
   for (const scope of MANAGER_CUSTOMER_SCOPES) {
     if (matchesScope(scope)) {
@@ -173,11 +157,8 @@ export const resolveManagerSiteLinks = async (managerId?: string | null): Promis
   const id = normalizeValue(managerId ?? undefined)
   if (!id) return { links: [], loaded: true }
 
-  await hydrateManagerScopes()
-  if (!scopesLoaded) {
-    invalidateManagerScopes()
-    await hydrateManagerScopes()
-  }
+  // hydrateManagerScopes never caches a failure, so a second call is a real retry.
+  const loaded = (await hydrateManagerScopes()) || (await hydrateManagerScopes())
 
   const links: ManagerSiteLink[] = dbScopes
     .filter((row) => row.manager_id.toLowerCase() === id)
@@ -191,7 +172,7 @@ export const resolveManagerSiteLinks = async (managerId?: string | null): Promis
     links.push({ customerId: null, label: tokens[0], tokens })
   })
 
-  return { links, loaded: scopesLoaded }
+  return { links, loaded }
 }
 
 export const resolveManagerIdsForCustomer = (customerLabel?: string | null): string[] => {
