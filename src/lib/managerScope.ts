@@ -125,6 +125,41 @@ export const buildCustomerScopeMatcher = (scopeTokens: string[]) => {
   }
 }
 
+export type ManagerSiteLink = {
+  customerId: string | null
+  /** Lowercased customer label, as admin_list_manager_customer_scopes derives it. */
+  label: string
+  tokens: string[]
+}
+
+/**
+ * The customers linked to ONE manager id, for views that must fail closed.
+ *
+ * Unlike resolveManagerCustomerScope this never matches on display name (a
+ * manager called "James" at another client would otherwise inherit PSM) and
+ * returns an empty list, not a wildcard, when nothing is linked.
+ */
+export const resolveManagerSiteLinks = async (managerId?: string | null): Promise<ManagerSiteLink[]> => {
+  const id = normalizeValue(managerId ?? undefined)
+  if (!id) return []
+
+  await hydrateManagerScopes()
+
+  const links: ManagerSiteLink[] = dbScopes
+    .filter((row) => row.manager_id.toLowerCase() === id)
+    .map((row) => ({ customerId: row.customer_id ?? null, label: row.customer_label, tokens: [row.customer_label] }))
+
+  const covered = new Set(links.map((link) => link.label))
+  MANAGER_CUSTOMER_SCOPES.forEach((scope) => {
+    if (!scope.managerIds?.some((candidate) => normalizeValue(candidate) === id)) return
+    const tokens = uniqueTokens(scope.customerTokens)
+    if (!tokens.length || tokens.some((token) => covered.has(token))) return
+    links.push({ customerId: null, label: tokens[0], tokens })
+  })
+
+  return links
+}
+
 export const resolveManagerIdsForCustomer = (customerLabel?: string | null): string[] => {
   const normalizedLabel = normalizeValue(customerLabel ?? undefined)
   if (!normalizedLabel) {
