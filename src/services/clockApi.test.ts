@@ -1,13 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const rpc = vi.fn()
-const select = vi.fn()
-const from = vi.fn(() => ({ select }))
 vi.mock('./supabase', () => ({
-  supabase: { rpc: (...args: unknown[]) => rpc(...args), from: (...args: unknown[]) => from(...(args as [])) },
+  supabase: { rpc: (...args: unknown[]) => rpc(...args) },
 }))
 
-import { clockIn, clockOut, getClockFlags, getCurrentShift } from './clockApi'
+import { clockIn, clockOut, getCurrentShift } from './clockApi'
 
 const EVENT_ID = '7b0f3c9e-2d4a-4c1b-9f3e-5a6b7c8d9e01'
 
@@ -40,8 +38,6 @@ const serverResult = (overrides: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   rpc.mockReset()
-  select.mockReset()
-  from.mockClear()
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
@@ -230,33 +226,5 @@ describe('getCurrentShift', () => {
     expect(await getCurrentShift()).toMatchObject({ ok: false, code: 'not_signed_in' })
     rpc.mockResolvedValue({ data: null, error: { message: 'offline' } })
     expect(await getCurrentShift()).toMatchObject({ ok: false, code: 'network' })
-  })
-})
-
-describe('getClockFlags', () => {
-  it('reads the switches from app_config', async () => {
-    select.mockResolvedValue({ data: [{ key: 'clock_v2', value: false }, { key: 'scanner_v2', value: true }], error: null })
-    expect(await getClockFlags()).toEqual({ clockV2: false, scannerV2: true, source: 'server' })
-    expect(from).toHaveBeenCalledWith('app_config')
-    expect(select).toHaveBeenCalledWith('key, value')
-  })
-
-  it('treats a missing switch as on, and only false/"false" as off', async () => {
-    select.mockResolvedValue({ data: [{ key: 'clock_v2', value: 'false' }], error: null })
-    expect(await getClockFlags()).toEqual({ clockV2: false, scannerV2: true, source: 'server' })
-  })
-
-  it('falls back to ON when the table cannot be read (D9: default ON)', async () => {
-    select.mockResolvedValue({ data: null, error: { message: 'offline' } })
-    expect(await getClockFlags()).toEqual({ clockV2: true, scannerV2: true, source: 'default' })
-    select.mockRejectedValue(new TypeError('Failed to fetch'))
-    expect(await getClockFlags()).toEqual({ clockV2: true, scannerV2: true, source: 'default' })
-  })
-
-  it('turns the new clock off when the switch table does not exist yet (migration not applied)', async () => {
-    select.mockResolvedValue({ data: null, error: { code: 'PGRST205', message: "Could not find the table 'public.app_config'" } })
-    expect(await getClockFlags()).toEqual({ clockV2: false, scannerV2: true, source: 'not_ready' })
-    select.mockResolvedValue({ data: null, error: { code: '42P01', message: 'relation "app_config" does not exist' } })
-    expect(await getClockFlags()).toEqual({ clockV2: false, scannerV2: true, source: 'not_ready' })
   })
 })

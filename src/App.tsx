@@ -6,14 +6,12 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { RequireAuth } from "./components/auth/RequireAuth";
 import { ClockRuntime } from "./components/clock/ClockRuntime";
-import { LegacyScannerRoute } from "./components/clock/LegacyScannerRoute";
 import Login from "./pages/Login";
 import CleanerDashboardPage from "./pages/CleanerDashboardPage";
 import CleanerHomePage from "./pages/CleanerHomePage";
 import ClockInPage from "./pages/ClockInPage";
 import ChatPage from "./pages/ChatPage";
 import ManagerDashboardPage from "./pages/ManagerDashboardPage";
-import ScannerPage from "./pages/ScannerPage";
 import HistoryPage from "./pages/HistoryPage";
 import ProfilePage from "./pages/ProfilePage";
 import QRLibraryPage from "./pages/QRLibraryPage";
@@ -52,7 +50,8 @@ const App = () => (
           <Route path="/my-schedule" element={<RequireAuth roles={["cleaner"]}><CleanerSchedulePage /></RequireAuth>} />
           <Route path="/clock-in" element={<RequireAuth roles={["cleaner", "ops_manager"]}><ClockInPage /></RequireAuth>} />
           <Route path="/chat" element={<RequireAuth><ChatPage /></RequireAuth>} />
-          <Route path="/scanner" element={<RequireAuth roles={["cleaner"]}><LegacyScannerRoute><ScannerPage /></LegacyScannerRoute></RequireAuth>} />
+          {/* The old all-codes scanner page is gone (P6); clock and area scans live on /clock-in. */}
+          <Route path="/scanner" element={<Navigate to="/clock-in" replace />} />
           <Route path="/history" element={<RequireAuth><HistoryPage /></RequireAuth>} />
           <Route path="/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
           <Route path="/qr-library" element={<RequireAuth roles={["manager", "ops_manager", "admin"]}><QRLibraryPage /></RequireAuth>} />

@@ -14,12 +14,12 @@ const busyDiagnostics = () => {
 }
 
 describe('buildClockDevice', () => {
-  it('says which scanner was used, even without diagnostics', () => {
-    expect(buildClockDevice({ scanner: 'v1' })).toMatchObject({ scanner: 'v1', client: 'clock_v2' })
+  it('says which client and scanner made the scan, even without diagnostics', () => {
+    expect(buildClockDevice()).toMatchObject({ scanner: 'v2', client: 'clock_v2' })
   })
 
   it('keeps a compact summary of the scan session', () => {
-    const device = buildClockDevice({ scanner: 'v2', diagnostics: busyDiagnostics() })
+    const device = buildClockDevice({ diagnostics: busyDiagnostics() })
     expect(device.scan).toMatchObject({
       platform: 'android',
       cameras: 12,
@@ -36,14 +36,14 @@ describe('buildClockDevice', () => {
   })
 
   it('stays under the 2 KB the server accepts', () => {
-    const device = buildClockDevice({ scanner: 'v2', diagnostics: busyDiagnostics() })
+    const device = buildClockDevice({ diagnostics: busyDiagnostics() })
     expect(new TextEncoder().encode(JSON.stringify(device)).length).toBeLessThanOrEqual(MAX_DEVICE_BYTES)
     expect(MAX_DEVICE_BYTES).toBeLessThan(2048)
   })
 
   it('drops the scan summary rather than go over the limit', () => {
     const huge = withPatch(busyDiagnostics(), { userAgent: 'U'.repeat(5000) })
-    const device = buildClockDevice({ scanner: 'v2', diagnostics: huge })
+    const device = buildClockDevice({ diagnostics: huge })
     expect(new TextEncoder().encode(JSON.stringify(device)).length).toBeLessThanOrEqual(MAX_DEVICE_BYTES)
   })
 })

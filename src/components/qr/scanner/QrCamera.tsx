@@ -1,5 +1,5 @@
 /**
- * The one camera component for every scan screen (P4, behind `scanner_v2`).
+ * The one camera component for every scan screen (P4).
  *
  * It owns the camera and the decoder and hands decoded text to `onDecode`.
  * What the text means (clock in, clock out, area, dedupe across saves, errors)

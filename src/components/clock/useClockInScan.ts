@@ -15,7 +15,7 @@ import type { SendOutcome } from '@/lib/clock/outbox'
 import type { ScanDiagnostics } from '@/lib/scanner/scanDiagnostics'
 
 /**
- * A scanned code on the clock-in screen (new clock path).
+ * A scanned code on the clock-in screen.
  *
  * The phone only checks the kind of poster, using the same parser the server
  * copies (so they agree): a code for another job is explained on the spot and
@@ -29,13 +29,12 @@ export type ClockInScanResult =
 interface Options {
   userId: string
   userName: string
-  scannerV2: boolean
   diagnosticsRef: MutableRefObject<ScanDiagnostics | null>
 }
 
 const asMessage = (notice: ClockNotice) => [notice.title, notice.body].filter(Boolean).join('. ')
 
-export function useClockInScan({ userId, userName, scannerV2, diagnosticsRef }: Options) {
+export function useClockInScan({ userId, userName, diagnosticsRef }: Options) {
   const locationRef = useRef<Promise<Coordinates | null> | null>(null)
   const lastReportRef = useRef<{ key: string; at: number } | null>(null)
 
@@ -81,7 +80,7 @@ export function useClockInScan({ userId, userName, scannerV2, diagnosticsRef }: 
       qrPayload: text,
       scannedAtMs,
       location,
-      device: { ...buildClockDevice({ scanner: scannerV2 ? 'v2' : 'v1', diagnostics: diagnosticsRef.current }) },
+      device: { ...buildClockDevice({ diagnostics: diagnosticsRef.current }) },
     })
     if (clockInIsFinished(outcome)) return { status: 'sent', outcome }
     // Explained right here, so not again on the next visit.

@@ -23,8 +23,8 @@ interface WorkflowManagerProps {
   cleanerName: string
   clockInTime?: string
   siteName?: string
-  // The new clock passes the clock-out outcome up; the old one passes nothing.
-  onClockOut?: (outcome?: SendOutcome) => void
+  // Called with the clock-out outcome once the attempt is over.
+  onClockOut?: (outcome: SendOutcome) => void
 }
 
 interface CompletedArea {
@@ -188,7 +188,7 @@ export const WorkflowManager: React.FC<WorkflowManagerProps> = ({
     return true
   }
 
-  const handleClockOutSuccess = (outcome?: SendOutcome) => {
+  const handleClockOutSuccess = (outcome: SendOutcome) => {
     onClockOut?.(outcome)
   }
 

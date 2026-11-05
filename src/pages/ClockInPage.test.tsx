@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { installTestLocalStorage } from '@/test/localStorage'
 
 /**
- * The clock-in page on the new clock path (clock_v2), driven through the real
+ * The clock-in page (the server clock), driven through the real
  * page, QRScanner, outbox and current-shift store. Only the network edge
  * (clockApi, supabase) and the camera are fakes.
  */
@@ -33,7 +33,6 @@ vi.mock('@/services/clockApi', async (importOriginal) => {
 })
 vi.mock('@/services/managerService', () => ({ autoLinkCleanerToCustomer: (...a: unknown[]) => h.autoLink(...(a as [])) }))
 vi.mock('@/components/qr/scanner/QrCamera', async () => ({ QrCamera: (await import('@/test/fakeQrCamera')).FakeQrCamera }))
-vi.mock('qr-scanner', () => ({ default: class {} }))
 vi.mock('@/components/layout/Sidebar07Layout', () => ({
   Sidebar07Layout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
@@ -43,7 +42,6 @@ const supabaseModule = (await import('@/services/supabase')) as unknown as {
 }
 const fakeDb = supabaseModule.__fake
 const { emitScan, resetFakeCamera } = await import('@/test/fakeQrCamera')
-const { setClockSwitchesForTests } = await import('@/lib/clock/clockFlags')
 const { resetClockRuntimeForTests, clockOutbox, getClockView } = await import('@/lib/clock/clockRuntime')
 const { default: ClockInPage } = await import('./ClockInPage')
 
@@ -112,7 +110,6 @@ beforeEach(() => {
   fakeDb.reset()
   resetFakeCamera()
   resetClockRuntimeForTests()
-  setClockSwitchesForTests({ clockV2: true, scannerV2: true })
   h.clockIn.mockReset()
   h.clockOut.mockReset()
   h.getCurrentShift.mockReset()
@@ -307,18 +304,5 @@ describe('ClockInPage, new clock: review fixes', () => {
     expect(screen.getByText(/17:30/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /got it/i }))
     await waitFor(() => expect(screen.queryByText("Your clock-out couldn't be saved")).not.toBeInTheDocument())
-  })
-})
-
-describe('ClockInPage with clock_v2 off', () => {
-  it('keeps the old path: no clock RPC, the old reconcile by name', async () => {
-    setClockSwitchesForTests({ clockV2: false, scannerV2: false })
-    renderPage()
-    expect(await screen.findByRole('button', { name: /start clock in/i })).toBeInTheDocument()
-    await waitFor(() =>
-      expect(fakeDb.calls).toContainEqual({ table: 'time_attendance', op: 'eq', args: ['cleaner_name', 'Jean Test'] }),
-    )
-    expect(h.getCurrentShift).not.toHaveBeenCalled()
-    expect(h.clockIn).not.toHaveBeenCalled()
   })
 })

@@ -15,7 +15,6 @@ vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ appUser: h.userType ? { userType: h.userType } : null }),
 }))
 
-const { setClockSwitchesForTests } = await import('@/lib/clock/clockFlags')
 const { ClockRuntime } = await import('./ClockRuntime')
 
 afterEach(() => {
@@ -34,22 +33,19 @@ describe('ClockRuntime', () => {
   it('preloads the scanner for a cleaner once the app is idle, not only when the camera opens (review M2)', async () => {
     vi.useFakeTimers()
     h.userType = 'cleaner'
-    setClockSwitchesForTests({ clockV2: true, scannerV2: true })
     render(<ClockRuntime />)
     expect(h.warmUp).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(3_000)
     expect(h.warmUp).toHaveBeenCalledTimes(1)
   })
 
-  it('does not download the scanner for a manager, or with the new camera off', async () => {
+  it('does not download the scanner for a manager, or when nobody is signed in', async () => {
     vi.useFakeTimers()
     h.userType = 'manager'
-    setClockSwitchesForTests({ clockV2: true, scannerV2: true })
     render(<ClockRuntime />)
     await vi.advanceTimersByTimeAsync(3_000)
     cleanup()
-    h.userType = 'cleaner'
-    setClockSwitchesForTests({ clockV2: true, scannerV2: false })
+    h.userType = undefined
     render(<ClockRuntime />)
     await vi.advanceTimersByTimeAsync(3_000)
     expect(h.warmUp).not.toHaveBeenCalled()

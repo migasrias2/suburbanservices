@@ -26,9 +26,9 @@ interface OpsWorkflowManagerProps {
   siteName?: string
   customerName?: string
   qrCodeId?: string
-  // The new clock passes the clock-out outcome up; the old one passes nothing.
-  onClockOut?: (outcome?: SendOutcome) => void
-  // New clock: offer Clock Out on the welcome screen too, so an ops manager
+  // Called with the clock-out outcome once the attempt is over.
+  onClockOut?: (outcome: SendOutcome) => void
+  // Offer Clock Out on the welcome screen too, so an ops manager
   // never needs to start an inspection just to finish a visit (L1).
   showWelcomeClockOut?: boolean
 }
@@ -254,7 +254,7 @@ export const OpsWorkflowManager: React.FC<OpsWorkflowManagerProps> = ({
     setError(null)
   }
 
-  const handleClockOutSuccess = (outcome?: SendOutcome) => {
+  const handleClockOutSuccess = (outcome: SendOutcome) => {
     onClockOut?.(outcome)
   }
 

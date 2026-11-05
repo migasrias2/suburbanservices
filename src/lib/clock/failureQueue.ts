@@ -2,14 +2,13 @@ import { buildClockFailureRow, type ClockFailure } from '@/services/clockFailure
 import type { SessionState } from './outbox'
 
 /**
- * Clock failure reports on the new clock path (D7c).
+ * Clock failure reports (D7c).
  *
  * A report made while signed out, or one that couldn't get through, is kept on
  * the phone and sent after its creator next signs in, never anonymously and
  * never under someone else's login (review L4). Kept reports are capped and
  * expire after a week; they are diagnostics, not payroll. Writes always merge
- * with what is stored, so a report added during a flush is never lost. The old
- * path keeps calling reportClockFailure directly, unchanged.
+ * with what is stored, so a report added during a flush is never lost.
  */
 export const FAILURE_QUEUE_KEY = 'clock.failureReports.v1'
 export const MAX_QUEUED_FAILURES = 30

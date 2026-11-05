@@ -10,7 +10,6 @@ import { ShiftSummaryCard } from '@/components/qr/ShiftSummaryCard'
 import { Button } from '@/components/ui/button'
 import { useCurrentShift } from '@/hooks/useCurrentShift'
 import { getStoredCleanerName } from '@/lib/identity'
-import { useClockSwitches } from '@/lib/clock/clockFlags'
 import {
   describeAutoClosedShift,
   describeClockOutcome,
@@ -25,7 +24,7 @@ import { ClockStatusBanner } from './ClockStatusBanner'
 import { useClockInScan } from './useClockInScan'
 
 /**
- * The clock-in page on the new clock path (clock_v2).
+ * The clock-in page (the server clock; the old page was removed in P6).
  *
  * Which screen shows comes from one place, the current-shift source (the
  * server's open shift, plus scans waiting on the phone), not from the
@@ -58,7 +57,6 @@ export default function ClockInPageV2() {
   const userType = (localStorage.getItem('userType') as UserType) || 'cleaner'
   const userId = localStorage.getItem('userId') || ''
   const navigate = useNavigate()
-  const { scannerV2 } = useClockSwitches()
   const { view, ready } = useCurrentShift(userId)
   const [showScanner, setShowScanner] = useState(false)
   const [notice, setNotice] = useState<ClockNotice | null>(null)
@@ -67,7 +65,7 @@ export default function ClockInPageV2() {
   // auto-close, or "Clock out" from a notice (still clocked in at another site).
   const [clockingOut, setClockingOut] = useState(false)
   const diagnosticsRef = useRef<ScanDiagnostics | null>(null)
-  const clockInScan = useClockInScan({ userId, userName, scannerV2, diagnosticsRef })
+  const clockInScan = useClockInScan({ userId, userName, diagnosticsRef })
 
   const startClockIn = () => {
     setNotice(null)
@@ -85,8 +83,7 @@ export default function ClockInPageV2() {
     return { status: 'done' }
   }
 
-  const handleClockOutDone = (outcome?: SendOutcome) => {
-    if (!outcome) return
+  const handleClockOutDone = (outcome: SendOutcome) => {
     setClockingOut(false)
     setNotice(outcome.status === 'answered' ? describeClockOutcome('clock_out', outcome) : null)
     const noShift = outcome.status === 'answered' && !outcome.result.ok && outcome.result.code === 'no_open_shift'

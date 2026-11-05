@@ -1,8 +1,7 @@
 import React from 'react'
-import { AlertCircle, Clock, Loader2 } from 'lucide-react'
+import { Clock, Loader2 } from 'lucide-react'
 import { Button } from '../ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
-import { Alert, AlertDescription } from '../ui/alert'
+import { Card, CardContent } from '../ui/card'
 
 /** Presentational pieces of QRScanner, moved out so the scanner file stays readable. */
 
@@ -13,28 +12,6 @@ export const SavingOverlay: React.FC = () => (
       Saving…
     </div>
   </div>
-)
-
-export const CameraDeniedCard: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
-  <Card className="w-full max-w-md mx-auto rounded-2xl border-0 shadow-sm">
-    <CardHeader>
-      <CardTitle className="flex items-center gap-2 text-destructive">
-        <AlertCircle className="h-5 w-5" />
-        Camera Access Denied
-      </CardTitle>
-    </CardHeader>
-    <CardContent className="space-y-4">
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          Camera access is required to scan QR codes. Please enable camera permissions in your browser settings.
-        </AlertDescription>
-      </Alert>
-      <Button onClick={onRetry} className="w-full rounded-full text-primary-foreground bg-primary">
-        Try Again
-      </Button>
-    </CardContent>
-  </Card>
 )
 
 export const ClockInRequiredCard: React.FC<{ onGoToClockIn: () => void; onCancel: () => void }> = ({

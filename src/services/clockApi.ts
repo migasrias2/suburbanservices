@@ -8,8 +8,8 @@ import { supabase } from './supabase'
  * whether the shift was saved. This module only sends the scan and turns the
  * answer into a discriminated union. Business outcomes come back as `code`s;
  * anything that stopped the request reaching the database is `network`, never
- * "not clocked in". Not wired into the app yet: P3 switches the clock screens
- * over behind the `clock_v2` switch.
+ * "not clocked in". The only way the app clocks in or out (P6 removed the old
+ * direct writes, which the database now refuses).
  */
 
 export const CLOCK_SUCCESS_CODES = [
@@ -155,8 +155,6 @@ export type ClockParams = {
   device?: Record<string, unknown>
 }
 
-export type ClockFlags = { clockV2: boolean; scannerV2: boolean; source: 'server' | 'default' | 'not_ready' }
-
 const paramsSchema = z.object({
   eventId: z.string().uuid(),
   qrPayload: z.string().refine((value) => value.trim().length > 0 && value.length <= 2048),
@@ -239,39 +237,5 @@ export async function getCurrentShift(): Promise<CurrentShiftResult> {
   } catch (error) {
     console.warn('current_shift request failed', error)
     return networkFailure(error)
-  }
-}
-
-const DEFAULT_FLAGS: ClockFlags = { clockV2: true, scannerV2: true, source: 'default' }
-
-// PostgREST "table not in schema cache" and Postgres "undefined table".
-const MISSING_TABLE_CODES = new Set(['PGRST205', '42P01'])
-
-// Kill switches are ON unless explicitly off (D9), so a typo can't disable them.
-const isOn = (value: unknown) => value !== false && value !== 'false'
-
-/** Remote kill switches from app_config. Defaults to ON when they can't be read. */
-export async function getClockFlags(): Promise<ClockFlags> {
-  try {
-    const { data, error } = await supabase.from('app_config').select('key, value')
-    // No switch table means the server clock migration isn't applied yet, so the
-    // new clock RPCs don't exist either: keep the old clock, the new camera is fine.
-    if (error && MISSING_TABLE_CODES.has(String((error as RpcError)?.code ?? ''))) {
-      console.warn('app_config does not exist yet; keeping the old clock', error)
-      return { clockV2: false, scannerV2: true, source: 'not_ready' }
-    }
-    if (error || !Array.isArray(data)) {
-      if (error) console.warn('Could not read app_config; using default switches', error)
-      return DEFAULT_FLAGS
-    }
-    const values = new Map((data as { key: string; value: unknown }[]).map((row) => [row.key, row.value]))
-    return {
-      clockV2: isOn(values.get('clock_v2')),
-      scannerV2: isOn(values.get('scanner_v2')),
-      source: 'server',
-    }
-  } catch (error) {
-    console.warn('app_config request failed; using default switches', error)
-    return DEFAULT_FLAGS
   }
 }

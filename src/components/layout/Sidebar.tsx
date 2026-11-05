@@ -35,7 +35,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, userType, use
 
   const cleanerMenuItems = [
     { icon: Clock, label: 'Clock In', path: '/clock-in' },
-    { icon: QrCode, label: 'Scanner', path: '/scanner' },
+    // Area scanning lives on /clock-in; /scanner only redirects there (P6).
+    { icon: QrCode, label: 'Scanner', path: '/clock-in' },
     { icon: FileText, label: 'History', path: '/history' },
   ]
 

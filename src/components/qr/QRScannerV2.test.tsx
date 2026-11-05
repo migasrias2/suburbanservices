@@ -6,13 +6,12 @@ import { installTestLocalStorage } from '@/test/localStorage'
 import type { QRCodeData } from '@/services/qrService'
 
 /**
- * The area scanner on the new clock path: the "clock in first" gate uses the
- * server's open shift (no calendar day), and the camera is <QrCamera/>.
+ * The area scanner: the "clock in first" gate uses the server's open shift
+ * (no calendar day), and the camera is <QrCamera/>.
  */
 
 const h = vi.hoisted(() => ({
   getCurrentShift: vi.fn(),
-  hasOpenClockInToday: vi.fn(async () => false),
   processQRScan: vi.fn(async () => ({ success: true })),
 }))
 
@@ -25,13 +24,10 @@ vi.mock('@/services/clockApi', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/services/clockApi')>()
   return { ...original, getCurrentShift: () => h.getCurrentShift() }
 })
-vi.mock('@/services/attendanceService', () => ({ hasOpenClockInToday: (...a: unknown[]) => h.hasOpenClockInToday(...(a as [])) }))
 vi.mock('@/services/managerService', () => ({ autoLinkCleanerToCustomer: async () => [] }))
 vi.mock('@/components/qr/scanner/QrCamera', async () => ({ QrCamera: (await import('@/test/fakeQrCamera')).FakeQrCamera }))
-vi.mock('qr-scanner', () => ({ default: class {} }))
 
 const { emitScan, resetFakeCamera, fakeCamera } = await import('@/test/fakeQrCamera')
-const { setClockSwitchesForTests } = await import('@/lib/clock/clockFlags')
 const { resetClockRuntimeForTests } = await import('@/lib/clock/clockRuntime')
 const { QRService } = await import('@/services/qrService')
 const { QRScanner } = await import('./QRScanner')
@@ -86,11 +82,10 @@ beforeEach(() => {
   installTestLocalStorage()
   localStorage.setItem('userId', USER)
   localStorage.setItem('userType', 'cleaner')
+  fakeDb.reset()
   resetFakeCamera()
   resetClockRuntimeForTests()
-  setClockSwitchesForTests({ clockV2: true, scannerV2: true })
   h.getCurrentShift.mockReset()
-  h.hasOpenClockInToday.mockClear()
   h.processQRScan.mockClear()
   vi.spyOn(QRService, 'processQRScan').mockImplementation(h.processQRScan)
   vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -103,22 +98,16 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('QRScanner area scans, new clock', () => {
+describe('QRScanner area scans', () => {
   it('lets a night shift scan areas after midnight (open shift, not calendar day)', async () => {
     h.getCurrentShift.mockResolvedValue({ ok: true, code: 'clocked_in', openShift: nightShift, lastClosed: null, serverNow: 'x' })
     const { onScanSuccess } = renderScanner()
     await startAndScan(AREA)
 
     await waitFor(() => expect(onScanSuccess).toHaveBeenCalledWith(expect.objectContaining({ id: 'area-1' })))
-    expect(h.hasOpenClockInToday).not.toHaveBeenCalled()
-    // The server already answered "on shift": the old shift lookups are skipped.
-    expect(h.processQRScan).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'area-1' }),
-      USER,
-      'Jean Test',
-      undefined,
-      { shiftChecked: true },
-    )
+    // The server answered "on shift"; the scan is logged with no shift lookups of its own.
+    expect(h.processQRScan).toHaveBeenCalledWith(expect.objectContaining({ id: 'area-1' }), USER, 'Jean Test', undefined)
+    expect(fakeDb.calls.filter((c) => c.table === 'time_attendance')).toEqual([])
   })
 
   it('asks to clock in first when the server says there is no open shift', async () => {
@@ -168,18 +157,5 @@ describe('QRScanner area scans, new clock', () => {
     await waitFor(() => expect(fakeCamera.paused).toBe(true))
     expect(screen.getByRole('status')).toHaveTextContent(/saving/i)
     await act(async () => finish({ success: true }))
-  })
-})
-
-describe('QRScanner area scans, clock_v2 off', () => {
-  it('keeps the old calendar-day check', async () => {
-    setClockSwitchesForTests({ clockV2: false, scannerV2: true })
-    h.hasOpenClockInToday.mockResolvedValue(true)
-    const { onScanSuccess } = renderScanner()
-    await startAndScan(AREA)
-    await waitFor(() => expect(onScanSuccess).toHaveBeenCalled())
-    expect(h.hasOpenClockInToday).toHaveBeenCalledWith(USER)
-    expect(h.getCurrentShift).not.toHaveBeenCalled()
-    expect(h.processQRScan.mock.calls[0]).toHaveLength(4)
   })
 })

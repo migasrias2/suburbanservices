@@ -1,20 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { installTestLocalStorage } from '@/test/localStorage'
 
-/** The app-wide clock wiring: triggers, the switch re-read, failures, the area-scan time limit. */
+/** The app-wide clock wiring: triggers, failures, the area-scan time limit. */
 
 const h = vi.hoisted(() => ({
   clockIn: vi.fn(),
   clockOut: vi.fn(),
   getCurrentShift: vi.fn(),
-  getClockFlags: vi.fn(),
+  from: vi.fn(),
   authCallback: null as null | ((event: string) => void),
   insert: vi.fn(async () => ({ error: null })),
 }))
 
 vi.mock('@/services/supabase', () => ({
   supabase: {
-    from: () => ({ insert: h.insert }),
+    from: (table: string) => {
+      h.from(table)
+      return { insert: h.insert }
+    },
     auth: {
       getSession: async () => ({ data: { session: { user: { id: 'user-1' } } }, error: null }),
       onAuthStateChange: (cb: (event: string) => void) => {
@@ -29,23 +32,19 @@ vi.mock('@/services/clockApi', async (importOriginal) => ({
   clockIn: (...a: unknown[]) => h.clockIn(...a),
   clockOut: (...a: unknown[]) => h.clockOut(...a),
   getCurrentShift: () => h.getCurrentShift(),
-  getClockFlags: () => h.getClockFlags(),
 }))
 vi.mock('@/services/managerService', () => ({ autoLinkCleanerToCustomer: async () => [] }))
 
 const runtime = await import('./clockRuntime')
-const { resetClockSwitchesForTests } = await import('./clockFlags')
 
 const USER = 'user-1'
-const flags = { clockV2: true, scannerV2: true, source: 'server' }
 
 beforeEach(() => {
   installTestLocalStorage()
   runtime.resetClockRuntimeForTests()
-  resetClockSwitchesForTests()
   h.clockIn.mockReset()
   h.getCurrentShift.mockReset().mockResolvedValue({ ok: true, code: 'not_clocked_in', openShift: null, lastClosed: null, serverNow: 'x' })
-  h.getClockFlags.mockReset().mockResolvedValue(flags)
+  h.from.mockClear()
   h.insert.mockClear()
   vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
@@ -56,11 +55,10 @@ afterEach(() => {
 })
 
 describe('startClockRuntime triggers', () => {
-  it('sends on start, on "online" and on return to the app, and re-reads the switches on return', async () => {
+  it('sends on start, on "online" and on return to the app, and reads no kill switches (removed in P6)', async () => {
     const flush = vi.spyOn(runtime.clockOutbox, 'flush')
     const stop = runtime.startClockRuntime()
     expect(flush).toHaveBeenCalledTimes(1)
-    expect(h.getClockFlags).toHaveBeenCalledTimes(1)
 
     window.dispatchEvent(new Event('online'))
     expect(flush).toHaveBeenCalledTimes(2)
@@ -68,20 +66,19 @@ describe('startClockRuntime triggers', () => {
     Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
     document.dispatchEvent(new Event('visibilitychange'))
     expect(flush).toHaveBeenCalledTimes(3)
-    expect(h.getClockFlags).toHaveBeenCalledTimes(2)
+    expect(h.from).not.toHaveBeenCalledWith('app_config')
     stop()
   })
 
-  it('re-reads the kill switches after sign-in, and sends what was waiting (review M4)', async () => {
+  it('sends what was waiting after sign-in (review M4)', async () => {
     vi.useFakeTimers()
     const flush = vi.spyOn(runtime.clockOutbox, 'flush')
     const stop = runtime.startClockRuntime()
-    h.getClockFlags.mockClear()
     flush.mockClear()
     h.authCallback?.('SIGNED_IN')
     await vi.advanceTimersByTimeAsync(1)
-    expect(h.getClockFlags).toHaveBeenCalledTimes(1)
     expect(flush).toHaveBeenCalledWith({ force: true })
+    expect(h.from).not.toHaveBeenCalledWith('app_config')
     stop()
   })
 

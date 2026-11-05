@@ -194,7 +194,7 @@ export default function ProfilePage() {
                 → Go to Clock In
               </button>
               <button 
-                onClick={() => navigate('/scanner')}
+                onClick={() => navigate('/clock-in')}
                 className="w-full text-left p-3 rounded-xl bg-success/10 hover:bg-success/10 transition-colors text-success font-medium"
               >
                 → Open Scanner

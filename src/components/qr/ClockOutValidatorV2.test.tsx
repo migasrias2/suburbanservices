@@ -4,13 +4,12 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { MemoryRouter } from 'react-router-dom'
 import { installTestLocalStorage } from '@/test/localStorage'
 
-/** ClockOutValidator on the new clock path: clock_out RPC, outbox, QrCamera. */
+/** ClockOutValidator: clock_out RPC, outbox, QrCamera. */
 
 const h = vi.hoisted(() => ({
   clockOut: vi.fn(),
   getCurrentShift: vi.fn(),
   processQRScan: vi.fn(),
-  reportClockFailure: vi.fn(async () => {}),
 }))
 
 vi.mock('@/services/supabase', async () => {
@@ -22,19 +21,13 @@ vi.mock('@/services/clockApi', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/services/clockApi')>()
   return { ...original, clockOut: (...a: unknown[]) => h.clockOut(...a), getCurrentShift: () => h.getCurrentShift() }
 })
-vi.mock('@/services/clockFailureService', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@/services/clockFailureService')>()
-  return { ...original, reportClockFailure: (...a: unknown[]) => h.reportClockFailure(...(a as [])) }
-})
 vi.mock('@/services/managerService', () => ({ autoLinkCleanerToCustomer: async () => [] }))
 vi.mock('@/components/qr/scanner/QrCamera', async () => ({ QrCamera: (await import('@/test/fakeQrCamera')).FakeQrCamera }))
-vi.mock('qr-scanner', () => ({ default: class {} }))
 
 const fakeDb = ((await import('@/services/supabase')) as unknown as {
   __fake: ReturnType<typeof import('@/test/fakeSupabase').createFakeSupabase>
 }).__fake
 const { emitScan, resetFakeCamera } = await import('@/test/fakeQrCamera')
-const { setClockSwitchesForTests } = await import('@/lib/clock/clockFlags')
 const { resetClockRuntimeForTests, clockOutbox, getClockView } = await import('@/lib/clock/clockRuntime')
 const { QRService } = await import('@/services/qrService')
 const { ClockOutValidator } = await import('./ClockOutValidator')
@@ -92,11 +85,9 @@ beforeEach(() => {
   fakeDb.reset()
   resetFakeCamera()
   resetClockRuntimeForTests()
-  setClockSwitchesForTests({ clockV2: true, scannerV2: true })
   h.clockOut.mockReset()
   h.getCurrentShift.mockReset()
   h.getCurrentShift.mockResolvedValue({ ok: true, code: 'not_clocked_in', openShift: null, lastClosed: null, serverNow: 'x' })
-  h.reportClockFailure.mockClear()
   vi.spyOn(QRService, 'processQRScan').mockImplementation(h.processQRScan)
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -219,17 +210,5 @@ describe('ClockOutValidator, new clock', () => {
     await startAndScan('Adams Clock-out')
     await waitFor(() => expect(onClockOutSuccess).toHaveBeenCalled())
     for (const table of ['time_attendance', 'cleaner_logs', 'live_tracking']) expect(fakeDb.writesTo(table)).toEqual([])
-  })
-})
-
-describe('ClockOutValidator with clock_v2 off and scanner_v2 on', () => {
-  it('uses the old clock-out rules with the new camera', async () => {
-    setClockSwitchesForTests({ clockV2: false, scannerV2: true })
-    h.processQRScan.mockResolvedValue({ success: true })
-    const { onClockOutSuccess } = renderValidator()
-    await startAndScan('Adams Clock-out')
-    await waitFor(() => expect(onClockOutSuccess).toHaveBeenCalled())
-    expect(h.processQRScan).toHaveBeenCalledTimes(1)
-    expect(h.clockOut).not.toHaveBeenCalled()
   })
 })

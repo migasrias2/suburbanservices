@@ -3,7 +3,6 @@ import type { ClockFailure } from '@/services/clockFailureService'
 import { autoLinkCleanerToCustomer } from '@/services/managerService'
 import { supabase } from '@/services/supabase'
 import { isServerAnswer, type ClockEvent, type ClockKind } from './clockEvents'
-import { refreshClockSwitches } from './clockFlags'
 import { createShiftStore, type CurrentShiftView } from './currentShift'
 import { createDroppedScans, type DroppedScan } from './droppedScans'
 import { createFailureQueue } from './failureQueue'
@@ -16,8 +15,7 @@ import { readSessionState } from './session'
 /**
  * The app's single clock outbox, current-shift store and failure queue, wired
  * together. Screens call submitClockScan / getClockView; <ClockRuntime/>
- * starts the background sending once, for the whole app, whatever the
- * clock_v2 switch says, so turning the switch off never strands a saved scan.
+ * starts the background sending once, for the whole app.
  */
 
 // Looked up on every call, never captured, so a replaced localStorage (tests,
@@ -186,24 +184,17 @@ export function startClockRuntime(): () => void {
   const onVisible = () => {
     if (document.visibilityState !== 'visible') return
     flushAll(true)
-    void refreshClockSwitches()
   }
   window.addEventListener('online', onOnline)
   document.addEventListener('visibilitychange', onVisible)
   // supabase-js warns against awaiting its own calls inside this callback, so defer.
   const { data } = supabase.auth.onAuthStateChange((event) => {
     if (event !== 'SIGNED_IN' && event !== 'TOKEN_REFRESHED') return
-    setTimeout(() => {
-      flushAll(true)
-      // The switches read on the login screen came back as anon (refused), so
-      // read them again as this person (review M4).
-      if (event === 'SIGNED_IN') void refreshClockSwitches()
-    }, 0)
+    setTimeout(() => flushAll(true), 0)
   })
   const timer = setInterval(() => {
     if (clockOutbox.pending().length) void clockOutbox.flush()
   }, AUTO_FLUSH_MS)
-  void refreshClockSwitches()
   flushAll(true)
   return () => {
     window.removeEventListener('online', onOnline)

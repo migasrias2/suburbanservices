@@ -12,7 +12,7 @@ import {
   AlertCircle,
   Folder
 } from 'lucide-react'
-import QrScanner from 'qr-scanner'
+import { decodeImage } from '@/lib/scanner/decoder'
 import JSZip from 'jszip'
 import { supabase } from '../../services/supabase'
 import { QRService, QRCodeData } from '../../services/qrService'
@@ -165,17 +165,15 @@ export const QRUploadManager: React.FC<QRUploadManagerProps> = ({ onUploadComple
             throw new Error('No images found in ZIP')
           }
           const imageBlob = await firstImage.async('blob')
-          const scanResult = await QrScanner.scanImage(imageBlob as Blob, { returnDetailedScanResult: true }).catch(() => null)
-          const qrText = (scanResult && (scanResult as any).data) || (scanResult as any) || null
+          const qrText = await decodeImage(imageBlob).catch(() => null)
           if (qrText) {
-            qrData = QRService.parseQRCode(qrText as string)
+            qrData = QRService.parseQRCode(qrText)
           }
         } else {
           // Single image file (PNG/JPG)
-          const scanResult = await QrScanner.scanImage(fileObj as unknown as Blob, { returnDetailedScanResult: true }).catch(() => null)
-          const qrText = (scanResult && (scanResult as any).data) || (scanResult as any) || null
+          const qrText = await decodeImage(fileObj).catch(() => null)
           if (qrText) {
-            qrData = QRService.parseQRCode(qrText as string)
+            qrData = QRService.parseQRCode(qrText)
           }
         }
 

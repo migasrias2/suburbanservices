@@ -15,7 +15,7 @@ import type { SendOutcome } from '@/lib/clock/outbox'
 import type { ScanDiagnostics } from '@/lib/scanner/scanDiagnostics'
 
 /**
- * The clock-out on the new clock path (clock_v2), for ClockOutValidator.
+ * The clock-out, for ClockOutValidator.
  *
  * The scan goes to the outbox and the clock_out RPC; the server writes the
  * shift, cleaner_logs and live_tracking, so nothing here writes them. The
@@ -26,7 +26,6 @@ import type { ScanDiagnostics } from '@/lib/scanner/scanDiagnostics'
 interface Options {
   cleanerId: string
   cleanerName: string
-  scannerV2: boolean
   onFinished?: (outcome: SendOutcome) => void
 }
 
@@ -36,7 +35,7 @@ const finishWorkDrafts = (cleanerId: string) => {
   clearDraft().catch(() => undefined)
 }
 
-export function useClockOutV2({ cleanerId, cleanerName, scannerV2, onFinished }: Options) {
+export function useClockOutV2({ cleanerId, cleanerName, onFinished }: Options) {
   const [notice, setNotice] = useState<ClockNotice | null>(null)
   const [saving, setSaving] = useState(false)
   const submittingRef = useRef(false)
@@ -71,7 +70,7 @@ export function useClockOutV2({ cleanerId, cleanerName, scannerV2, onFinished }:
         qrPayload: rawText,
         scannedAtMs,
         location,
-        device: { ...buildClockDevice({ scanner: scannerV2 ? 'v2' : 'v1', diagnostics: diagnosticsRef.current }) },
+        device: { ...buildClockDevice({ diagnostics: diagnosticsRef.current }) },
       })
       finished = clockOutIsFinished(outcome)
       if (finished) {

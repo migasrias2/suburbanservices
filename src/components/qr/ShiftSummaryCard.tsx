@@ -1,12 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { CheckCircle2, Flag, MapPin } from 'lucide-react'
-import {
-  fetchShiftSummary,
-  findLatestClosedShiftId,
-  flagOwnShift,
-  type ShiftSummary,
-} from '../../services/shiftSummaryService'
+import { fetchShiftSummary, flagOwnShift, type ShiftSummary } from '../../services/shiftSummaryService'
 import { Button } from '../ui/button'
 import { Textarea } from '../ui/textarea'
 
@@ -14,8 +9,8 @@ interface ShiftSummaryCardProps {
   cleanerId: string
   cleanerName: string
   onDone: () => void
-  /** The shift the clock-out answer named (new clock). Without it, the latest closed shift is looked up. */
-  shiftId?: number | null
+  /** The shift the clock-out answer named. */
+  shiftId: number
 }
 
 const formatWorked = (minutes: number): string => {
@@ -48,14 +43,11 @@ export const ShiftSummaryCard: React.FC<ShiftSummaryCardProps> = ({
   useEffect(() => {
     let cancelled = false
     const load = async () => {
-      const id = shiftId ?? (await findLatestClosedShiftId(cleanerId))
+      setAttendanceId(shiftId)
+      const data = await fetchShiftSummary(shiftId)
       if (cancelled) return
-      setAttendanceId(id)
-      if (id != null) {
-        const data = await fetchShiftSummary(id)
-        if (!cancelled) setSummary(data)
-      }
-      if (!cancelled) setIsLoading(false)
+      setSummary(data)
+      setIsLoading(false)
     }
     load()
     return () => {

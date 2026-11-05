@@ -13,9 +13,11 @@ const MAX_UA = 160
 const MAX_LABEL = 60
 const MAX_ERROR_NAMES = 5
 
+// `client` and `scanner` are labels kept stable in clock_events.device, so rows
+// from before and after the old clock and camera were removed (P6) read alike.
 export interface ClockDevice {
   client: 'clock_v2'
-  scanner: 'v1' | 'v2'
+  scanner: 'v2'
   build?: string
   scan?: Record<string, unknown> & { errors?: string[] }
 }
@@ -57,8 +59,8 @@ const buildId = (): string | undefined => {
   }
 }
 
-export function buildClockDevice(input: { scanner: 'v1' | 'v2'; diagnostics?: ScanDiagnostics | null }): ClockDevice {
-  const base: ClockDevice = { client: 'clock_v2', scanner: input.scanner, build: buildId() }
+export function buildClockDevice(input: { diagnostics?: ScanDiagnostics | null } = {}): ClockDevice {
+  const base: ClockDevice = { client: 'clock_v2', scanner: 'v2', build: buildId() }
   if (!input.diagnostics) return base
   const withScan = { ...base, scan: summarise(input.diagnostics) }
   return byteSize(withScan) <= MAX_DEVICE_BYTES ? withScan : base

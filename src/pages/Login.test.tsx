@@ -132,6 +132,16 @@ describe('a successful sign-in still clears the previous shift', () => {
     })
   }
 
+  it('clears the retired kill-switch cache (clock.flags.v1, unread since P6)', async () => {
+    localStorage.setItem('clock.flags.v1', '{"clockV2":true,"scannerV2":true}')
+    signIn.mockResolvedValue(undefined)
+    const { container } = renderLogin()
+
+    await attemptLogin(container)
+
+    expect(localStorage.getItem('clock.flags.v1')).toBeNull()
+  })
+
   it('navigates once the sign-in has succeeded', async () => {
     signIn.mockResolvedValue(undefined)
     const { container } = renderLogin()

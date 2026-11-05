@@ -17,12 +17,12 @@
  *  While live: a 3 s frame stall (or the track ending) uses the same single
  *  reopen; hidden page → release; visible again → start over.
  */
-import { nextCameraId } from '@/lib/cameraChoice'
 import type { CameraController, OpenRequest } from './cameraController'
 import { waitForFrames, watchFrames } from './frameWatchdog'
 import {
   chooseLens,
   findAndroidMainLens,
+  nextCameraId,
   readDecodedCamera,
   rememberDecodedCamera,
   switchableCameras,

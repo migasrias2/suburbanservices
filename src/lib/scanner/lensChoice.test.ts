@@ -3,6 +3,8 @@ import { installTestLocalStorage } from '@/test/localStorage'
 import {
   chooseLens,
   DECODED_CAMERA_STORAGE_KEY,
+  nextCameraId,
+  pickScanCamera,
   readDecodedCamera,
   rememberDecodedCamera,
   switchableCameras,
@@ -133,5 +135,90 @@ describe('detectPlatform', () => {
       detectPlatform('Mozilla/5.0 (Linux; Android 14; SM-S911B) AppleWebKit/537.36 Chrome/141.0 Mobile Safari/537.36', 5),
     ).toBe('android')
     expect(detectPlatform('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0', 0)).toBe('other')
+  })
+})
+
+// Labels as Chrome on Android reports them (Samsung Galaxy S22, after camera
+// permission is granted). Four back lenses; only camera2 0 is the main one.
+const samsungS22 = [
+  { id: 'front', label: 'camera2 1, facing front' },
+  { id: 'main', label: 'camera2 0, facing back' },
+  { id: 'ultrawide', label: 'camera2 2, facing back' },
+  { id: 'tele', label: 'camera2 3, facing back' },
+]
+
+describe('pickScanCamera', () => {
+  it("picks the Android phone's main back lens, not the ultra-wide that cannot focus close", () => {
+    expect(pickScanCamera(samsungS22)).toBe('main')
+  })
+
+  it('picks the main lens whatever order the browser lists them in', () => {
+    expect(pickScanCamera([...samsungS22].reverse())).toBe('main')
+  })
+
+  it('skips ultra-wide, telephoto and macro lenses on phones that name them', () => {
+    expect(
+      pickScanCamera([
+        { id: 'uw', label: 'Back Ultra Wide Camera' },
+        { id: 'back', label: 'Back Camera' },
+        { id: 'tele', label: 'Back Telephoto Camera' },
+      ]),
+    ).toBe('back')
+  })
+
+  it("leaves the choice to the browser when it can't tell the lenses apart", () => {
+    expect(pickScanCamera([{ id: 'a', label: '' }, { id: 'b', label: '' }])).toBeNull()
+    expect(pickScanCamera([])).toBeNull()
+  })
+
+  it('never picks a front camera', () => {
+    expect(pickScanCamera([{ id: 'front', label: 'camera2 1, facing front' }])).toBeNull()
+  })
+
+  // Chrome renamed "camera2 0" to "camera 0" in 2025. Listed ultra-wide first,
+  // as some Samsungs do, so a plain "first back camera" guess would be wrong.
+  const chrome2025 = [
+    { id: 'ultrawide', label: 'camera 2, facing back' },
+    { id: 'front', label: 'camera 1, facing front' },
+    { id: 'main', label: 'camera 0, facing back' },
+    { id: 'tele', label: 'camera 3, facing back' },
+  ]
+
+  it('picks the main lens under the newer "camera 0" label too', () => {
+    expect(pickScanCamera(chrome2025)).toBe('main')
+  })
+
+  it('picks "camera 0" over "camera 10" listed before it', () => {
+    expect(
+      pickScanCamera([
+        { id: 'ten', label: 'camera 10, facing back' },
+        { id: 'main', label: 'camera 0, facing back' },
+      ]),
+    ).toBe('main')
+  })
+
+  it('does not take a label that only contains "camera2 0, facing back"', () => {
+    expect(
+      pickScanCamera([
+        { id: 'aux', label: 'aux camera2 0, facing back (depth)' },
+        { id: 'main', label: 'camera2 0, facing back' },
+      ]),
+    ).toBe('main')
+  })
+})
+
+describe('nextCameraId', () => {
+  it('moves to the next camera and wraps round', () => {
+    expect(nextCameraId(samsungS22, 'main')).toBe('ultrawide')
+    expect(nextCameraId(samsungS22, 'tele')).toBe('front')
+  })
+
+  it('starts from the first camera when the current one is unknown', () => {
+    expect(nextCameraId(samsungS22, null)).toBe('front')
+  })
+
+  it('has nothing to switch to with one camera or none', () => {
+    expect(nextCameraId([samsungS22[1]], 'main')).toBeNull()
+    expect(nextCameraId([], null)).toBeNull()
   })
 })

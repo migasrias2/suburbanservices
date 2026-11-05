@@ -71,6 +71,8 @@ export default function Login() {
       localStorage.removeItem('currentClockInPhase')
       localStorage.removeItem('currentSiteName')
       localStorage.removeItem('recentClockOutAt')
+      // The kill-switch cache; nothing reads it since P6.
+      localStorage.removeItem('clock.flags.v1')
     } catch {
       // no-op
     }

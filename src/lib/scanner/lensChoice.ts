@@ -12,9 +12,10 @@
  * A lens is remembered only once it has actually decoded a code, never merely
  * because it opened (research 03 §2, plan §3.5).
  */
-import { pickScanCamera, type CameraOption } from '@/lib/cameraChoice'
-
-export type { CameraOption }
+export interface CameraOption {
+  id: string
+  label: string
+}
 
 export type LensRung = 'remembered' | 'android-main' | 'back-label' | 'facing-mode'
 
@@ -29,8 +30,32 @@ export const DECODED_CAMERA_STORAGE_KEY = 'qrScanV2DecodedCameraId'
 
 const ANDROID_MAIN_BACK = /^camera2? 0, facing back$/i
 const FRONT = /front|user|selfie|facetime/i
+const BACK = /back|rear|environment/i
+const SPECIAL_LENS = /ultra|wide|tele|macro|depth|zoom|tof/i
 
 export const isAndroidMainLens = (label: string): boolean => ANDROID_MAIN_BACK.test(label.trim())
+
+/**
+ * The main back lens by label, or null to let the browser choose. Samsung
+ * Galaxy phones list ultra-wide, telephoto and macro lenses as back cameras
+ * too; the main lens is the one that focuses at arm's length.
+ */
+export const pickScanCamera = (cameras: CameraOption[]): string | null => {
+  const androidMain = cameras.find((camera) => ANDROID_MAIN_BACK.test(camera.label))
+  if (androidMain) return androidMain.id
+
+  const plainBack = cameras.find(
+    (camera) => BACK.test(camera.label) && !FRONT.test(camera.label) && !SPECIAL_LENS.test(camera.label),
+  )
+  return plainBack?.id ?? null
+}
+
+/** The camera after `currentId`, wrapping round; null when there is nothing to switch to. */
+export const nextCameraId = (cameras: CameraOption[], currentId: string | null): string | null => {
+  if (cameras.length < 2) return null
+  const index = cameras.findIndex((camera) => camera.id === currentId)
+  return cameras[(index + 1) % cameras.length].id
+}
 
 const FACING_MODE: LensChoice = { deviceId: null, rung: 'facing-mode', label: null }
 
@@ -42,7 +67,7 @@ export const chooseLens = (
   const remembered = options.remembered ? cameras.find((camera) => camera.id === options.remembered) : undefined
   if (remembered) return { deviceId: remembered.id, rung: 'remembered', label: remembered.label || null }
 
-  const picked = pickScanCamera(cameras, null)
+  const picked = pickScanCamera(cameras)
   const camera = picked ? cameras.find((c) => c.id === picked) : undefined
   if (!camera) return FACING_MODE
   return {
