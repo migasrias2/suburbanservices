@@ -8,6 +8,7 @@ import {
   type ClockEvent,
 } from './clockEvents'
 import type { OutboxStorage } from './outboxStorage'
+import { holdAppReload } from '@/lib/appReloadGuard'
 
 /**
  * The clock outbox: every scan is saved on the phone first, then sent until the
@@ -252,7 +253,8 @@ export function createClockOutbox(deps: OutboxDeps): ClockOutbox {
   }
 
   const enqueueFlush = (force: boolean): Promise<Map<string, SendOutcome>> => {
-    const run = chain.then(() => runFlush(force))
+    const releaseReload = holdAppReload()
+    const run = chain.then(() => runFlush(force)).finally(releaseReload)
     chain = run.catch((error: unknown) => console.warn('Clock outbox flush failed', error))
     return run
   }

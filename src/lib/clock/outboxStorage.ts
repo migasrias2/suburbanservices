@@ -17,6 +17,8 @@ export interface OutboxStorage {
   write(events: ClockEvent[]): void
   /** The next place in line: always above every number handed out or stored before. */
   nextSeq(): number
+  /** False when a reload would lose a scan kept only in this tab's memory. */
+  isDurable(): boolean
 }
 
 export const OUTBOX_STORAGE_KEY = 'clock.outbox.v1'
@@ -61,6 +63,7 @@ export function createMemoryOutboxStorage(initial: ClockEvent[] = []): OutboxSto
       counter = Math.max(counter, highestSeq(events)) + 1
       return counter
     },
+    isDurable: () => events.length === 0,
   }
 }
 
@@ -116,5 +119,17 @@ export function createLocalOutboxStorage(store: () => KeyValueStore | undefined,
     return lastSeq
   }
 
-  return { read, write, nextSeq }
+  const isDurable = () => {
+    const events = read()
+    if (!events.length) return true
+    try {
+      if (degraded || !store()) return false
+      const stored = parseEvents(store()?.getItem(key) ?? null)
+      return events.every((event) => stored.some((saved) => JSON.stringify(saved) === JSON.stringify(event)))
+    } catch {
+      return false
+    }
+  }
+
+  return { read, write, nextSeq, isDurable }
 }

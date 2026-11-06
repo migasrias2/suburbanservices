@@ -9,6 +9,7 @@ import { QrCamera } from '@/components/qr/scanner/QrCamera'
 import { Button } from '../ui/button'
 import { Alert, AlertDescription } from '../ui/alert'
 import { ClockInRequiredCard, SavingOverlay } from './QRScannerParts'
+import { holdAppReload } from '@/lib/appReloadGuard'
 
 /**
  * What a parent that handles the scanned text itself (onDecodeText) reports
@@ -127,6 +128,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     lastScanCodeRef.current = { code: text, time: now }
     failedCodeRef.current = null
     processingRef.current = true
+    const releaseReload = holdAppReload()
     // Shown as "Saving…" over the camera, so a read that takes a few seconds
     // on bad signal doesn't look like a scan that failed. A new attempt
     // replaces the last error.
@@ -320,6 +322,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
     } finally {
       processingRef.current = false
       setIsProcessing(false)
+      releaseReload()
     }
   }
 

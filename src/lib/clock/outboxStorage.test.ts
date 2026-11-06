@@ -29,6 +29,7 @@ describe('outbox storage on localStorage', () => {
     const store = memoryStore()
     createLocalOutboxStorage(() => store).write([event()])
     expect(createLocalOutboxStorage(() => store).read()).toEqual([event()])
+    expect(createLocalOutboxStorage(() => store).isDurable()).toBe(true)
   })
 
   it('reads a corrupt entry as empty, and skips entries that are not scans', () => {
@@ -50,12 +51,16 @@ describe('outbox storage on localStorage', () => {
     }))
     storage.write([event()])
     expect(storage.read()).toEqual([event()])
+    expect(storage.isDurable()).toBe(false)
+    storage.write([])
+    expect(storage.isDurable()).toBe(true)
   })
 
   it('works in memory when there is no storage at all', () => {
     const storage = createLocalOutboxStorage(() => undefined)
     storage.write([event()])
     expect(storage.read()).toEqual([event()])
+    expect(storage.isDurable()).toBe(false)
   })
 
   it('hands out increasing sequence numbers that survive a reload (review L1)', () => {

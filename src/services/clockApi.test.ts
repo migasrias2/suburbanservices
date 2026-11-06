@@ -6,6 +6,7 @@ vi.mock('./supabase', () => ({
 }))
 
 import { clockIn, clockOut, getCurrentShift } from './clockApi'
+import { isAppReloadIdle } from '@/lib/appReloadGuard'
 
 const EVENT_ID = '7b0f3c9e-2d4a-4c1b-9f3e-5a6b7c8d9e01'
 
@@ -43,6 +44,18 @@ beforeEach(() => {
 })
 
 describe('clockIn', () => {
+  it('blocks app reload for the real RPC lifetime, even after the UI stops awaiting it', async () => {
+    let finish!: (value: { data: unknown; error: null }) => void
+    rpc.mockReturnValue(new Promise(resolve => { finish = resolve }))
+    const pending = clockIn({ eventId: EVENT_ID, qrPayload: 'Adams Clock-in' })
+    expect(isAppReloadIdle()).toBe(false)
+    await Promise.resolve()
+    expect(isAppReloadIdle()).toBe(false)
+    finish({ data: serverResult(), error: null })
+    await pending
+    expect(isAppReloadIdle()).toBe(true)
+  })
+
   it('calls clock_in with the server parameter names and safe defaults', async () => {
     rpc.mockResolvedValue({ data: serverResult(), error: null })
     await clockIn({ eventId: EVENT_ID, qrPayload: 'Adams Clock-in' })

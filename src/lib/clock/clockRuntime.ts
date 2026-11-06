@@ -85,8 +85,11 @@ const onFailed = (event: ClockEvent, info: { reason: FailReason; code: string | 
   shiftStore.notify()
 }
 
+const clockStorage = createLocalOutboxStorage(localStore)
+export const canReloadClock = () => clockStorage.isDurable()
+
 export const clockOutbox = createClockOutbox({
-  storage: createLocalOutboxStorage(localStore),
+  storage: clockStorage,
   send: sendClockEvent,
   readSession: readSessionState,
   onSettled,

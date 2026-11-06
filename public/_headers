@@ -2,6 +2,20 @@
 # Everything Vite writes to /assets/ has a content hash in its file name (JS, CSS,
 # the decoder worker and the ~950 KB zxing .wasm), so a new build always gets a
 # new URL and these can be cached for a year. Nothing in public/ lives under
-# /assets/, and index.html is not covered, so a deploy is still picked up at once.
+# /assets/.
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+# Netlify combines matching headers, rather than letting a later /* rule
+# override /assets/*. Keep HTML rules disjoint from hashed asset URLs.
+# :page covers index.html and all flat SPA routes; /admin/ is the nested group.
+/
+  Cache-Control: no-cache
+/:page
+  Cache-Control: no-cache
+/:page/
+  Cache-Control: no-cache
+/admin/*
+  Cache-Control: no-cache
+/version.json
+  Cache-Control: no-store

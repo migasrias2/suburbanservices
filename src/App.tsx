@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { RequireAuth } from "./components/auth/RequireAuth";
 import { ClockRuntime } from "./components/clock/ClockRuntime";
+import { AppVersionUpdater } from "./components/clock/AppVersionUpdater";
 import Login from "./pages/Login";
 import CleanerDashboardPage from "./pages/CleanerDashboardPage";
 import CleanerHomePage from "./pages/CleanerHomePage";
@@ -42,6 +43,7 @@ const App = () => (
       <BrowserRouter>
       <AuthProvider>
         <ClockRuntime />
+        <AppVersionUpdater />
         <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />

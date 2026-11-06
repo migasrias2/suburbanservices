@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-libra
 import { MemoryRouter } from 'react-router-dom'
 import { installTestLocalStorage } from '@/test/localStorage'
 import type { DecodeTextOutcome } from './QRScanner'
+import { isAppReloadIdle } from '@/lib/appReloadGuard'
 
 /**
  * QRScanner's own guards around a save, on <QrCamera/> (faked). The camera can
@@ -89,9 +90,11 @@ describe('one poster held in view', () => {
     expect(save).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('status')).toHaveTextContent('Saving…')
     expect(fakeCamera.paused).toBe(true)
+    expect(isAppReloadIdle()).toBe(false)
 
     await act(async () => pending.resolve({ status: 'done' }))
     expect(fakeCamera.active).toBe(false)
+    expect(isAppReloadIdle()).toBe(true)
   })
 })
 

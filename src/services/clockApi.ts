@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { supabase } from './supabase'
+import { holdAppReload } from '@/lib/appReloadGuard'
 
 /**
  * Typed client for the server clock (migration 20261105090000_server_clock_core.sql).
@@ -200,6 +201,7 @@ async function callClock(fn: 'clock_in' | 'clock_out', params: ClockParams): Pro
   if (!paramsSchema.safeParse(params).success) {
     return { ok: false, code: 'bad_request', message: 'The scan could not be sent. Please scan again.' }
   }
+  const releaseReload = holdAppReload()
   try {
     const { data, error } = await supabase.rpc(fn, toRpcParams(params))
     if (error) {
@@ -211,6 +213,8 @@ async function callClock(fn: 'clock_in' | 'clock_out', params: ClockParams): Pro
   } catch (error) {
     console.warn(`${fn} request failed`, error)
     return networkFailure(error)
+  } finally {
+    releaseReload()
   }
 }
 

@@ -13,6 +13,7 @@ import { buildClockDevice } from '@/lib/clock/deviceInfo'
 import { requestLocationOnce, type Coordinates } from '@/lib/clock/location'
 import type { SendOutcome } from '@/lib/clock/outbox'
 import type { ScanDiagnostics } from '@/lib/scanner/scanDiagnostics'
+import { holdAppReload } from '@/lib/appReloadGuard'
 
 /**
  * The clock-out, for ClockOutValidator.
@@ -59,6 +60,7 @@ export function useClockOutV2({ cleanerId, cleanerName, onFinished }: Options) {
   const submit = async (rawText: string, scannedAtMs: number) => {
     if (submittingRef.current) return
     submittingRef.current = true
+    const releaseReload = holdAppReload()
     let finished = false
     setSaving(true)
     setNotice(null)
@@ -88,6 +90,7 @@ export function useClockOutV2({ cleanerId, cleanerName, onFinished }: Options) {
       // Stay locked after the attempt is over: a straggling decode must not send again.
       if (!finished) submittingRef.current = false
       setSaving(false)
+      releaseReload()
     }
   }
 
