@@ -75,6 +75,10 @@ const flagNotes = (flags: string[]): string[] =>
 export function describeWrongPoster(expected: ClockKind, scanned: PosterKind): ClockNotice {
   const want = expected === 'clock_in' ? 'Clock In' : 'Clock Out'
   const job = expected === 'clock_in' ? 'To start your shift' : 'To finish your shift'
+  if (scanned === 'CLOCK_OUT' && expected === 'clock_in') {
+    // The classic wrong-screen scan: offer the right screen instead of a dead end.
+    return notice('error', "That's the Clock Out code", `To finish your shift, tap Clock out. To start one, scan the Clock In code.`, 'clock_out')
+  }
   if (scanned === 'CLOCK_OUT') return notice('error', "That's the Clock Out code", `${job}, scan the ${want} code.`)
   if (scanned === 'CLOCK_IN') return notice('error', "That's the Clock In code", `${job}, scan the ${want} code.`)
   if (scanned === 'AREA' || scanned === 'TASK') {

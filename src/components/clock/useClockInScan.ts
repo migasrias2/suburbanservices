@@ -24,7 +24,7 @@ import type { ScanDiagnostics } from '@/lib/scanner/scanDiagnostics'
  */
 export type ClockInScanResult =
   | { status: 'sent'; outcome: SendOutcome }
-  | { status: 'failed'; message: string; definitive: boolean }
+  | { status: 'failed'; message: string; definitive: boolean; wrongScreen?: 'CLOCK_OUT' }
 
 interface Options {
   userId: string
@@ -71,7 +71,12 @@ export function useClockInScan({ userId, userName, diagnosticsRef }: Options) {
     if (!parsed || !kind) return { status: 'failed', message: asMessage(describeUnreadableCode('clock_in')), definitive: true }
     if (kind !== 'CLOCK_IN') {
       if (kind === 'CLOCK_OUT') reportWrongPoster(kind, parsed.id)
-      return { status: 'failed', message: asMessage(describeWrongPoster('clock_in', kind)), definitive: true }
+      return {
+        status: 'failed',
+        message: asMessage(describeWrongPoster('clock_in', kind)),
+        definitive: true,
+        ...(kind === 'CLOCK_OUT' ? { wrongScreen: 'CLOCK_OUT' as const } : {}),
+      }
     }
     const location = await (locationRef.current ?? requestLocationOnce())
     const outcome = await submitClockScan({

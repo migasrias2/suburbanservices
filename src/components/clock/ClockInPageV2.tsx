@@ -13,6 +13,7 @@ import { getStoredCleanerName } from '@/lib/identity'
 import {
   describeAutoClosedShift,
   describeClockOutcome,
+  describeWrongPoster,
   type ClockNotice,
 } from '@/lib/clock/clockMessages'
 import type { CurrentShiftView } from '@/lib/clock/currentShift'
@@ -75,6 +76,12 @@ export default function ClockInPageV2() {
 
   const handleClockInText = async (text: string): Promise<DecodeTextOutcome> => {
     const result = await clockInScan.handleText(text)
+    if (result.status === 'failed' && result.wrongScreen) {
+      // A Clock Out poster here: close the camera and offer the clock-out screen.
+      setNotice(describeWrongPoster('clock_in', result.wrongScreen))
+      setShowScanner(false)
+      return { status: 'done' }
+    }
     if (result.status === 'failed') return result
     // A waiting or sign-in scan is shown by the status banner, so only server answers get a notice.
     if (result.outcome.status === 'answered') setNotice(describeClockOutcome('clock_in', result.outcome))
