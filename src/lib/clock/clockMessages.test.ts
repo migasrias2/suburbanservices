@@ -185,6 +185,14 @@ describe('describeWrongPoster', () => {
   it('explains a Clock Out code on the clock-in screen', () => {
     expect(describeWrongPoster('clock_in', 'CLOCK_OUT').title).toMatch(/Clock Out code/)
   })
+  it('offers the Clock out button when a Clock Out code is scanned on the clock-in screen', () => {
+    const notice = describeWrongPoster('clock_in', 'CLOCK_OUT')
+    expect(notice.action).toBe('clock_out')
+    expect(notice.body).toMatch(/tap Clock out/)
+  })
+  it('does not offer a button for a Clock In code on the clock-out screen', () => {
+    expect(describeWrongPoster('clock_out', 'CLOCK_IN').action).toBeNull()
+  })
   it('explains an area code on the clock-out screen', () => {
     expect(describeWrongPoster('clock_out', 'AREA').title).toMatch(/area code/i)
   })
