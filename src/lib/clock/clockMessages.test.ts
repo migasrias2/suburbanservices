@@ -193,6 +193,12 @@ describe('describeWrongPoster', () => {
   it('does not offer a button for a Clock In code on the clock-out screen', () => {
     expect(describeWrongPoster('clock_out', 'CLOCK_IN').action).toBeNull()
   })
+  it('tells a cleaner on the clock-out screen to scan the Clock Out code', () => {
+    const notice = describeWrongPoster('clock_out', 'CLOCK_IN')
+    expect(notice.title).toMatch(/Clock In code/)
+    expect(notice.body).toMatch(/clocking out/)
+    expect(notice.body).toMatch(/scan the Clock Out code/)
+  })
   it('explains an area code on the clock-out screen', () => {
     expect(describeWrongPoster('clock_out', 'AREA').title).toMatch(/area code/i)
   })

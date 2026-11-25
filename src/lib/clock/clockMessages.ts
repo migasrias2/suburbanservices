@@ -80,6 +80,10 @@ export function describeWrongPoster(expected: ClockKind, scanned: PosterKind): C
     return notice('error', "That's the Clock Out code", `To finish your shift, tap Clock out. To start one, scan the Clock In code.`, 'clock_out')
   }
   if (scanned === 'CLOCK_OUT') return notice('error', "That's the Clock Out code", `${job}, scan the ${want} code.`)
+  if (scanned === 'CLOCK_IN' && expected === 'clock_out') {
+    // On the clock-out screen: say which screen they are on and which poster to find.
+    return notice('error', "That's the Clock In code", "You're clocking out, so scan the Clock Out code. The Clock In code starts a shift.")
+  }
   if (scanned === 'CLOCK_IN') return notice('error', "That's the Clock In code", `${job}, scan the ${want} code.`)
   if (scanned === 'AREA' || scanned === 'TASK') {
     return notice('error', "That's an area code", `${job}, scan the ${want} code first.`)
