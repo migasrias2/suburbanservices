@@ -81,7 +81,7 @@ export const ClockNoticePanel: React.FC<ClockNoticePanelProps> = ({
         ) : null}
       </div>
       {action || secondary ? (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap justify-center gap-2">
           {action ? (
             <Button onClick={action.onClick} className="rounded-full">
               {action.label}
